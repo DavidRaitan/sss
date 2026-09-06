@@ -68,7 +68,9 @@ acct_email() {
 
 require_shared_client() {
   [ -f "$SHARED_CLIENT" ] || die "no OAuth client installed.
-Create a Desktop app OAuth client in Google Cloud Console, download the JSON, then:
+Create a *Desktop app* OAuth client at
+  https://console.cloud.google.com/auth/clients
+download the JSON, then run:
   gws-account client /path/to/client_secret.json
 See docs/google-workspace-cli.md for the full walkthrough."
 }

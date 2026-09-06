@@ -135,9 +135,14 @@ fi
 
 step "Done. Next steps"
 cat <<EOS
-1. Create a Google Cloud project and a Desktop-app OAuth client, and add each
-   Gmail address you plan to connect under "Test users".
-   Full walkthrough: docs/google-workspace-cli.md
+1. In the Google Cloud Console (no gcloud needed), create a project, enable the
+   Drive/Docs/Sheets/Gmail/Calendar APIs, add every Gmail address you plan to
+   connect under Google Auth Platform -> Audience -> Test users, and create a
+   Desktop app OAuth client under Google Auth Platform -> Clients.
+     https://console.cloud.google.com/auth/audience
+     https://console.cloud.google.com/auth/clients
+   Full walkthrough, including the 7-day token expiry in Testing mode:
+     docs/google-workspace-cli.md
 
 2. Install the downloaded OAuth client JSON:
      gws-account client ~/Downloads/client_secret_XXXX.json

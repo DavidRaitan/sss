@@ -33,10 +33,20 @@ everywhere — interactive shells, scripts, cron jobs, and agents like Claude Co
 
 ## 1. Install
 
+From a clone of this repo:
+
 ```bash
 git clone https://github.com/davidraitan/sss.git
 cd sss
 ./scripts/gws-install.sh --with-skills
+```
+
+Or, from the three scripts saved anywhere on disk — they only need to sit in the
+same directory:
+
+```bash
+chmod +x gws-install.sh gws-account.sh
+./gws-install.sh --with-skills
 ```
 
 This installs the `gws` binary (via Homebrew, npm or cargo — whichever you
@@ -47,40 +57,85 @@ into `~/.claude/skills`, so Claude Code knows how to drive the CLI.
 
 Then restart your shell, or `source ~/.zshrc`.
 
-## 2. Create a Google Cloud project and OAuth client
+## 2. Create the Google Cloud project and OAuth client (Console)
 
 `gws` talks to Google's APIs as *your own* OAuth application, so you need a
-Google Cloud project. This is free and takes about five minutes.
+Google Cloud project. It is free, and takes about ten minutes of clicking.
 
-If you have the [`gcloud` CLI](https://cloud.google.com/sdk/docs/install)
-installed, `gws auth setup` automates most of this. Otherwise, do it by hand:
+> `gws auth setup` can automate parts of this, but it requires the `gcloud` CLI.
+> The steps below are the manual equivalent and need no local tooling at all —
+> `gws-account` never calls `gcloud`.
 
-1. Create a project at [console.cloud.google.com/projectcreate](https://console.cloud.google.com/projectcreate).
-   Name it anything — `gws-cli` works.
+Google reorganized this area of the Console in 2025: what used to be
+*APIs & Services → OAuth consent screen* is now **Google Auth Platform**, split
+into **Branding**, **Audience**, **Data access** and **Clients**. Old links still
+redirect, but the page names below are the current ones.
 
-2. **Enable the APIs you want.** In *APIs & Services → Library*, enable each of:
-   Google Drive API, Google Docs API, Google Sheets API, Gmail API, Google
-   Calendar API. Nothing works until the matching API is enabled; `gws` prints a
-   direct enable-link when it hits a disabled one, so you can also do this
-   lazily.
+### 2.1 Create a project
 
-3. **Configure the OAuth consent screen** (*APIs & Services → OAuth consent screen*):
-   - User type: **External**
-   - Fill in app name and your email; you can skip the optional fields.
-   - Leave it in **Testing** mode — you do not need Google verification.
+Go to [console.cloud.google.com/projectcreate](https://console.cloud.google.com/projectcreate).
+Name it anything — `gws-cli` is fine. Note the **project ID** it generates; the
+links below take `?project=PROJECT_ID`.
 
-4. **Add every account as a Test user.** On the consent screen, go to
-   *Test users → Add users* and enter each Gmail address you plan to connect.
-   **Do this for all of them, including the first.** An account that is not
-   listed fails login with a generic "Access blocked" error that does not
-   explain the cause.
+### 2.2 Enable the APIs
 
-5. **Create the OAuth client** (*APIs & Services → Credentials → Create
-   credentials → OAuth client ID*):
-   - Application type: **Desktop app**
-   - Download the JSON.
+Nothing works until the matching API is enabled for the project. Open each and
+click **Enable**:
 
-One client serves all your accounts — you do not need a project per account.
+| API | Link |
+|---|---|
+| Google Drive | [drive.googleapis.com](https://console.cloud.google.com/apis/library/drive.googleapis.com) |
+| Google Docs | [docs.googleapis.com](https://console.cloud.google.com/apis/library/docs.googleapis.com) |
+| Google Sheets | [sheets.googleapis.com](https://console.cloud.google.com/apis/library/sheets.googleapis.com) |
+| Gmail | [gmail.googleapis.com](https://console.cloud.google.com/apis/library/gmail.googleapis.com) |
+| Google Calendar | [calendar-json.googleapis.com](https://console.cloud.google.com/apis/library/calendar-json.googleapis.com) |
+
+Make sure the project selector at the top is on your new project. You can also
+do this lazily — `gws` prints a direct enable-link when it hits a disabled API.
+
+### 2.3 Configure Branding
+
+Open **[Google Auth Platform → Branding](https://console.cloud.google.com/auth/branding)**.
+If the project has never been configured, you get a **Get started** wizard
+instead; fill in the same fields.
+
+- **App name**: anything, e.g. `gws-cli`
+- **User support email**: your own address
+- **Audience**: **External** (required for `@gmail.com` accounts; *Internal*
+  only exists for Workspace domains)
+- **Contact information**: your own address
+
+### 2.4 Add your accounts as test users
+
+Open **[Google Auth Platform → Audience](https://console.cloud.google.com/auth/audience)**.
+This page holds both the publishing status and the test user list.
+
+Under **Test users**, click **Add users** and enter **every Gmail address you
+plan to connect** — including the first one. The cap is 100.
+
+> An account that is not on this list fails login with a generic
+> **"Access blocked"** screen that never explains the cause. This is the single
+> most common reason setup stalls.
+
+### 2.5 Create the OAuth client
+
+Open **[Google Auth Platform → Clients](https://console.cloud.google.com/auth/clients)**
+→ **Create client** (direct link:
+[/auth/clients/create](https://console.cloud.google.com/auth/clients/create)).
+
+- **Application type**: **Desktop app** — this matters. `gws` completes OAuth
+  through a localhost callback, which is what the Desktop type allows. A "Web
+  application" client will fail with `redirect_uri_mismatch`.
+- **Name**: anything.
+
+Create it, then **Download JSON**. One client serves all your accounts — you do
+not need a project or client per account.
+
+### 2.6 Decide on publishing status
+
+See [The 7-day refresh token problem](#the-7-day-refresh-token-problem) below
+before you settle on **Testing**. It is the one decision here worth making
+deliberately.
 
 ## 3. Install the client and add accounts
 
@@ -169,6 +224,59 @@ consequences:
 
 To change scopes later, re-run `gws-account login <name>` and re-consent.
 
+Note that this cap tracks *unverified*, not *testing*. Publishing the app to
+production (Option B below) stops refresh tokens expiring, but the app stays
+unverified, so assume the scope limit still applies and keep selecting scopes
+rather than taking all of them.
+
+## The 7-day refresh token problem
+
+This is the biggest operational gotcha, and it is not obvious from the CLI.
+
+**While your app's publishing status is "Testing" and its audience is
+"External", Google revokes every refresh token after exactly 7 days.** When that
+happens, `gws` fails with `invalid_grant`, and you have to re-run
+`gws-account login <name>` for *each* account, weekly.
+
+You have two options.
+
+### Option A — stay in Testing, re-auth weekly
+
+Nothing more to configure. When a command starts failing with `invalid_grant`:
+
+```bash
+gws-account login personal
+```
+
+Fine if you use the CLI occasionally. Annoying as a daily driver, and it scales
+badly with the number of accounts.
+
+### Option B — publish the app (recommended for daily use)
+
+On **[Google Auth Platform → Audience](https://console.cloud.google.com/auth/audience)**,
+under *Publishing status*, click **Publish app** to move it to **In production**.
+Refresh tokens then stop expiring on a timer.
+
+What this does and does not mean:
+
+- You are **not** submitting for verification, and you do not need a security
+  audit. The app stays unverified.
+- Because it is unverified, the consent screen keeps showing
+  **"Google hasn't verified this app"** — click *Advanced → Continue*. That
+  warning is about your own client; it is expected.
+- Unverified apps requesting sensitive or restricted scopes (Gmail and full
+  Drive are both restricted) are capped at 100 users. Irrelevant when the users
+  are your own accounts.
+- Full verification — with the security audit — is only needed to remove the
+  warning screen and distribute the app to the public. You are not doing that.
+
+Google can tighten this behaviour for restricted scopes, so treat Option B as
+"works today, verify it still holds if logins start expiring again." If publish
+is blocked for your project, fall back to Option A.
+
+Either way, the tokens themselves are unaffected by *which* option you pick —
+only how long they live.
+
 ## Where credentials live
 
 Tokens are encrypted at rest with AES-256-GCM. The key comes from your OS
@@ -200,8 +308,22 @@ one of the first two is set in your environment — they win over the config dir
 
 ## Troubleshooting
 
-**"Access blocked" / "app not verified" on login.** The account is not in the
-consent screen's *Test users* list. Add it, then re-run `gws-account login <name>`.
+**"Access blocked" on login.** The account is not in the *Test users* list on
+[Google Auth Platform → Audience](https://console.cloud.google.com/auth/audience).
+Add it, then re-run `gws-account login <name>`.
+
+**"Google hasn't verified this app".** Expected — it is your own unverified
+client. Click *Advanced → Continue*.
+
+**`invalid_grant`, or an account that worked last week and now does not.** The
+7-day testing-mode refresh token expiry. Re-run `gws-account login <name>`, and
+see [The 7-day refresh token problem](#the-7-day-refresh-token-problem) to stop
+it recurring.
+
+**`redirect_uri_mismatch`.** The OAuth client is the wrong type. `gws` needs a
+**Desktop app** client, not a Web application one. Create a new one on
+[Google Auth Platform → Clients](https://console.cloud.google.com/auth/clients)
+and re-run `gws-account client <new.json>`.
 
 **Login fails asking for too many scopes.** Testing-mode scope cap. Re-run with a
 shorter list: `GWS_SERVICES=drive,docs,sheets gws-account login <name>`.
