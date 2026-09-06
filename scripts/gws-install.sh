@@ -79,15 +79,19 @@ install -m 644 "$SCRIPT_DIR/gws-shell.sh" "$ACCOUNTS_HOME/shell.sh"
 info "installed $BIN_DIR/gws-account"
 info "installed $ACCOUNTS_HOME/shell.sh"
 
+# Whether BIN_DIR is on PATH is decided later, once the rc file is known: on
+# macOS ~/.local/bin is not on the default PATH, so merely printing a note here
+# leaves gws-account installed but invisible.
+PATH_NEEDED=0
 case ":$PATH:" in
   *":$BIN_DIR:"*) ;;
-  *) info "NOTE: $BIN_DIR is not on your PATH. Add it:"
-     info "      export PATH=\"\$HOME/.local/bin:\$PATH\"" ;;
+  *) PATH_NEEDED=1 ;;
 esac
 
 # --- 3. Shell integration -------------------------------------------------
 
 SOURCE_LINE="source \"$ACCOUNTS_HOME/shell.sh\"   # gws @account support"
+PATH_LINE="export PATH=\"$BIN_DIR:\$PATH\"   # gws-account"
 
 if [ "$NO_SHELL" = 0 ]; then
   step "Shell integration"
@@ -103,12 +107,33 @@ if [ "$NO_SHELL" = 0 ]; then
       info "already sourced from $SHELL_RC"
     else
       printf '\n%s\n' "$SOURCE_LINE" >> "$SHELL_RC"
-      info "appended to $SHELL_RC — run: source $SHELL_RC"
+      info "appended to $SHELL_RC"
     fi
+
+    if [ "$PATH_NEEDED" = 1 ]; then
+      if grep -qF "$BIN_DIR" "$SHELL_RC"; then
+        info "$BIN_DIR already added to PATH in $SHELL_RC"
+      else
+        printf '%s\n' "$PATH_LINE" >> "$SHELL_RC"
+        info "added $BIN_DIR to PATH in $SHELL_RC"
+      fi
+      PATH_NEEDED=0
+    fi
+
+    info "run: source $SHELL_RC"
   else
-    info "add this line to your shell rc file:"
+    info "add these lines to your shell rc file:"
+    [ "$PATH_NEEDED" = 1 ] && info "    $PATH_LINE"
     info "    $SOURCE_LINE"
   fi
+fi
+
+# --no-shell, or no rc file found: PATH is still the user's to fix.
+if [ "$PATH_NEEDED" = 1 ]; then
+  info ""
+  info "NOTE: $BIN_DIR is not on your PATH, so gws-account will not be found."
+  info "      Add this to your shell rc file:"
+  info "          $PATH_LINE"
 fi
 
 # --- 4. Claude Code skills ------------------------------------------------
