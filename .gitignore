@@ -1,0 +1,9 @@
+# Never commit Google OAuth material.
+client_secret*.json
+credentials*.json
+token_cache.json
+.encryption_key
+service-account*.json
+.env
+
+.DS_Store
