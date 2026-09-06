@@ -128,8 +128,32 @@ Open **[Google Auth Platform → Clients](https://console.cloud.google.com/auth/
   application" client will fail with `redirect_uri_mismatch`.
 - **Name**: anything.
 
-Create it, then **Download JSON**. One client serves all your accounts — you do
-not need a project or client per account.
+Create it, then **Download JSON**.
+
+### One project covers every account
+
+**You need exactly one project and one OAuth client, no matter how many Google
+accounts you connect.** The project is the *application's* identity, not a
+container for your data. Any Google account can authorize that app; each one
+gets its own separate token and its own separate data.
+
+This matters in two common situations:
+
+- **An account that cannot create projects.** Google caps how many projects an
+  account may own, and the cap is often already reached. That account does not
+  need a project of its own — host the project on whichever account can, and
+  connect the constrained account as a *user* of it.
+- **Keeping work and personal separate.** Owning the project grants no access to
+  the data of accounts that authorize it. The project owner sees API usage and
+  quota, never another account's mail or files.
+
+Two consequences worth knowing:
+
+- Manage the project while signed in as **the account that owns it**. Opening
+  the Console as a different account shows an empty project list, which reads
+  like the project vanished.
+- API quota and any billing attach to the owning project. Personal use sits far
+  inside the free tier.
 
 ### 2.6 Decide on publishing status
 
@@ -354,6 +378,10 @@ plaintext `credentials.json`. If `@account` seems to be ignored, check whether
 one of the first two is set in your environment — they win over the config dir.
 
 ## Troubleshooting
+
+**The Console shows no projects / my project disappeared.** You are signed into
+the Console as a different Google account than the one that owns the project.
+Switch accounts, top right.
 
 **"Access blocked" on login.** The account is not in the *Test users* list on
 [Google Auth Platform → Audience](https://console.cloud.google.com/auth/audience).
