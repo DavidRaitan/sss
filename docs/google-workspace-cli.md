@@ -163,7 +163,7 @@ Verify with `gws-account list`, which shows the real email behind each name:
 (* = default; used by a bare `gws ...`)
 ```
 
-## 4. Daily use
+## 4. Daily use (your shell)
 
 ```bash
 # The default account — no prefix needed
@@ -198,6 +198,53 @@ gws schema drive.files.list          # inspect any method's request/response
 ```
 
 ---
+
+## 5. Using it from Claude Code
+
+`gws` is a CLI, not an MCP server. It reaches Claude through **skills** — plain
+Markdown files in `~/.claude/skills/` that teach Claude how to drive the
+commands. The installer puts them there:
+
+- `gws-accounts` — the multi-account skill from this repo. **Always installed.**
+- ~50 upstream skills (`gws-gmail`, `gws-drive`, `gws-calendar`, …) — installed
+  with `--with-skills`.
+
+The `gws-accounts` skill is not optional decoration. The upstream skills know
+nothing about `gws-account`, so without it Claude only ever uses your default
+account, silently, even when you asked for a different one.
+
+Once installed, just ask in plain language:
+
+> "What's unread in my work inbox?"
+> "Copy the Q3 numbers from my personal Drive into a new sheet"
+> "What's on my calendar tomorrow across both accounts?"
+
+To cut permission prompts, allowlist these in `~/.claude/settings.json`:
+
+```json
+{ "permissions": { "allow": ["Bash(gws:*)", "Bash(gws-account:*)"] } }
+```
+
+### Why Claude uses `gws-account run`, not `gws @name`
+
+The `@account` prefix is a **shell function**, defined only in interactive
+shells that source your rc file. Claude Code runs commands in non-interactive
+shells, which do not load it — so `gws @work ...` fails there. The `gws-accounts`
+skill tells Claude to use the real executable instead:
+
+```bash
+gws-account run work -- gmail +triage
+```
+
+Both forms do the same thing. Use `@work` yourself; let Claude use
+`gws-account run`.
+
+### How this differs from the Google Drive connector
+
+The Drive connector on claude.ai is a separate, single-account integration.
+It cannot hold several Google accounts at once, and it does not cover Gmail or
+Calendar. Keep it if you use it — the two do not conflict — but multi-account
+read/write is what this setup is for.
 
 ## Scopes, and the testing-mode limit
 

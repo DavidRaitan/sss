@@ -19,6 +19,10 @@ gws drive files list           # default account
 gws @side drive files list     # a specific account
 ```
 
+From Claude Code, just ask — "check my work inbox", "list files in my personal
+Drive". The installed `gws-accounts` skill is what lets Claude target a specific
+account instead of always using the default.
+
 Full walkthrough, including the Google Cloud project and OAuth setup:
 **[docs/google-workspace-cli.md](docs/google-workspace-cli.md)**
 
@@ -27,3 +31,4 @@ Full walkthrough, including the Google Cloud project and OAuth setup:
 | `scripts/gws-install.sh` | Installs `gws`, the account manager, shell integration, and optionally the gws Claude Code skills |
 | `scripts/gws-account.sh` | Account manager — `add`, `list`, `use`, `run`, `login`, `status`, `remove`, `migrate` |
 | `scripts/gws-shell.sh` | Shell integration providing the `gws @account ...` prefix |
+| `skills/gws-accounts/` | Claude Code skill teaching Claude to target a named account |

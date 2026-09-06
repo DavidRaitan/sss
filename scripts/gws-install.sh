@@ -111,7 +111,27 @@ if [ "$NO_SHELL" = 0 ]; then
   fi
 fi
 
-# --- 4. Optional: Claude Code skills --------------------------------------
+# --- 4. Claude Code skills ------------------------------------------------
+
+# The multi-account skill is ours and always installed: without it Claude only
+# ever drives the default account, since the upstream skills know nothing about
+# gws-account.
+step "Installing the multi-account skill for Claude Code"
+
+LOCAL_SKILL=""
+for cand in "$SCRIPT_DIR/../skills/gws-accounts" "$SCRIPT_DIR/skills/gws-accounts"; do
+  [ -d "$cand" ] && { LOCAL_SKILL="$cand"; break; }
+done
+
+if [ -n "$LOCAL_SKILL" ]; then
+  mkdir -p "$SKILLS_DIR"
+  rm -rf "$SKILLS_DIR/gws-accounts"
+  cp -R "$LOCAL_SKILL" "$SKILLS_DIR/"
+  info "installed $SKILLS_DIR/gws-accounts"
+else
+  info "NOTE: skills/gws-accounts not found next to this script; skipped."
+  info "      Without it, Claude Code will only use your default account."
+fi
 
 if [ "$WITH_SKILLS" = 1 ]; then
   step "Installing gws Claude Code skills"
@@ -151,9 +171,14 @@ cat <<EOS
      gws-account add personal
      gws-account add second
 
-4. Use them:
+4. Use them from your shell:
      gws drive files list             # default account
      gws @second drive files list     # the other one
      gws-account list                 # see all accounts
      gws-account use second           # change the default
+
+5. Use them from Claude Code. Just ask in plain language -- "check my work
+   inbox", "list files in my personal Drive". To cut permission prompts,
+   allowlist these in ~/.claude/settings.json:
+     "Bash(gws:*)", "Bash(gws-account:*)"
 EOS
