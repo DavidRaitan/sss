@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>חברותא</title>
+<style>
+  :root {
+    --ink: #1a1614; --dim: #6b625c; --faint: #a09890;
+    --ground: #faf7f2; --card: #fff; --line: #e5ded4;
+    --mark: #b4472f; --glow: #fdf3d8;
+    --serif: "SBL Hebrew", "Taamey Frank CLM", "Times New Roman", serif;
+    --ui: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --ink:#ece6de; --dim:#9a9088; --faint:#6b625c;
+            --ground:#16130f; --card:#1e1a16; --line:#332c25;
+            --mark:#e08a6d; --glow:#2b2317; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--ground); color:var(--ink); font-family:var(--ui); }
+  header { position:sticky; top:0; z-index:5; display:flex; align-items:center;
+    gap:14px; padding:11px 18px; background:var(--card);
+    border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  h1 { margin:0; font-size:16px; font-weight:600; letter-spacing:.01em; }
+  .grow { flex:1; }
+  button { font:inherit; font-size:12.5px; color:var(--dim); cursor:pointer;
+    background:none; border:1px solid var(--line); border-radius:6px; padding:5px 11px; }
+  button:hover { color:var(--ink); border-color:var(--faint); }
+  button[aria-pressed="true"] { color:var(--card); background:var(--ink); border-color:var(--ink); }
+  .warn { width:100%; font-size:12px; color:var(--mark); }
+
+  main { display:grid; grid-template-columns:minmax(0,1fr) 380px; gap:22px;
+    max-width:1180px; margin:0 auto; padding:22px 18px 90px; align-items:start; }
+  @media (max-width:900px) { main { grid-template-columns:minmax(0,1fr); } }
+
+  .seg { background:var(--card); border:1px solid var(--line); border-radius:9px;
+    padding:15px 18px; margin-bottom:11px; cursor:pointer; }
+  .seg:hover { border-color:var(--faint); }
+  .seg[aria-current="true"] { border-color:var(--mark); box-shadow:0 0 0 1px var(--mark); }
+  .n { font-family:var(--ui); font-size:11px; color:var(--faint); margin-bottom:7px;
+    display:flex; gap:9px; align-items:center; }
+  .he { font-family:var(--serif); font-size:25px; line-height:1.95; }
+  /* Each clause is a printed stopping point. Showing them is the whole
+     pisuk feature made visible: this is where the sentence actually breaks. */
+  .stops .cl { border-radius:3px; padding:0 2px; }
+  .stops .cl:nth-child(odd) { background:var(--glow); }
+  .en { margin-top:11px; font-size:14.5px; line-height:1.65; color:var(--dim);
+    direction:ltr; text-align:left; }
+  .en .add { color:var(--faint); font-style:italic; }
+  .tags { display:flex; gap:6px; flex-wrap:wrap; margin-inline-start:auto; }
+  .tag { font-size:10.5px; color:var(--dim); background:var(--ground);
+    border:1px solid var(--line); border-radius:20px; padding:1px 8px; }
+
+  aside { position:sticky; top:70px; max-height:calc(100vh - 92px); overflow-y:auto;
+    background:var(--card); border:1px solid var(--line); border-radius:9px; padding:15px 17px; }
+  @media (max-width:900px) { aside { position:static; max-height:none; } }
+  aside h2 { margin:0 0 3px; font-size:13px; font-weight:600; }
+  aside .sub { font-size:11.5px; color:var(--faint); margin-bottom:14px; }
+  .grp { font-size:10.5px; letter-spacing:.09em; text-transform:uppercase;
+    color:var(--faint); margin:16px 0 8px; padding-bottom:5px; border-bottom:1px solid var(--line); }
+  .src { margin-bottom:13px; }
+  .src .who { font-size:12.5px; font-weight:600; }
+  .src .dib { font-family:var(--serif); font-size:15px; color:var(--mark); }
+  .src .body { font-family:var(--serif); font-size:16.5px; line-height:1.8;
+    margin-top:5px; max-height:5.6em; overflow:hidden; }
+  .src.open .body { max-height:none; }
+  .more { font-size:11.5px; color:var(--dim); background:none; border:0; padding:3px 0; }
+  /* The argument the comment states about itself, in its own marker words. */
+  .shape { display:flex; gap:5px; flex-wrap:wrap; margin-top:6px; }
+  .mv { font-size:10px; border-radius:3px; padding:1px 6px; border:1px solid var(--line); color:var(--dim); }
+  .mv.difficulty { color:var(--mark); border-color:var(--mark); }
+  .mv.position, .mv.alternative { background:var(--ground); }
+  .ref { font-size:10.5px; color:var(--faint); direction:ltr; margin-top:5px; }
+  .lnk { display:block; font-size:12px; color:var(--dim); direction:ltr;
+    text-align:left; padding:2px 0; text-decoration:none; }
+  .lnk:hover { color:var(--mark); }
+</style>
+</head>
+<body>
+<header>
+  <h1 id="ref">…</h1>
+  <button id="stops" aria-pressed="false">עצירות</button>
+  <button id="eng" aria-pressed="false">English</button>
+  <span class="grow"></span>
+  <span class="warn" id="warn" hidden></span>
+</header>
+<main>
+  <div id="daf"></div>
+  <aside id="panel"><h2>לחצו על שורה</h2>
+    <div class="sub">Sources on a line appear here, heaviest first.</div></aside>
+</main>
+<script>
+const PACKS = ["../packs/berakhot_2a.json"];
+// Mirrors Sefaria's own link categories -- the panel is its grouping, not ours.
+const ORDER = ["Commentary", "Halakhah", "Talmud", "Tanakh", "Midrash", "Responsa"];
+let pack = null, current = null;
+
+const el = (t, c, x) => { const n = document.createElement(t);
+  if (c) n.className = c; if (x !== undefined) n.textContent = x; return n; };
+
+function drawDaf() {
+  document.getElementById("ref").textContent = pack.ref;
+  if (pack.fixture) {
+    const w = document.getElementById("warn");
+    w.hidden = false; w.textContent = pack.fixture_note;
+  }
+  const daf = document.getElementById("daf");
+  daf.replaceChildren();
+  for (const seg of pack.segments) {
+    const box = el("div", "seg");
+    box.dataset.n = seg.n;
+    const head = el("div", "n");
+    head.append(el("span", null, seg.ref));
+    const tags = el("div", "tags");
+    for (const [cat, count] of Object.entries(seg.panel || {}))
+      tags.append(el("span", "tag", cat + " " + count));
+    head.append(tags);
+    const he = el("div", "he");
+    // One span per printed clause, so the stopping points are addressable.
+    for (const c of (seg.clauses.length ? seg.clauses : [{he: seg.he}]))
+      he.append(el("span", "cl", c.he + " "));
+    box.append(head, he);
+    const en = el("div", "en");
+    for (const span of seg.en || [])
+      en.append(el("span", span.kind === "daf" ? "lit" : "add", span.text + " "));
+    en.hidden = true;
+    box.append(en);
+    box.onclick = () => select(seg.n);
+    daf.append(box);
+  }
+}
+
+function select(n) {
+  current = n;
+  for (const box of document.querySelectorAll(".seg"))
+    box.setAttribute("aria-current", String(+box.dataset.n === n));
+  const seg = pack.segments.find(s => s.n === n);
+  const panel = document.getElementById("panel");
+  panel.replaceChildren();
+  panel.append(el("h2", null, seg.ref));
+
+  const rows = [];
+  for (const [who, list] of Object.entries(seg.commentaries || {}))
+    for (const e of list) rows.push([who, e]);
+  rows.sort((a, b) => (b[1].weight || 0) - (a[1].weight || 0));
+  panel.append(el("div", "sub", rows.length + " sources on this line"));
+
+  if (rows.length) {
+    panel.append(el("div", "grp", "Commentary"));
+    for (const [who, e] of rows) {
+      const box = el("div", "src");
+      const head = el("div", "who", who);
+      if (e.dibur) { head.append(" "); head.append(el("span", "dib", e.dibur)); }
+      box.append(head);
+      const body = el("div", "body", e.he);
+      box.append(body);
+      const shape = el("div", "shape");
+      for (const m of (e.structure ? e.structure.moves : []))
+        shape.append(el("span", "mv " + m.kind, m.marker));
+      if (shape.children.length) box.append(shape);
+      box.append(el("div", "ref", e.ref));
+      const more = el("button", "more", "הצג הכל");
+      more.onclick = () => { box.classList.toggle("open");
+        more.textContent = box.classList.contains("open") ? "הצג פחות" : "הצג הכל"; };
+      box.append(more);
+      panel.append(box);
+    }
+  }
+  for (const [label, refs] of [["Halakhah", seg.halacha], ["Talmud", seg.xrefs]]) {
+    if (!refs || !refs.length) continue;
+    panel.append(el("div", "grp", label));
+    for (const r of refs) {
+      const a = el("a", "lnk", r);
+      a.href = "https://www.sefaria.org/" + encodeURIComponent(r.replace(/ /g, "_"));
+      a.target = "_blank"; a.rel = "noopener";
+      panel.append(a);
+    }
+  }
+}
+
+function toggle(id, apply) {
+  const b = document.getElementById(id);
+  b.onclick = () => { const on = b.getAttribute("aria-pressed") !== "true";
+    b.setAttribute("aria-pressed", String(on)); apply(on); };
+}
+toggle("stops", on => document.getElementById("daf").classList.toggle("stops", on));
+toggle("eng", on => document.querySelectorAll(".en").forEach(e => e.hidden = !on));
+
+(async () => {
+  for (const url of PACKS) {
+    try {
+      const r = await fetch(url);
+      if (!r.ok) continue;
+      pack = await r.json(); drawDaf(); select(pack.segments[0].n); return;
+    } catch (e) { /* try the next one */ }
+  }
+  document.getElementById("daf").textContent =
+    "No pack found. Build one first, and serve this over http (not file://).";
+})();
+</script>
+</body>
+</html>

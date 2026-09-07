@@ -26,6 +26,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+import extract_sugya
+
 API = "https://www.sefaria.org/api"
 
 # The vocalized Davidson text is the one worth aligning against: it carries
@@ -89,7 +91,7 @@ FALLBACK_DIBUR = [r"^<b>(.+?)</b>", r"^(.{2,80}?)\s*[–—-]\s+"]
 
 
 def get(path, soft=False, **params):
-    url = "%s/%s" % (API, urllib.parse.quote(path, safe="/:,-. "))
+    url = "%s/%s" % (API, urllib.parse.quote(path, safe="/:,-."))
     if params:
         parts = []
         for key, value in params.items():
@@ -246,6 +248,8 @@ def build_segment(ref, number, source_html, english_html, links, wanted, pattern
                 "dibur": opening.group(1).rstrip(" .:") if opening else None,
                 "weight": WEIGHT.get(name, 20),
                 "he": body,
+                # The argument the comment states about itself, when it states one.
+                "structure": extract_sugya.structure(link.get("ref"), body),
                 "en": plain(link.get("text") or "") if link.get("he") else None,
             })
         elif link.get("type") == HALACHA_LINK_TYPE:
