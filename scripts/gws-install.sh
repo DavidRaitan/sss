@@ -185,6 +185,28 @@ fi
 
 # --- 5. Next steps --------------------------------------------------------
 
+# Re-running the installer to pick up updates is routine, and replaying the
+# full first-run walkthrough then reads as "there is still setup to do".
+CONFIGURED=0
+for d in "$ACCOUNTS_HOME"/*/; do
+  [ -d "$d" ] && { CONFIGURED=1; break; }
+done
+
+if [ "$CONFIGURED" = 1 ]; then
+  step "Done. Accounts already configured"
+  if have gws-account; then
+    gws-account list 2>/dev/null || true
+  else
+    info "(open a new shell, or run: source ${SHELL_RC:-your shell rc}, then: gws-account list)"
+  fi
+  cat <<EOS
+
+Nothing else to do. Setup steps are in docs/google-workspace-cli.md if you
+ever need them again (adding an account, changing scopes, publishing the app).
+EOS
+  exit 0
+fi
+
 step "Done. Next steps"
 cat <<EOS
 1. In the Google Cloud Console (no gcloud needed), create a project, enable the
