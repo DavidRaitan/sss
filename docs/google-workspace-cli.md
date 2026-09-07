@@ -161,6 +161,48 @@ See [The 7-day refresh token problem](#the-7-day-refresh-token-problem) below
 before you settle on **Testing**. It is the one decision here worth making
 deliberately.
 
+### Accounts that do not own the project need one IAM grant
+
+There is one thing the shared project does *not* cover automatically. `gws`
+sends an `x-goog-user-project` header on every request, taking the project ID
+straight from `client_secret.json` (`auth.rs`, `get_quota_project`). Google then
+requires the calling account to hold `serviceusage.services.use` on that
+project. The owner has it implicitly; **every other account does not**, and its
+very first call fails:
+
+```
+403  Caller does not have required permission to use project <project-id>.
+     Grant the caller the roles/serviceusage.serviceUsageConsumer role...
+```
+
+Authentication is fine at this point — it is purely a quota-attribution
+permission. Two ways to resolve it.
+
+**Option A — grant the role (recommended).** Signed in as the account that owns
+the project, open [IAM](https://console.cloud.google.com/iam-admin/iam) →
+**Grant access** → principal is the other account's email → role
+**Service Usage Consumer** → Save. Takes a couple of minutes to propagate. This
+grants only the ability to consume the project's API quota; it conveys no
+access to the project's data or to any Drive, mail or files.
+
+**Option B — stop sending the header.** Blank the project ID in that one
+account's client config, leaving the other accounts untouched:
+
+```bash
+python3 - <<'EOF'
+import json, os
+p = os.path.expanduser("~/.config/gws-accounts/<account>/client_secret.json")
+d = json.load(open(p))
+d["installed"]["project_id"] = ""          # must stay present; it is a required field
+json.dump(d, open(p, "w"), indent=2)
+EOF
+```
+
+`get_quota_project` skips an empty value, so no header is sent and the 403 goes
+away. Keeps the accounts fully independent, and needs no IAM change. Note that
+`gws-account client` rewrites this file for every account, so re-run the blanking
+after installing a new client JSON.
+
 ## 3. Install the client and add accounts
 
 ```bash
@@ -378,6 +420,12 @@ plaintext `credentials.json`. If `@account` seems to be ignored, check whether
 one of the first two is set in your environment — they win over the config dir.
 
 ## Troubleshooting
+
+**403 "Caller does not have required permission to use project ...".** The
+account is not a member of the Cloud project, so it may not consume its API
+quota. See [Accounts that do not own the project need one IAM
+grant](#accounts-that-do-not-own-the-project-need-one-iam-grant). Authentication
+is not the problem — `gws-account list` will still show the account's email.
 
 **The Console shows no projects / my project disappeared.** You are signed into
 the Console as a different Google account than the one that owns the project.
