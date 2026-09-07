@@ -1,9 +1,14 @@
 # Using both Google accounts in Claude Desktop
 
-Claude Desktop's chat has no shell, so it cannot run `gws`, and it does not load
-`~/.claude/skills`, so it cannot read the account-routing rules either. This MCP
-server bridges both gaps: it runs `gws` on Claude's behalf, and carries the
-routing rules in its tool descriptions — the only instructions Desktop sees.
+Claude Desktop does support Skills — but a skill is not enough here, and the
+reason is *where the code runs*. Desktop skills execute in Claude's sandbox, not
+on your Mac, so they cannot invoke `gws` and cannot reach the OAuth tokens under
+`~/.config/gws-accounts`, which are encrypted against your login keychain.
+
+An MCP server runs as a process **on your machine**. That is the whole reason
+this route works. The server runs `gws` locally and carries the account-routing
+rules in its tool descriptions, since it cannot rely on the
+`~/.claude/skills` files that only Claude Code reads.
 
 Requires the `gws` setup from [google-workspace-cli.md](google-workspace-cli.md)
 to be working first. Verify with `gws-account list`.
@@ -13,8 +18,21 @@ to be working first. Verify with `gws-account list`.
 The server is a single Python file with **no dependencies** — no npm, no pip, no
 virtualenv. It runs under the python3 that ships with macOS.
 
-1. Open Claude Desktop → **Settings → Developer → Edit Config**. That opens
-   `~/Library/Application Support/Claude/claude_desktop_config.json`.
+### The easy way
+
+```bash
+python3 ~/sss/scripts/gws-desktop-setup.py
+```
+
+It finds the config file, merges in the `google-workspace` entry while keeping
+every other server you have, backs up the original, and fills in the absolute
+paths to python3, the server and `gws`. Add `--dry-run` to see the result
+without writing. Then quit Claude Desktop with ⌘Q and reopen.
+
+### By hand
+
+1. Open Claude Desktop → **Settings → Developer → Edit Config**, or edit
+   `~/Library/Application Support/Claude/claude_desktop_config.json` directly.
 
 2. Add the `google-workspace` entry. **If the file already has `mcpServers`,
    add this server inside it rather than replacing the block** — otherwise you
@@ -64,8 +82,9 @@ YouTube, Descript, video, the channel and Torah Meirah content; the default for
 everything else**, with subject matter deciding rather than file type, and a
 question to the user rather than a guess when it is ambiguous.
 
-This duplicates the `gws-my-accounts` skill on purpose. Claude Code reads the
-skill; Desktop reads the tool descriptions. Changing the routing means changing
+This duplicates the `gws-my-accounts` skill on purpose. Claude Code reads that
+skill off disk; this server cannot rely on it, so it carries the same rules
+itself. Changing the routing means changing
 **both** — the skill in `skills/gws-my-accounts/SKILL.md` and `ACCOUNT_RULE` in
 `mcp/gws_mcp_server.py`.
 

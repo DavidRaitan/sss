@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """MCP server exposing the Google Workspace CLI (gws) to Claude Desktop.
 
-Claude Desktop's chat has no shell and no skills, so it cannot use `gws`
-directly and cannot read the routing rules that Claude Code gets from
-~/.claude/skills. This server bridges that: it runs `gws` on the user's behalf
-and carries the account-routing rules in the tool descriptions, which are the
-only instructions Desktop actually sees.
+Claude Desktop supports Skills, but a skill cannot do this job: skills execute
+in Claude's sandbox rather than on the user's machine, so they can reach neither
+the `gws` binary nor the OAuth tokens under ~/.config/gws-accounts. An MCP
+server runs locally, which is the whole point. It runs `gws` on the user's
+behalf and carries the account-routing rules in its tool descriptions, since the
+~/.claude/skills copy of those rules is read only by Claude Code.
 
 Speaks MCP over stdio as newline-delimited JSON-RPC 2.0. Standard library only,
 deliberately: this has to run under whatever python3 the desktop app inherits,
@@ -150,9 +151,9 @@ def run_gws(account, args, timeout=60):
 
 # --- Tool definitions -------------------------------------------------------
 #
-# The descriptions carry the account-routing rules. In Claude Code these live
-# in ~/.claude/skills, but Desktop chat never loads skills, so the descriptions
-# are the only place the rules can go.
+# The descriptions carry the account-routing rules. Claude Code reads the same
+# rules from ~/.claude/skills; this server cannot depend on those files, so the
+# descriptions have to state them.
 
 ACCOUNT_RULE = (
     "Which Google account to use. Omit for the default account, which is "
