@@ -26,9 +26,15 @@ account instead of always using the default.
 Full walkthrough, including the Google Cloud project and OAuth setup:
 **[docs/google-workspace-cli.md](docs/google-workspace-cli.md)**
 
+**Claude Desktop:** its chat has no shell and loads no skills, so it needs the
+bundled MCP server to reach either account —
+**[docs/claude-desktop-mcp.md](docs/claude-desktop-mcp.md)**
+
 | Script | Purpose |
 |---|---|
 | `scripts/gws-install.sh` | Installs `gws`, the account manager, shell integration, and optionally the gws Claude Code skills |
 | `scripts/gws-account.sh` | Account manager — `add`, `list`, `use`, `run`, `login`, `status`, `remove`, `migrate` |
 | `scripts/gws-shell.sh` | Shell integration providing the `gws @account ...` prefix |
 | `skills/gws-accounts/` | Claude Code skill teaching Claude to target a named account |
+| `skills/gws-my-accounts/` | Which account a task belongs to (YouTube/Descript vs. default) |
+| `mcp/gws_mcp_server.py` | Zero-dependency MCP server exposing both accounts to Claude Desktop |
