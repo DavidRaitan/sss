@@ -141,21 +141,28 @@ fi
 # The multi-account skill is ours and always installed: without it Claude only
 # ever drives the default account, since the upstream skills know nothing about
 # gws-account.
-step "Installing the multi-account skill for Claude Code"
+step "Installing this repo's skills for Claude Code"
 
-LOCAL_SKILL=""
-for cand in "$SCRIPT_DIR/../skills/gws-accounts" "$SCRIPT_DIR/skills/gws-accounts"; do
-  [ -d "$cand" ] && { LOCAL_SKILL="$cand"; break; }
+LOCAL_SKILLS=""
+for cand in "$SCRIPT_DIR/../skills" "$SCRIPT_DIR/skills"; do
+  [ -d "$cand" ] && { LOCAL_SKILLS="$cand"; break; }
 done
 
-if [ -n "$LOCAL_SKILL" ]; then
+if [ -n "$LOCAL_SKILLS" ]; then
   mkdir -p "$SKILLS_DIR"
-  rm -rf "$SKILLS_DIR/gws-accounts"
-  cp -R "$LOCAL_SKILL" "$SKILLS_DIR/"
-  info "installed $SKILLS_DIR/gws-accounts"
+  local_count=0
+  for sk in "$LOCAL_SKILLS"/*/; do
+    [ -f "${sk}SKILL.md" ] || continue
+    name="$(basename "$sk")"
+    rm -rf "$SKILLS_DIR/$name"
+    cp -R "$sk" "$SKILLS_DIR/"
+    info "installed $SKILLS_DIR/$name"
+    local_count=$((local_count + 1))
+  done
+  [ "$local_count" = 0 ] && info "NOTE: no skills found in $LOCAL_SKILLS"
 else
-  info "NOTE: skills/gws-accounts not found next to this script; skipped."
-  info "      Without it, Claude Code will only use your default account."
+  info "NOTE: no skills/ directory next to this script; skipped."
+  info "      Without gws-accounts, Claude Code only uses your default account."
 fi
 
 if [ "$WITH_SKILLS" = 1 ]; then
