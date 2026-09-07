@@ -33,17 +33,44 @@ API = "https://www.sefaria.org/api"
 # where each clause stops. That is exactly the judgement a learner gets wrong.
 VOCALIZED = "William Davidson Edition - Vocalized Aramaic"
 
-# Which commentators to pull, by masechta. The strong Rishonim differ by
-# tractate, so this is a routing decision, not a constant -- keep it explicit.
-DEFAULT_COMMENTATORS = ["Rashi", "Tosafot", "Steinsaltz"]
-
-BY_MASECHTA = {
-    "Berakhot": DEFAULT_COMMENTATORS + ["Rif", "Meiri", "Tosafot HaRosh", "Rashba"],
-    "Bava Metzia": DEFAULT_COMMENTATORS + ["Rif", "Ramban", "Rashba", "Ritva", "Shita Mekubetzet"],
-    "Gittin": DEFAULT_COMMENTATORS + ["Rif", "Ramban", "Rashba", "Ritva", "Meiri"],
-    "Ketubot": DEFAULT_COMMENTATORS + ["Rif", "Ramban", "Rashba", "Ritva", "Shita Mekubetzet"],
-    "Shabbat": DEFAULT_COMMENTATORS + ["Rif", "Ramban", "Rashba", "Ritva", "Rabbeinu Chananel"],
+# Two different things live here, and conflating them is how you promise a
+# learner Rabbeinu Chananel on a masechta he was never printed on.
+#
+# ROUTING is judgement: which commentator answers which kind of question. It is
+# hand-authored, it is the moat, and no API will hand it to us.
+ROUTING = {
+    "meaning": ["Rashi", "Steinsaltz"],
+    "conflict": ["Tosafot"],            # squaring this sugya with another: its whole function
+    "structure": ["Steinsaltz"],        # plus the sugya map
+    "logic": ["Ramban", "Rashba", "Ritva", "Ran", "Meiri"],
+    "halacha": ["Rif", "Rosh"],         # then Ein Mishpat out to Rambam / Tur / Shulchan Arukh
+    "on_the_page": ["Rashi", "Tosafot", "Rabbeinu Chananel"],
+    "on_commentary": ["Maharsha"],
 }
+
+# COVERAGE is a fact about the data, so we ask Sefaria rather than guess -- see
+# available(). Which Rishonim are strong on a tractate is judgement; which ones
+# Sefaria actually holds is not.
+
+# Sefaria tags every link with a category -- Commentary, Halakhah, Midrash,
+# Talmud, Responsa, Reference -- and that tagging is what its connections panel
+# is built from. It is the skeleton of "what did X say here / what is the law
+# here", already done for all of shas, so the pack mirrors it rather than
+# inventing a taxonomy of its own.
+PANEL = ["Commentary", "Halakhah", "Talmud", "Tanakh", "Mishnah", "Midrash",
+         "Responsa", "Quoting Commentary", "Reference", "Chasidut", "Musar", "Kabbalah"]
+
+# Weight decides two things: what surfaces first when the panel opens, and what
+# is heavy enough to precompute into the pack instead of fetching on demand.
+# Anything printed on the daf itself outranks everything else, because that is
+# what the learner is looking at while we talk.
+WEIGHT = {
+    "Rashi": 100, "Tosafot": 100, "Rabbeinu Chananel": 95, "Steinsaltz": 95,
+    "Rif": 75, "Rosh": 70, "Tosafot HaRosh": 65,
+    "Ramban": 60, "Rashba": 60, "Ritva": 60, "Ran": 55, "Meiri": 55,
+    "Maharsha": 40, "Penei Yehoshua": 30, "Rashash": 30,
+}
+PRELOAD_ABOVE = 50  # heavier than this ships inside the pack; the rest is fetched live
 
 # Ein Mishpat routes the sugya to where it lands in halacha. Sefaria types
 # these links separately, which saves us from guessing.
@@ -56,10 +83,12 @@ LITERAL_TAG = re.compile(r"</?(?:b|strong)\b[^>]*>", re.I)
 # the printed gemara. Commas are a softer break and are kept inside the clause.
 CLAUSE_END = re.compile(r"[^.?!:]+[.?!:]?")
 # Rashi and Tosafot open with the words they are commenting on, then a dash.
-DIBUR = re.compile(r"^(.{2,80}?)\s*[–—-]\s+")
+# Sefaria ships the exact pattern per commentary in its index metadata, so we
+# read it from there and keep these only for indexes that omit it.
+FALLBACK_DIBUR = [r"^<b>(.+?)</b>", r"^(.{2,80}?)\s*[–—-]\s+"]
 
 
-def get(path, **params):
+def get(path, soft=False, **params):
     url = "%s/%s" % (API, urllib.parse.quote(path, safe="/:,-. "))
     if params:
         parts = []
@@ -72,7 +101,12 @@ def get(path, **params):
             with urllib.request.urlopen(url, timeout=30) as response:
                 return json.load(response)
         except (urllib.error.URLError, TimeoutError) as exc:
+            code = getattr(exc, "code", None)
+            if soft and code == 404:
+                return None
             if attempt == 3:
+                if soft:
+                    return None
                 raise SystemExit("sefaria unreachable: %s (%s)" % (url, exc))
             time.sleep(2 ** attempt)
 
@@ -117,6 +151,32 @@ def split_clauses(vocalized):
     return clauses
 
 
+def dibur_patterns(title):
+    """The patterns that split a comment's opening lemma from its body.
+
+    Sefaria records these per commentary -- Rashi and Tosafot mark the lemma
+    with a dash, others bold it -- so reading them beats one guessed regex.
+    """
+    index = get("v2/raw_index/%s" % title, soft=True) or {}
+    schema = index.get("schema", {})
+    if not schema.get("isSegmentLevelDiburHamatchil", True):
+        return []
+    return [re.compile(p) for p in (schema.get("diburHamatchilRegexes") or FALLBACK_DIBUR)]
+
+
+def available(masechta, names):
+    """Which of these commentators Sefaria actually holds on this masechta."""
+    return [n for n in names
+            if get("v2/raw_index/%s on %s" % (n, masechta), soft=True) is not None]
+
+
+def wanted_for(masechta):
+    """Everything the routing table might reach for, that Sefaria really has."""
+    asked = list(dict.fromkeys(sum(ROUTING.values(), [])))
+    asked = [n for n in asked if WEIGHT.get(n, 0) > PRELOAD_ABOVE]
+    return available(masechta, sorted(asked, key=lambda n: -WEIGHT.get(n, 0)))
+
+
 def fetch_daf(ref):
     """Pull the daf itself in both the vocalized source and the Davidson English."""
     data = get("v3/texts/%s" % ref, version=[VOCALIZED, "english"])
@@ -152,7 +212,7 @@ def commentator_of(link, wanted):
     return None
 
 
-def build_segment(ref, number, source_html, english_html, links, wanted):
+def build_segment(ref, number, source_html, english_html, links, wanted, patterns):
     vocalized = plain(source_html)
     segment = {
         "ref": "%s:%d" % (ref, number),
@@ -167,17 +227,24 @@ def build_segment(ref, number, source_html, english_html, links, wanted):
         "commentaries": {},
         "halacha": [],
         "xrefs": [],
+        # Counts per category, so the panel can be drawn before anything loads.
+        "panel": {},
     }
     for link in links:
+        category = link.get("category")
+        if category in PANEL:
+            segment["panel"][category] = segment["panel"].get(category, 0) + 1
         name = commentator_of(link, wanted)
         body = plain(link.get("he") or link.get("text") or "")
         if name:
-            opening = DIBUR.match(body)
+            opening = next(
+                (m for p in patterns.get(name, []) for m in [p.match(body)] if m), None)
             segment["commentaries"].setdefault(name, []).append({
                 "ref": link.get("ref"),
                 # The words on the daf this comment hangs off -- our anchor for
                 # "what does the commentary say about the line I just read".
                 "dibur": opening.group(1).rstrip(" .:") if opening else None,
+                "weight": WEIGHT.get(name, 20),
                 "he": body,
                 "en": plain(link.get("text") or "") if link.get("he") else None,
             })
@@ -191,6 +258,7 @@ def build_segment(ref, number, source_html, english_html, links, wanted):
 def build(ref, wanted, only=None):
     source, english = fetch_daf(ref)
     links = fetch_links(ref)
+    patterns = {n: dibur_patterns("%s on %s" % (n, ref.rsplit(" ", 1)[0])) for n in wanted}
     segments = []
     for index, html in enumerate(source, start=1):
         if only and index not in only:
@@ -199,12 +267,14 @@ def build(ref, wanted, only=None):
         segments.append(build_segment(
             ref, index, html,
             english[index - 1] if index <= len(english) else "",
-            links.get(segment_ref, []), wanted,
+            links.get(segment_ref, []), wanted, patterns,
         ))
     return {
         "ref": ref,
         "masechta": ref.rsplit(" ", 1)[0],
         "commentators": wanted,
+        "routing": ROUTING,
+        "weights": WEIGHT,
         "built_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "source": "sefaria.org",
         # No sugya map yet -- it is written separately and checked against this.
@@ -234,7 +304,7 @@ def main():
     args = parser.parse_args()
 
     masechta = args.ref.rsplit(" ", 1)[0]
-    wanted = BY_MASECHTA.get(masechta, DEFAULT_COMMENTATORS)
+    wanted = wanted_for(masechta)
     pack = build(args.ref, wanted, parse_range(args.segments))
 
     os.makedirs(args.out, exist_ok=True)
