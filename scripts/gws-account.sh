@@ -59,11 +59,19 @@ current_default() {
 # Ask gws which account a config dir is actually authenticated as.
 acct_email() {
   local dir="$1" out
-  out="$(GOOGLE_WORKSPACE_CLI_CONFIG_DIR="$dir" gws auth status 2>/dev/null)" || { printf 'not authenticated'; return; }
-  # Pull the first email-looking token out of the status output.
+  out="$(GOOGLE_WORKSPACE_CLI_CONFIG_DIR="$dir" gws auth status 2>/dev/null)" || { printf 'NOT AUTHENTICATED'; return; }
+
   local email
   email="$(printf '%s' "$out" | grep -oE '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}' | head -1)"
-  printf '%s' "${email:-authenticated}"
+  if [ -n "$email" ]; then
+    printf '%s' "$email"
+    return
+  fi
+
+  # No email in the output. gws can report an unauthenticated dir on a zero
+  # exit, so never call this authenticated - an account whose login never
+  # completed must be visibly broken, not merely unlabelled.
+  printf 'NOT AUTHENTICATED (run: gws-account login %s)' "$(basename "$dir")"
 }
 
 require_shared_client() {
@@ -124,11 +132,19 @@ cmd_add() {
   info "created account '$name' at $dir"
 
   # First account added becomes the default automatically.
+  local became_default=0
   if ! current_default >/dev/null 2>&1; then
     set_default "$name"
+    became_default=1
   fi
 
-  cmd_login "$name"
+  # An aborted login used to leave the directory behind, so a retry hit
+  # "account already exists" and the account sat there unauthenticated.
+  if ! cmd_login "$name"; then
+    rm -rf "$dir"
+    [ "$became_default" = 1 ] && rm -f "$DEFAULT_LINK"
+    die "login failed, so account '$name' was removed. Run 'gws-account add $name' to try again."
+  fi
 }
 
 cmd_login() {
@@ -145,7 +161,13 @@ cmd_login() {
   info "gws cannot verify which account you pick, so choosing the wrong one"
   info "silently binds these credentials to it."
   info ""
-  GOOGLE_WORKSPACE_CLI_CONFIG_DIR="$dir" gws auth login -s "$GWS_SERVICES"
+  # Check explicitly rather than relying on errexit: callers invoke this from an
+  # `if !` context, which disables errexit for the whole function body.
+  if ! GOOGLE_WORKSPACE_CLI_CONFIG_DIR="$dir" gws auth login -s "$GWS_SERVICES"; then
+    info ""
+    info "OAuth login did not complete for '$name'."
+    return 1
+  fi
 
   info ""
   info "'$name' is now: $(acct_email "$dir")"
