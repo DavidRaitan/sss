@@ -29,6 +29,20 @@ info() { printf '%s\n' "$*"; }
 step() { printf '\n==> %s\n' "$*"; }
 have() { command -v "$1" >/dev/null 2>&1; }
 
+# Copy one skill directory into SKILLS_DIR as a directory named after it.
+#
+# The destination is always spelled out in full. `cp -R src/ dest/` copies the
+# directory's *contents* rather than the directory on macOS's BSD cp, which
+# silently scattered every skill's SKILL.md into one directory where each
+# overwrote the last. Naming the destination behaves identically on BSD and GNU.
+install_skill() {
+  local src="$1" name="$2" dest="$SKILLS_DIR/$name"
+  rm -rf "$dest"
+  cp -R "$src" "$dest"
+  # Trust nothing: a skill Claude cannot read is worse than a loud failure.
+  [ -f "$dest/SKILL.md" ] || die "failed to install skill '$name': $dest/SKILL.md is missing after copy"
+}
+
 while [ $# -gt 0 ]; do
   case "$1" in
     --method) METHOD="${2:-}"; shift 2 ;;
@@ -154,8 +168,7 @@ if [ -n "$LOCAL_SKILLS" ]; then
   for sk in "$LOCAL_SKILLS"/*/; do
     [ -f "${sk}SKILL.md" ] || continue
     name="$(basename "$sk")"
-    rm -rf "$SKILLS_DIR/$name"
-    cp -R "$sk" "$SKILLS_DIR/"
+    install_skill "${sk%/}" "$name"
     info "installed $SKILLS_DIR/$name"
     local_count=$((local_count + 1))
   done
@@ -175,9 +188,8 @@ if [ "$WITH_SKILLS" = 1 ]; then
   mkdir -p "$SKILLS_DIR"
   count=0
   for s in "$tmp/cli/skills"/*/; do
-    [ -d "$s" ] || continue
-    rm -rf "$SKILLS_DIR/$(basename "$s")"
-    cp -R "$s" "$SKILLS_DIR/"
+    [ -f "${s}SKILL.md" ] || continue
+    install_skill "${s%/}" "$(basename "$s")"
     count=$((count + 1))
   done
   info "installed $count skills into $SKILLS_DIR"
