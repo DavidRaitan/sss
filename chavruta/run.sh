@@ -6,6 +6,12 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "python3 is not installed."
+  echo "On a Mac, run:  xcode-select --install"
+  exit 1
+fi
+
 VENV=".venv"
 PY="$VENV/bin/python"
 
