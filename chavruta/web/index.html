@@ -64,6 +64,10 @@
   .msg .trace { display:block; font-size:10.5px; color:var(--faint); margin-top:5px; direction:ltr; }
   .ask { display:flex; gap:7px; border-top:1px solid var(--line); padding:10px; }
   .ask input { flex:1; width:auto; }
+  #mic { font-size:15px; padding:5px 9px; }
+  #mic[aria-pressed="true"] { background:var(--mark); border-color:var(--mark); color:#fff; }
+  @keyframes pulse { 50% { opacity:.55; } }
+  #mic[aria-pressed="true"] { animation:pulse 1.1s ease-in-out infinite; }
 
   .grp { font-size:10.5px; letter-spacing:.09em; text-transform:uppercase; color:var(--faint);
     margin:14px 0 7px; padding-bottom:4px; border-bottom:1px solid var(--line); }
@@ -94,6 +98,15 @@
     <option value="beginner">מתחיל — lean on English</option>
     <option value="fluent">שוטף — no translation</option>
   </select>
+  <select id="stt" aria-label="how to listen">
+    <option value="browser">שמיעה: דפדפן (חינם)</option>
+    <option value="api">שמיעה: API (מעורב שפות)</option>
+  </select>
+  <select id="lang" aria-label="spoken language">
+    <option value="he-IL">מדבר עברית</option>
+    <option value="en-US">speaking English</option>
+  </select>
+  <button id="speak" aria-pressed="true" title="speak replies aloud (never the gemara)">🔊</button>
   <button id="stops" aria-pressed="false">עצירות</button>
   <button id="eng" aria-pressed="false">English</button>
   <span class="grow"></span>
@@ -109,6 +122,7 @@
     <div class="pane" id="p-chat" role="tabpanel"></div>
     <div class="pane" id="p-src" role="tabpanel" hidden></div>
     <form class="ask" id="ask">
+      <button type="button" id="mic" title="click to talk, click again to send">🎤</button>
       <input id="say" placeholder="say what you think it means…" autocomplete="off">
       <button type="submit">→</button>
     </form>
@@ -224,6 +238,7 @@ $("ask").onsubmit = async ev => {
     pending.remove();
     if (!r.ok) return void bubble("warn", data.error || "something went wrong");
     bubble("", data.text, data.trace);
+    speak(data.text);
     if (!data.grounded) bubble("warn", "ungrounded: " + data.problem);
   } catch (e) { pending.remove(); bubble("warn","could not reach the server"); }
 };
@@ -243,6 +258,113 @@ toggle("stops", on => $("daf").classList.toggle("stops", on));
 toggle("eng", on => document.querySelectorAll(".en").forEach(e => e.hidden = !on));
 $("go").onclick = () => openDaf($("ref").value.trim());
 $("ref").onkeydown = e => { if (e.key === "Enter") $("go").click(); };
+
+
+/* ---- voice -------------------------------------------------------------
+   Two ways to listen. The browser's recogniser is free and instant but
+   handles one language at a time, which is wrong for a sentence that starts
+   in English and lands in Aramaic. The API path costs a little and copes with
+   that. Both feed the same box, so you can switch mid-session and feel the
+   difference -- which is the ASR question this project has to answer anyway.
+
+   Replies are spoken, the gemara is never spoken. Synthesised Aramaic sounds
+   wrong to exactly the people whose ear is trained enough to matter, and
+   reading it aloud is the learning act being protected -- so Hebrew-script
+   runs are stripped before anything reaches the synthesiser. You read the
+   text; it talks about it.                                                */
+
+const HEBREW = /[\u0590-\u05FF]+(?:[\s\u0590-\u05FF"'\u05f3\u05f4.,:;?!-]*[\u0590-\u05FF]+)*/g;
+let recog = null, listening = false, recorder = null, chunks = [];
+
+function speakable(text) {
+  return text.replace(HEBREW, " — ").replace(/\[\[[^\]]+\]\]/g, "")
+             .replace(/\s{2,}/g, " ").replace(/(\s—\s){2,}/g, " — ").trim();
+}
+
+function speak(text) {
+  if ($("speak").getAttribute("aria-pressed") !== "true") return;
+  if (!window.speechSynthesis) return;
+  const say = speakable(text);
+  if (!say) return;
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(say);
+  u.lang = "en-US"; u.rate = 1.02;
+  speechSynthesis.speak(u);
+}
+
+function micState(on) {
+  listening = on;
+  $("mic").setAttribute("aria-pressed", String(on));
+}
+
+function startBrowser() {
+  const Rec = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!Rec) { note("this browser cannot listen — switch שמיעה to API"); return; }
+  recog = new Rec();
+  recog.lang = $("lang").value;
+  recog.continuous = true;
+  recog.interimResults = true;
+  let settled = "";
+  recog.onresult = ev => {
+    let interim = "";
+    for (let i = ev.resultIndex; i < ev.results.length; i++) {
+      const r = ev.results[i];
+      if (r.isFinal) settled += r[0].transcript + " "; else interim += r[0].transcript;
+    }
+    $("say").value = (settled + interim).trim();
+  };
+  recog.onerror = ev => { note("listening stopped: " + ev.error); micState(false); };
+  recog.onend = () => { if (listening) { try { recog.start(); } catch (e) {} } };
+  recog.start();
+  micState(true);
+}
+
+async function startApi() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({audio: true});
+    recorder = new MediaRecorder(stream); chunks = [];
+    recorder.ondataavailable = e => chunks.push(e.data);
+    recorder.onstop = async () => {
+      stream.getTracks().forEach(t => t.stop());
+      const blob = new Blob(chunks, {type: "audio/webm"});
+      if (blob.size < 1200) return;
+      note("transcribing…", true);
+      try {
+        const r = await fetch("/api/transcribe", {method:"POST",
+          headers:{"Content-Type":"application/octet-stream"}, body: blob});
+        const data = await r.json();
+        note(data.error || "");
+        if (data.text) { $("say").value = data.text; $("ask").requestSubmit(); }
+      } catch (e) { note("could not transcribe"); }
+    };
+    recorder.start(); micState(true);
+  } catch (e) { note("no microphone access"); micState(false); }
+}
+
+function stopListening() {
+  micState(false);
+  if (recog) { try { recog.stop(); } catch (e) {} recog = null; }
+  if (recorder && recorder.state !== "inactive") recorder.stop();
+  recorder = null;
+}
+
+$("mic").onclick = () => {
+  if (listening) {
+    stopListening();
+    // The browser recogniser fills the box as you speak, so send what is there.
+    if ($("stt").value === "browser" && $("say").value.trim()) $("ask").requestSubmit();
+    return;
+  }
+  if (speechSynthesis) speechSynthesis.cancel();   // do not talk over the learner
+  ($("stt").value === "api" ? startApi : startBrowser)();
+};
+$("stt").onchange = () => { if (listening) stopListening(); };
+$("lang").onchange = () => { if (listening && recog) { stopListening(); startBrowser(); } };
+$("speak").onclick = () => {
+  const on = $("speak").getAttribute("aria-pressed") !== "true";
+  $("speak").setAttribute("aria-pressed", String(on));
+  if (!on && window.speechSynthesis) speechSynthesis.cancel();
+};
 
 openDaf($("ref").value);
 </script>

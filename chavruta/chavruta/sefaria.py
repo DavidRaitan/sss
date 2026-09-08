@@ -66,6 +66,11 @@ CLAUSE_END = re.compile(r"[^.?!:]+[.?!:]?")
 FALLBACK_DIBUR = [r"^<b>(.+?)</b>", r"^(.{2,80}?)\s*[–—-]\s+"]
 
 
+# Availability and dibur patterns are properties of a text, not of a session,
+# so they are asked once per process rather than once per daf.
+_SEEN = {}
+
+
 def get(path, soft=False, **params):
     url = "%s/%s" % (API, urllib.parse.quote(path, safe="/:,-."))
     if params:
@@ -74,15 +79,19 @@ def get(path, soft=False, **params):
             for item in value if isinstance(value, list) else [value]:
                 parts.append("%s=%s" % (key, urllib.parse.quote(str(item))))
         url += "?" + "&".join(parts)
-    for attempt in range(4):
+    # A soft call is a probe -- "does this text exist" -- and most of them are
+    # expected to miss. Retrying those with backoff turned opening one daf into
+    # a minute of waiting, so probes get one quick attempt and real fetches
+    # keep the retries.
+    attempts, timeout = (1, 6) if soft else (4, 30)
+    for attempt in range(attempts):
         try:
-            with urllib.request.urlopen(url, timeout=30) as response:
+            with urllib.request.urlopen(url, timeout=timeout) as response:
                 return json.load(response)
         except (urllib.error.URLError, TimeoutError) as exc:
-            code = getattr(exc, "code", None)
-            if soft and code == 404:
+            if soft:
                 return None
-            if attempt == 3:
+            if attempt == attempts - 1:
                 if soft:
                     return None
                 raise SystemExit("sefaria unreachable: %s (%s)" % (url, exc))
@@ -135,7 +144,9 @@ def dibur_patterns(title):
     Sefaria records these per commentary -- Rashi and Tosafot mark the lemma
     with a dash, others bold it -- so reading them beats one guessed regex.
     """
-    index = get("v2/raw_index/%s" % title, soft=True) or {}
+    if title not in _SEEN:
+        _SEEN[title] = get("v2/raw_index/%s" % title, soft=True) or {}
+    index = _SEEN[title]
     schema = index.get("schema", {})
     if not schema.get("isSegmentLevelDiburHamatchil", True):
         return []
@@ -144,8 +155,14 @@ def dibur_patterns(title):
 
 def available(masechta, names):
     """Which of these commentators Sefaria actually holds on this masechta."""
-    return [n for n in names
-            if get("v2/raw_index/%s on %s" % (n, masechta), soft=True) is not None]
+    found = []
+    for name in names:
+        key = "%s on %s" % (name, masechta)
+        if key not in _SEEN:
+            _SEEN[key] = get("v2/raw_index/%s" % key, soft=True) or {}
+        if _SEEN[key]:
+            found.append(name)
+    return found
 
 
 def wanted_for(masechta, wide=False):

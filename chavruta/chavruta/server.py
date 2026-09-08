@@ -6,6 +6,7 @@ from Sefaria the first time a page is opened and cached on disk, so the second
 visit to a daf is instant and free.
 """
 
+import io
 import json
 import os
 import posixpath
@@ -36,15 +37,32 @@ def pack_path(ref):
 
 
 def load_pack(ref, rebuild=False):
-    """From disk if we have it, from Sefaria if we do not."""
+    """From disk if we have the real thing, from Sefaria otherwise.
+
+    A fixture on disk is never good enough to serve. It exists so the app runs
+    with no network, and left to satisfy a request it silently shows three
+    hand-typed lines in place of the daf -- which is the exact failure this
+    product cannot have. So a fixture is treated as absent, and only comes back
+    if Sefaria genuinely cannot be reached.
+    """
     path = pack_path(ref)
+    stale = None
     if os.path.exists(path) and not rebuild:
-        return Pack.load(path)
+        pack = Pack.load(path)
+        if not pack.is_fixture:
+            return pack
+        stale = pack
+
     masechta = ref.rsplit(" ", 1)[0]
     # Everything on the daf in one request -- what enters the prompt is decided
     # later, per turn, by retrieve.py.
     wanted = sefaria.wanted_for(masechta, wide=True)
-    data = sefaria.build(ref, wanted)
+    try:
+        data = sefaria.build(ref, wanted)
+    except SystemExit:
+        if stale is not None:
+            return stale
+        raise
     os.makedirs(PACKS, exist_ok=True)
     with open(path, "w", encoding="utf-8") as handle:
         json.dump(data, handle, ensure_ascii=False, indent=2)
@@ -108,7 +126,10 @@ class Handler(BaseHTTPRequestHandler):
         return self.send_file(target)
 
     def do_POST(self):
-        if urllib.parse.urlparse(self.path).path != "/api/say":
+        route = urllib.parse.urlparse(self.path).path
+        if route == "/api/transcribe":
+            return self.transcribe()
+        if route != "/api/say":
             return self.send_json({"error": "not found"}, 404)
         length = int(self.headers.get("Content-Length") or 0)
         try:
@@ -143,6 +164,37 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as exc:
             traceback.print_exc()
             return self.send_json({"error": "%s: %s" % (type(exc).__name__, exc)}, 500)
+
+    def transcribe(self):
+        """Audio in, text out, for speech the browser cannot handle.
+
+        The browser's own recogniser is free and instant but takes one language
+        at a time, which is the wrong shape for someone who says a sentence in
+        English with the Aramaic still in it. This path costs money and handles
+        that, so the two sit side by side and the learner picks.
+        """
+        length = int(self.headers.get("Content-Length") or 0)
+        if not length:
+            return self.send_json({"error": "no audio"}, 400)
+        audio = self.rfile.read(length)
+        try:
+            from .llm import LLM
+            client = LLM().client
+            buffer = io.BytesIO(audio)
+            buffer.name = "speech.webm"  # the SDK infers the format from this
+            result = client.audio.transcriptions.create(
+                model=os.environ.get("CHAVRUTA_MODEL_STT", "gpt-transcribe"),
+                file=buffer,
+                # Naming what it is about to hear is the cheapest accuracy win
+                # available: without it, Aramaic inside an English sentence
+                # comes back as approximate English words.
+                prompt=("Someone studying Talmud aloud. Speech mixes English with "
+                        "Hebrew and Aramaic mid-sentence, and includes terms like "
+                        "gemara, sugya, machlokes, Rashi, Tosafot, mishna."),
+            )
+            return self.send_json({"text": (result.text or "").strip()})
+        except Exception as exc:
+            return self.send_json({"error": "%s: %s" % (type(exc).__name__, exc)}, 502)
 
     def health(self):
         llm = LLM()
