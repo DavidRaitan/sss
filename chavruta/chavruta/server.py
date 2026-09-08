@@ -107,6 +107,16 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_file(os.path.join(WEB, "index.html"))
         if url.path == "/api/health":
             return self.send_json(self.health())
+        if url.path == "/api/find":
+            # Sefaria resolves partial and Hebrew names to real refs, so typing
+            # "berachot 2" or "ברכות ב" lands on the daf without knowing how
+            # Sefaria spells it.
+            q = (query.get("q") or [""])[0].strip()
+            if len(q) < 2:
+                return self.send_json({"matches": []})
+            found = sefaria.get("name/%s" % q, soft=True, limit=8) or {}
+            matches = [c for c in (found.get("completions") or []) if c][:8]
+            return self.send_json({"matches": matches, "is_ref": bool(found.get("is_ref"))})
         if url.path == "/api/daf":
             ref = (query.get("ref") or [""])[0].strip()
             if not ref:

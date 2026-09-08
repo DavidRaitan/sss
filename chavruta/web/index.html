@@ -23,7 +23,15 @@
   h1 { margin:0 6px 0 0; font-size:15px; font-weight:600; }
   input, select, button { font:inherit; font-size:13px; border:1px solid var(--line);
     background:var(--card); color:var(--ink); border-radius:6px; padding:5px 10px; }
-  input { width:170px; }
+  input { width:230px; }
+  .lbl { font-size:12px; color:var(--faint); }
+  .find { position:relative; }
+  #hits { position:absolute; top:100%; inset-inline-start:0; z-index:20; min-width:230px;
+    background:var(--card); border:1px solid var(--line); border-radius:8px;
+    margin-top:4px; overflow:hidden; box-shadow:0 6px 20px rgba(0,0,0,.11); }
+  #hits div { padding:7px 11px; font-size:13px; cursor:pointer; direction:ltr; text-align:left; }
+  #hits div:hover, #hits div.on { background:var(--glow); }
+  .where { font-size:11.5px; color:var(--faint); margin:0 0 9px; }
   button { cursor:pointer; color:var(--dim); }
   button:hover { color:var(--ink); border-color:var(--faint); }
   button[aria-pressed="true"], button.go { color:#fff; background:var(--ink); border-color:var(--ink); }
@@ -90,9 +98,14 @@
 <body>
 <header>
   <h1>חברותא</h1>
-  <input id="ref" placeholder="Berakhot 2a" value="Berakhot 2a"
-         aria-label="daf reference" autocomplete="off">
-  <button class="go" id="go">פתח</button>
+  <div class="find">
+    <input id="ref" placeholder="ברכות ב · berachot 2 · bava metzia 59"
+           value="Berakhot 2a" aria-label="find a daf" autocomplete="off">
+    <div id="hits" hidden></div>
+  </div>
+  <button id="prev" title="previous amud">‹</button>
+  <button id="next" title="next amud">›</button>
+  <label class="lbl">רמה</label>
   <select id="level" aria-label="level">
     <option value="standard">רגיל — Rashi &amp; Tosafot</option>
     <option value="beginner">מתחיל — lean on English</option>
@@ -113,11 +126,13 @@
   <span class="note" id="note" hidden></span>
 </header>
 <main>
-  <div id="daf"></div>
+  <div><p class="where" id="where"></p><div id="daf"></div></div>
   <aside>
     <div class="tabs" role="tablist">
-      <button id="t-chat" role="tab" aria-selected="true" aria-controls="p-chat">חברותא</button>
-      <button id="t-src" role="tab" aria-selected="false" aria-controls="p-src">מפרשים</button>
+      <button id="t-chat" role="tab" aria-selected="true" aria-controls="p-chat">
+        שיחה · talk</button>
+      <button id="t-src" role="tab" aria-selected="false" aria-controls="p-src">
+        מפרשים · sources</button>
     </div>
     <div class="pane" id="p-chat" role="tabpanel"></div>
     <div class="pane" id="p-src" role="tabpanel" hidden></div>
@@ -151,6 +166,8 @@ async function openDaf(ref) {
     const data = await r.json();
     if (!r.ok) { note(data.error || "could not open that daf"); return; }
     pack = data; line = pack.segments[0]?.n || 1;
+    $("where").textContent = pack.ref + " — " + pack.segments.length +
+      " lines on this amud. Click a line to talk about it.";
     note(pack.fixture ? pack.fixture_note : "");
     drawDaf(); select(line); $("p-chat").replaceChildren();
     say_system("Open at " + pack.ref + ". Read a line, then tell me what you think it means.");
@@ -181,6 +198,8 @@ function select(n) {
   line = n;
   for (const b of document.querySelectorAll(".seg"))
     b.setAttribute("aria-current", String(+b.dataset.n === n));
+  $("where").textContent = pack.ref + " — line " + n + " of " + pack.segments.length +
+    ". The chavruta answers about this line.";
   const seg = pack.segments.find(s => s.n === n), pane = $("p-src");
   pane.replaceChildren();
   const rows = [];
@@ -256,9 +275,78 @@ const toggle = (id, apply) => { const b = $(id);
     b.setAttribute("aria-pressed", String(on)); apply(on); }; };
 toggle("stops", on => $("daf").classList.toggle("stops", on));
 toggle("eng", on => document.querySelectorAll(".en").forEach(e => e.hidden = !on));
-$("go").onclick = () => openDaf($("ref").value.trim());
-$("ref").onkeydown = e => { if (e.key === "Enter") $("go").click(); };
 
+
+
+/* ---- finding and moving between dapim ---------------------------------- */
+
+// "Berakhot 2a" -> "Berakhot 2b" -> "Berakhot 3a". An amud, not a page.
+function step(ref, by) {
+  const m = /^(.*?)(\d+)([ab])$/.exec(ref.trim());
+  if (!m) return null;
+  let [, book, num, side] = m;
+  num = parseInt(num, 10);
+  if (by > 0) { if (side === "a") side = "b"; else { side = "a"; num++; } }
+  else { if (side === "b") side = "a"; else { side = "b"; num--; } }
+  return num < 2 ? null : book + num + side;
+}
+
+let hitIndex = -1;
+function showHits(list) {
+  const box = $("hits");
+  box.replaceChildren(); hitIndex = -1;
+  if (!list.length) { box.hidden = true; return; }
+  list.forEach(name => {
+    const row = el("div", null, name);
+    row.onmousedown = ev => { ev.preventDefault(); $("ref").value = name;
+      box.hidden = true; openDaf(name); };
+    box.append(row);
+  });
+  box.hidden = false;
+}
+
+let findTimer = null;
+$("ref").oninput = () => {
+  clearTimeout(findTimer);
+  const q = $("ref").value.trim();
+  findTimer = setTimeout(async () => {
+    if (q.length < 2) return void showHits([]);
+    try {
+      const r = await fetch("/api/find?q=" + encodeURIComponent(q));
+      const d = await r.json();
+      showHits(d.matches || []);
+    } catch (e) { showHits([]); }
+  }, 220);
+};
+$("ref").onkeydown = ev => {
+  const box = $("hits"), rows = [...box.querySelectorAll("div")];
+  if (!box.hidden && rows.length && (ev.key === "ArrowDown" || ev.key === "ArrowUp")) {
+    ev.preventDefault();
+    hitIndex = (hitIndex + (ev.key === "ArrowDown" ? 1 : -1) + rows.length) % rows.length;
+    rows.forEach((r, i) => r.classList.toggle("on", i === hitIndex));
+    return;
+  }
+  if (ev.key === "Enter") {
+    ev.preventDefault();
+    const pick = hitIndex >= 0 && rows[hitIndex] ? rows[hitIndex].textContent : $("ref").value.trim();
+    $("ref").value = pick; box.hidden = true; openDaf(pick);
+  }
+  if (ev.key === "Escape") box.hidden = true;
+};
+$("ref").onblur = () => setTimeout(() => { $("hits").hidden = true; }, 150);
+
+function go(by) {
+  if (!pack) return;
+  const next = step(pack.ref, by);
+  if (next) { $("ref").value = next; openDaf(next); }
+}
+$("prev").onclick = () => go(-1);
+$("next").onclick = () => go(1);
+document.addEventListener("keydown", ev => {
+  if (document.activeElement.tagName === "INPUT") return;
+  if (ev.key === "ArrowLeft") go(1);        // RTL: left is forward
+  if (ev.key === "ArrowRight") go(-1);
+});
 
 /* ---- voice -------------------------------------------------------------
    Two ways to listen. The browser's recogniser is free and instant but
