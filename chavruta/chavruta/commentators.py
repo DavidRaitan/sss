@@ -20,6 +20,14 @@ BACKBONE loads with the page. Everything else is fetched only when the
 conversation actually reaches for it -- see retrieve.py.
 """
 
+# What you can open. One masechta for now, deliberately: the routing judgement
+# below is per-tractate and unverified everywhere else, and offering a page we
+# route badly is worse than not offering it.
+MASECHTOT = [
+    {"name": "Berakhot", "he": "ברכות", "first": 2, "last": 64, "last_amud": "a"},
+]
+
+
 # --- layer 1: who is on the page, and who is a step away ----------------------
 
 # On the daf itself. These are what the learner is looking at while you talk,

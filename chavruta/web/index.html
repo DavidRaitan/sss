@@ -6,86 +6,89 @@
 <title>חברותא</title>
 <style>
   :root {
-    --ink:#1a1614; --dim:#6b625c; --faint:#a09890;
-    --ground:#faf7f2; --card:#fff; --line:#e5ded4;
-    --mark:#b4472f; --glow:#fdf3d8; --me:#eef2f6;
-    --serif:"SBL Hebrew","Taamey Frank CLM","Times New Roman",serif;
+    --ink:#221c15; --dim:#6d6255; --faint:#a3988a;
+    --page:#fdfaf3; --ground:#f2ece1; --line:#e0d7c7;
+    --mark:#9c3b21; --glow:#f7e9c9; --edge:#cbbfa9;
+    --serif:"SBL Hebrew","Taamey Frank CLM","Frank Ruehl CLM","Times New Roman",serif;
     --ui:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
   }
   @media (prefers-color-scheme: dark) {
-    :root { --ink:#ece6de; --dim:#9a9088; --faint:#6b625c; --ground:#16130f;
-            --card:#1e1a16; --line:#332c25; --mark:#e08a6d; --glow:#2b2317; --me:#232b33; }
+    :root { --ink:#eee6d8; --dim:#a2988a; --faint:#6f6558; --page:#1b1712;
+            --ground:#13100c; --line:#332c22; --mark:#dd8a63; --glow:#33291a; --edge:#3d3427; }
   }
   * { box-sizing:border-box; }
-  body { margin:0; background:var(--ground); color:var(--ink); font-family:var(--ui); }
-  header { position:sticky; top:0; z-index:5; display:flex; gap:9px; align-items:center;
-    padding:10px 16px; background:var(--card); border-bottom:1px solid var(--line); flex-wrap:wrap; }
-  h1 { margin:0 6px 0 0; font-size:15px; font-weight:600; }
-  input, select, button { font:inherit; font-size:13px; border:1px solid var(--line);
-    background:var(--card); color:var(--ink); border-radius:6px; padding:5px 10px; }
-  input { width:230px; }
-  .lbl { font-size:12px; color:var(--faint); }
-  .find { position:relative; }
-  #hits { position:absolute; top:100%; inset-inline-start:0; z-index:20; min-width:230px;
-    background:var(--card); border:1px solid var(--line); border-radius:8px;
-    margin-top:4px; overflow:hidden; box-shadow:0 6px 20px rgba(0,0,0,.11); }
-  #hits div { padding:7px 11px; font-size:13px; cursor:pointer; direction:ltr; text-align:left; }
-  #hits div:hover, #hits div.on { background:var(--glow); }
-  .where { font-size:11.5px; color:var(--faint); margin:0 0 9px; }
-  button { cursor:pointer; color:var(--dim); }
-  button:hover { color:var(--ink); border-color:var(--faint); }
-  button[aria-pressed="true"], button.go { color:#fff; background:var(--ink); border-color:var(--ink); }
+  html, body { height:100%; }
+  body { margin:0; background:var(--ground); color:var(--ink); font-family:var(--ui);
+    display:flex; flex-direction:column; }
+
+  /* ---- the picker: masechta, daf, amud, like turning to a page ---- */
+  header { display:flex; align-items:center; gap:10px; padding:9px 16px;
+    background:var(--page); border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  .brand { font-family:var(--serif); font-size:19px; letter-spacing:.02em; }
+  .pick { display:flex; align-items:center; gap:6px; }
+  .pick label { font-size:11px; color:var(--faint); }
+  select, .btn { font:inherit; font-size:13px; color:var(--ink); background:var(--page);
+    border:1px solid var(--line); border-radius:7px; padding:5px 9px; cursor:pointer; }
+  select:hover, .btn:hover { border-color:var(--edge); }
+  .amud { display:flex; }
+  .amud .btn { border-radius:0; margin-inline-start:-1px; font-family:var(--serif); font-size:16px; padding:2px 13px; }
+  .amud .btn:first-child { border-start-start-radius:7px; border-end-start-radius:7px; }
+  .amud .btn:last-child { border-start-end-radius:7px; border-end-end-radius:7px; }
+  .btn[aria-pressed="true"] { background:var(--ink); color:var(--page); border-color:var(--ink); }
   .grow { flex:1; }
-  .note { width:100%; font-size:12px; color:var(--mark); }
-  .note.busy { color:var(--dim); }
+  .quiet { font-size:12px; color:var(--faint); }
 
-  main { display:grid; grid-template-columns:minmax(0,1fr) 400px; gap:20px;
-    max-width:1240px; margin:0 auto; padding:20px 16px 40px; align-items:start; }
-  @media (max-width:920px) { main { grid-template-columns:minmax(0,1fr); } }
+  /* ---- the daf ---- */
+  main { flex:1; overflow-y:auto; }
+  .sheet { max-width:760px; margin:0 auto; padding:26px 22px 40px; background:var(--page);
+    min-height:100%; border-inline:1px solid var(--line); }
+  .amudname { text-align:center; font-family:var(--serif); font-size:15px;
+    color:var(--faint); letter-spacing:.06em; margin-bottom:20px; }
+  .ln { position:relative; font-family:var(--serif); font-size:26px; line-height:2.05;
+    padding:5px 14px 5px 10px; border-radius:6px; cursor:pointer; }
+  .ln:hover { background:var(--ground); }
+  .ln[aria-current="true"] { background:var(--glow); box-shadow:inset 3px 0 0 var(--mark); }
+  .stops .cl:nth-child(even) { border-bottom:1px dotted var(--edge); }
+  .ln .en { display:none; font-family:var(--ui); font-size:14px; line-height:1.6;
+    color:var(--dim); direction:ltr; text-align:left; margin:6px 0 2px; }
+  .showen .ln .en { display:block; }
+  .ln .en .add { color:var(--faint); font-style:italic; }
+  .hint { font-size:11px; color:var(--faint); margin-inline-start:6px; }
 
-  .seg { background:var(--card); border:1px solid var(--line); border-radius:9px;
-    padding:14px 17px; margin-bottom:10px; cursor:pointer; }
-  .seg:hover { border-color:var(--faint); }
-  .seg[aria-current="true"] { border-color:var(--mark); box-shadow:0 0 0 1px var(--mark); }
-  .n { font-size:11px; color:var(--faint); margin-bottom:6px; display:flex; gap:8px; }
-  .he { font-family:var(--serif); font-size:24px; line-height:1.95; }
-  .stops .cl:nth-child(odd) { background:var(--glow); border-radius:3px; padding:0 2px; }
-  .en { margin-top:10px; font-size:14px; line-height:1.6; color:var(--dim);
-    direction:ltr; text-align:left; }
-  .en .add { color:var(--faint); font-style:italic; }
-  .tags { display:flex; gap:5px; flex-wrap:wrap; margin-inline-start:auto; }
-  .tag { font-size:10px; color:var(--dim); background:var(--ground);
-    border:1px solid var(--line); border-radius:20px; padding:1px 7px; }
+  /* ---- the voice bar: this is the conversation ---- */
+  footer { background:var(--page); border-top:1px solid var(--line); padding:11px 16px 13px; }
+  .bar { max-width:760px; margin:0 auto; display:flex; align-items:center; gap:14px; }
+  #mic { width:56px; height:56px; border-radius:50%; border:1px solid var(--edge);
+    background:var(--page); font-size:22px; cursor:pointer; flex:none; }
+  #mic[data-state="listening"] { background:var(--mark); border-color:var(--mark); color:#fff;
+    animation:pulse 1.15s ease-in-out infinite; }
+  #mic[data-state="thinking"] { background:var(--ink); border-color:var(--ink); color:var(--page); }
+  #mic[data-state="speaking"] { background:var(--glow); border-color:var(--edge); }
+  @keyframes pulse { 50% { box-shadow:0 0 0 9px rgba(156,59,33,.16); } }
+  .said { flex:1; min-width:0; }
+  .state { font-size:11.5px; color:var(--faint); letter-spacing:.04em; }
+  .last { font-size:15px; line-height:1.5; margin-top:3px;
+    display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+  .last.mine { color:var(--dim); font-style:italic; }
+  .tools { display:flex; gap:7px; flex:none; }
 
-  aside { position:sticky; top:64px; background:var(--card); border:1px solid var(--line);
-    border-radius:9px; display:flex; flex-direction:column; max-height:calc(100vh - 86px); }
-  @media (max-width:920px) { aside { position:static; max-height:none; } }
-  .tabs { display:flex; border-bottom:1px solid var(--line); }
-  .tabs button { border:0; border-radius:0; background:none; padding:10px 14px; font-size:13px; }
-  .tabs button[aria-selected="true"] { color:var(--ink); box-shadow:inset 0 -2px 0 var(--mark); }
-  .pane { overflow-y:auto; padding:14px 16px; flex:1; min-height:280px; }
-  .pane[hidden] { display:none; }
-
-  .msg { margin-bottom:13px; font-size:14.5px; line-height:1.62; white-space:pre-wrap; }
-  .msg.me { background:var(--me); border-radius:9px; padding:8px 11px; }
-  .msg.warn { color:var(--mark); font-size:12px; }
-  .msg .trace { display:block; font-size:10.5px; color:var(--faint); margin-top:5px; direction:ltr; }
-  .ask { display:flex; gap:7px; border-top:1px solid var(--line); padding:10px; }
-  .ask input { flex:1; width:auto; }
-  #mic { font-size:15px; padding:5px 9px; }
-  #mic[aria-pressed="true"] { background:var(--mark); border-color:var(--mark); color:#fff; }
-  @keyframes pulse { 50% { opacity:.55; } }
-  #mic[aria-pressed="true"] { animation:pulse 1.1s ease-in-out infinite; }
-
+  /* ---- transcript and sources slide over, they do not compete ---- */
+  .sheetover { position:fixed; inset:0; background:rgba(0,0,0,.28); display:none; z-index:30; }
+  .sheetover[data-open="true"] { display:block; }
+  .panel { position:absolute; inset-block:0; inset-inline-start:0; width:min(430px,92vw);
+    background:var(--page); border-inline-end:1px solid var(--line); overflow-y:auto; padding:18px 20px; }
+  .panel h2 { margin:0 0 2px; font-size:14px; }
+  .panel .sub { font-size:11.5px; color:var(--faint); margin-bottom:15px; }
+  .close { position:absolute; top:12px; inset-inline-end:14px; }
   .grp { font-size:10.5px; letter-spacing:.09em; text-transform:uppercase; color:var(--faint);
-    margin:14px 0 7px; padding-bottom:4px; border-bottom:1px solid var(--line); }
-  .src { margin-bottom:12px; }
+    margin:15px 0 8px; padding-bottom:4px; border-bottom:1px solid var(--line); }
+  .src { margin-bottom:13px; }
   .src .who { font-size:12.5px; font-weight:600; }
   .src .dib { font-family:var(--serif); font-size:15px; color:var(--mark); }
-  .src .body { font-family:var(--serif); font-size:16px; line-height:1.78; margin-top:4px;
-    max-height:5.2em; overflow:hidden; }
+  .src .body { font-family:var(--serif); font-size:16.5px; line-height:1.8; margin-top:4px;
+    max-height:5.4em; overflow:hidden; }
   .src.open .body { max-height:none; }
-  .more { border:0; padding:2px 0; font-size:11.5px; background:none; }
+  .more { border:0; background:none; padding:2px 0; font-size:11.5px; color:var(--dim); cursor:pointer; }
   .shape { display:flex; gap:4px; flex-wrap:wrap; margin-top:5px; }
   .mv { font-size:10px; border-radius:3px; padding:1px 6px; border:1px solid var(--line); color:var(--dim); }
   .mv.difficulty { color:var(--mark); border-color:var(--mark); }
@@ -93,368 +96,332 @@
   .lnk { display:block; font-size:12px; color:var(--dim); direction:ltr; text-align:left;
     padding:2px 0; text-decoration:none; }
   .lnk:hover { color:var(--mark); }
+  .turn { margin-bottom:14px; font-size:14.5px; line-height:1.6; white-space:pre-wrap; }
+  .turn.me { color:var(--dim); font-style:italic; }
+  .turn .trace { display:block; font-size:10px; color:var(--faint); margin-top:4px; direction:ltr; }
 </style>
 </head>
 <body>
 <header>
-  <h1>חברותא</h1>
-  <div class="find">
-    <input id="ref" placeholder="ברכות ב · berachot 2 · bava metzia 59"
-           value="Berakhot 2a" aria-label="find a daf" autocomplete="off">
-    <div id="hits" hidden></div>
-  </div>
-  <button id="prev" title="previous amud">‹</button>
-  <button id="next" title="next amud">›</button>
-  <label class="lbl">רמה</label>
-  <select id="level" aria-label="level">
-    <option value="standard">רגיל — Rashi &amp; Tosafot</option>
-    <option value="beginner">מתחיל — lean on English</option>
-    <option value="fluent">שוטף — no translation</option>
-  </select>
-  <select id="stt" aria-label="how to listen">
-    <option value="browser">שמיעה: דפדפן (חינם)</option>
-    <option value="api">שמיעה: API (מעורב שפות)</option>
-  </select>
-  <select id="lang" aria-label="spoken language">
-    <option value="he-IL">מדבר עברית</option>
-    <option value="en-US">speaking English</option>
-  </select>
-  <button id="speak" aria-pressed="true" title="speak replies aloud (never the gemara)">🔊</button>
-  <button id="stops" aria-pressed="false">עצירות</button>
-  <button id="eng" aria-pressed="false">English</button>
+  <span class="brand">חברותא</span>
+  <span class="pick"><label for="mas">מסכת</label><select id="mas"></select></span>
+  <span class="pick"><label for="daf">דף</label><select id="daf"></select></span>
+  <span class="pick"><label>עמוד</label>
+    <span class="amud"><button class="btn" id="am-a" aria-pressed="true">א</button>
+    <button class="btn" id="am-b" aria-pressed="false">ב</button></span></span>
   <span class="grow"></span>
-  <span class="note" id="note" hidden></span>
+  <select id="level" aria-label="level">
+    <option value="standard">רגיל</option>
+    <option value="beginner">מתחיל</option>
+    <option value="fluent">שוטף</option>
+  </select>
+  <button class="btn" id="eng" aria-pressed="false">תרגום</button>
+  <button class="btn" id="stops" aria-pressed="false">עצירות</button>
+  <span class="quiet" id="note"></span>
 </header>
-<main>
-  <div><p class="where" id="where"></p><div id="daf"></div></div>
-  <aside>
-    <div class="tabs" role="tablist">
-      <button id="t-chat" role="tab" aria-selected="true" aria-controls="p-chat">
-        שיחה · talk</button>
-      <button id="t-src" role="tab" aria-selected="false" aria-controls="p-src">
-        מפרשים · sources</button>
-    </div>
-    <div class="pane" id="p-chat" role="tabpanel"></div>
-    <div class="pane" id="p-src" role="tabpanel" hidden></div>
-    <form class="ask" id="ask">
-      <button type="button" id="mic" title="click to talk, click again to send">🎤</button>
-      <input id="say" placeholder="say what you think it means…" autocomplete="off">
-      <button type="submit">→</button>
-    </form>
-  </aside>
-</main>
+
+<main><div class="sheet" id="sheet">
+  <div class="amudname" id="amudname">…</div>
+  <div id="daftext"></div>
+</div></main>
+
+<footer><div class="bar">
+  <button id="mic" data-state="idle" title="דבר">🎤</button>
+  <div class="said">
+    <div class="state" id="state">לחץ על המיקרופון ודבר</div>
+    <div class="last" id="last"></div>
+  </div>
+  <div class="tools">
+    <button class="btn" id="speak" aria-pressed="true" title="שהחברותא ידבר">🔊</button>
+    <button class="btn" id="showsrc" title="מפרשים">מפרשים</button>
+    <button class="btn" id="showlog" title="תמליל">תמליל</button>
+  </div>
+</div></footer>
+
+<div class="sheetover" id="over" data-open="false">
+  <div class="panel" id="panel"></div>
+</div>
+
 <script>
-const ORDER = ["Commentary","Halakhah","Talmud","Tanakh","Midrash","Responsa"];
-let pack = null, line = 1;
+const $ = id => document.getElementById(id);
+const el = (t,c,x)=>{const n=document.createElement(t); if(c)n.className=c;
+  if(x!==undefined)n.textContent=x; return n;};
+
+let pack=null, line=1, masechtot=[], amud="a", history=[];
 const session = sessionStorage.getItem("chav") ||
   (sessionStorage.setItem("chav", Math.random().toString(36).slice(2)),
    sessionStorage.getItem("chav"));
 
-const el = (t,c,x)=>{const n=document.createElement(t);
-  if(c)n.className=c; if(x!==undefined)n.textContent=x; return n;};
-const $ = id => document.getElementById(id);
+/* Hebrew numerals, because a daf is ב and not 2 — the small thing that makes
+   this read as a gemara rather than a database row. */
+const ONES=["","א","ב","ג","ד","ה","ו","ז","ח","ט"], TENS=["","י","כ","ל","מ","נ","ס","ע","פ","צ"];
+function hebNum(n) {
+  if (n === 15) return "טו";
+  if (n === 16) return "טז";
+  const h = Math.floor(n/100), t = Math.floor((n%100)/10), o = n%10;
+  return (h===1?"ק":h===2?"ר":h===3?"ש":"") + TENS[t] + ONES[o];
+}
 
-function note(text, busy) {
-  const n = $("note");
-  n.hidden = !text; n.textContent = text || ""; n.classList.toggle("busy", !!busy);
+function status(text, state) {
+  $("state").textContent = text;
+  if (state) $("mic").dataset.state = state;
+}
+function note(text) { $("note").textContent = text || ""; }
+
+/* ---- picking a page ---------------------------------------------------- */
+
+async function buildPickers() {
+  try {
+    const r = await fetch("/api/masechtot");
+    masechtot = (await r.json()).masechtot || [];
+  } catch (e) { masechtot = []; }
+  const mas = $("mas");
+  mas.replaceChildren();
+  for (const m of masechtot) {
+    const o = el("option", null, m.he); o.value = m.name; mas.append(o);
+  }
+  fillDapim();
+  mas.onchange = () => { fillDapim(); turnTo(); };
+  $("daf").onchange = turnTo;
+}
+
+function current() { return masechtot.find(m => m.name === $("mas").value) || masechtot[0]; }
+
+function fillDapim() {
+  const m = current(); if (!m) return;
+  const daf = $("daf"); daf.replaceChildren();
+  for (let n = m.first; n <= m.last; n++) {
+    const o = el("option", null, hebNum(n)); o.value = n; daf.append(o);
+  }
+  daf.value = m.first;
+}
+
+function setAmud(which) {
+  amud = which;
+  $("am-a").setAttribute("aria-pressed", String(which === "a"));
+  $("am-b").setAttribute("aria-pressed", String(which === "b"));
+}
+$("am-a").onclick = () => { setAmud("a"); turnTo(); };
+$("am-b").onclick = () => { setAmud("b"); turnTo(); };
+
+function turnTo() {
+  const m = current(); if (!m) return;
+  const n = parseInt($("daf").value, 10);
+  // The last amud of a masechta may not have a second side.
+  if (n === m.last && m.last_amud === "a" && amud === "b") setAmud("a");
+  openDaf(m.name + " " + n + amud);
 }
 
 async function openDaf(ref) {
-  note("fetching " + ref + " from Sefaria…", true);
+  note(""); status("פותח את הדף…", "thinking");
+  $("amudname").textContent = ref;
   try {
     const r = await fetch("/api/daf?ref=" + encodeURIComponent(ref));
     const data = await r.json();
-    if (!r.ok) { note(data.error || "could not open that daf"); return; }
-    pack = data; line = pack.segments[0]?.n || 1;
-    $("where").textContent = pack.ref + " — " + pack.segments.length +
-      " lines on this amud. Click a line to talk about it.";
-    note(pack.fixture ? pack.fixture_note : "");
-    drawDaf(); select(line); $("p-chat").replaceChildren();
-    say_system("Open at " + pack.ref + ". Read a line, then tell me what you think it means.");
-  } catch (e) { note("could not reach the server"); }
+    if (!r.ok) {
+      status("לא הצלחתי לפתוח את הדף", "idle");
+      note(data.error ? "" : ""); console.warn(data.error);
+      return;
+    }
+    pack = data; history = [];
+    drawDaf(); select(pack.segments[0]?.n || 1);
+    status("לחץ על המיקרופון ודבר", "idle");
+    if (pack.fixture) note("נתוני בדיקה — לא הדף האמיתי");
+  } catch (e) {
+    status("אין חיבור לשרת", "idle"); console.warn(e);
+  }
 }
 
 function drawDaf() {
-  const daf = $("daf"); daf.replaceChildren();
+  const m = current();
+  const n = pack.ref.match(/(\d+)([ab])$/);
+  $("amudname").textContent = (m ? m.he : pack.ref) +
+    (n ? " · דף " + hebNum(+n[1]) + " עמוד " + (n[2] === "a" ? "א" : "ב") : "");
+  const box = $("daftext"); box.replaceChildren();
   for (const seg of pack.segments) {
-    const box = el("div","seg"); box.dataset.n = seg.n;
-    const head = el("div","n"); head.append(el("span",null,seg.ref));
-    const tags = el("div","tags");
-    for (const [c,k] of Object.entries(seg.panel||{})) tags.append(el("span","tag",c+" "+k));
-    head.append(tags);
-    const he = el("div","he");
-    for (const c of (seg.clauses?.length ? seg.clauses : [{he:seg.he}]))
-      he.append(el("span","cl", c.he + " "));
-    const en = el("div","en"); en.hidden = $("eng").getAttribute("aria-pressed") !== "true";
-    for (const s of seg.en||[]) en.append(el("span", s.kind==="daf"?"lit":"add", s.text+" "));
-    box.append(head, he, en);
-    box.onclick = () => select(seg.n);
-    daf.append(box);
+    const row = el("div", "ln"); row.dataset.n = seg.n;
+    for (const c of (seg.clauses?.length ? seg.clauses : [{he: seg.he}]))
+      row.append(el("span", "cl", c.he + " "));
+    const en = el("div", "en");
+    for (const s of seg.en || []) en.append(el("span", s.kind === "daf" ? "" : "add", s.text + " "));
+    row.append(en);
+    row.onclick = () => select(seg.n);
+    box.append(row);
   }
-  daf.classList.toggle("stops", $("stops").getAttribute("aria-pressed")==="true");
 }
 
 function select(n) {
   line = n;
-  for (const b of document.querySelectorAll(".seg"))
-    b.setAttribute("aria-current", String(+b.dataset.n === n));
-  $("where").textContent = pack.ref + " — line " + n + " of " + pack.segments.length +
-    ". The chavruta answers about this line.";
-  const seg = pack.segments.find(s => s.n === n), pane = $("p-src");
-  pane.replaceChildren();
-  const rows = [];
-  for (const [who,list] of Object.entries(seg.commentaries||{}))
-    for (const e of list) rows.push([who,e]);
-  rows.sort((a,b)=>(b[1].weight||0)-(a[1].weight||0));
-  if (rows.length) pane.append(el("div","grp","Commentary"));
-  for (const [who,e] of rows) {
-    const box = el("div","src");
-    const head = el("div","who",who);
-    if (e.dibur) { head.append(" "); head.append(el("span","dib",e.dibur)); }
-    box.append(head, el("div","body",e.he));
-    const shape = el("div","shape");
-    for (const m of (e.structure? e.structure.moves : []))
-      shape.append(el("span","mv "+m.kind, m.marker));
-    if (shape.children.length) box.append(shape);
-    box.append(el("div","ref",e.ref));
-    const more = el("button","more","הצג הכל");
-    more.onclick = ev => { ev.stopPropagation(); box.classList.toggle("open");
-      more.textContent = box.classList.contains("open") ? "הצג פחות" : "הצג הכל"; };
-    box.append(more); pane.append(box);
-  }
-  for (const [label,refs] of [["Halakhah",seg.halacha],["Talmud",seg.xrefs]]) {
-    if (!refs?.length) continue;
-    pane.append(el("div","grp",label));
-    for (const r of refs) {
-      const a = el("a","lnk",r);
-      a.href = "https://www.sefaria.org/" + encodeURIComponent(r.replace(/ /g,"_"));
-      a.target="_blank"; a.rel="noopener"; pane.append(a);
-    }
-  }
+  for (const r of document.querySelectorAll(".ln"))
+    r.setAttribute("aria-current", String(+r.dataset.n === n));
 }
 
-function bubble(cls, text, trace) {
-  const m = el("div","msg "+cls, text);
-  if (trace) m.append(el("span","trace",
-    "routed: " + trace.kind + (trace.claim ? " (claim)" : "") +
-    " · opened: " + (trace.opened||[]).join(", ")));
-  const pane = $("p-chat"); pane.append(m); pane.scrollTop = pane.scrollHeight;
-  return m;
-}
-const say_system = t => bubble("warn", t);
+/* ---- talking ----------------------------------------------------------- */
 
-$("ask").onsubmit = async ev => {
-  ev.preventDefault();
-  const box = $("say"), said = box.value.trim();
-  if (!said || !pack) return;
-  box.value = ""; bubble("me", said);
-  const pending = bubble("", "…");
-  try {
-    const r = await fetch("/api/say", {method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({ref: pack.ref, line, said, session, level: $("level").value})});
-    const data = await r.json();
-    pending.remove();
-    if (!r.ok) return void bubble("warn", data.error || "something went wrong");
-    bubble("", data.text, data.trace);
-    speak(data.text);
-    if (!data.grounded) bubble("warn", "ungrounded: " + data.problem);
-  } catch (e) { pending.remove(); bubble("warn","could not reach the server"); }
-};
+/* Replies are spoken; the gemara is not. Synthesised Aramaic sounds wrong to
+   exactly the ear that would notice, and reading it aloud is the learning act
+   being protected — so Hebrew runs are stripped before the synthesiser. */
+const HEBREW = /[֐-׿]+(?:[\s֐-׿"'׳״.,:;?!-]*[֐-׿]+)*/g;
+const speakable = t => t.replace(HEBREW, " — ").replace(/\[\[[^\]]+\]\]/g, "")
+  .replace(/\s{2,}/g, " ").replace(/(\s—\s){2,}/g, " — ").trim();
 
-for (const [tab, pane] of [["t-chat","p-chat"],["t-src","p-src"]]) {
-  $(tab).onclick = () => {
-    for (const [t,p] of [["t-chat","p-chat"],["t-src","p-src"]]) {
-      const on = t === tab;
-      $(t).setAttribute("aria-selected", String(on)); $(p).hidden = !on;
-    }
-  };
-}
-const toggle = (id, apply) => { const b = $(id);
-  b.onclick = () => { const on = b.getAttribute("aria-pressed")!=="true";
-    b.setAttribute("aria-pressed", String(on)); apply(on); }; };
-toggle("stops", on => $("daf").classList.toggle("stops", on));
-toggle("eng", on => document.querySelectorAll(".en").forEach(e => e.hidden = !on));
-
-
-
-/* ---- finding and moving between dapim ---------------------------------- */
-
-// "Berakhot 2a" -> "Berakhot 2b" -> "Berakhot 3a". An amud, not a page.
-function step(ref, by) {
-  const m = /^(.*?)(\d+)([ab])$/.exec(ref.trim());
-  if (!m) return null;
-  let [, book, num, side] = m;
-  num = parseInt(num, 10);
-  if (by > 0) { if (side === "a") side = "b"; else { side = "a"; num++; } }
-  else { if (side === "b") side = "a"; else { side = "b"; num--; } }
-  return num < 2 ? null : book + num + side;
-}
-
-let hitIndex = -1;
-function showHits(list) {
-  const box = $("hits");
-  box.replaceChildren(); hitIndex = -1;
-  if (!list.length) { box.hidden = true; return; }
-  list.forEach(name => {
-    const row = el("div", null, name);
-    row.onmousedown = ev => { ev.preventDefault(); $("ref").value = name;
-      box.hidden = true; openDaf(name); };
-    box.append(row);
-  });
-  box.hidden = false;
-}
-
-let findTimer = null;
-$("ref").oninput = () => {
-  clearTimeout(findTimer);
-  const q = $("ref").value.trim();
-  findTimer = setTimeout(async () => {
-    if (q.length < 2) return void showHits([]);
-    try {
-      const r = await fetch("/api/find?q=" + encodeURIComponent(q));
-      const d = await r.json();
-      showHits(d.matches || []);
-    } catch (e) { showHits([]); }
-  }, 220);
-};
-$("ref").onkeydown = ev => {
-  const box = $("hits"), rows = [...box.querySelectorAll("div")];
-  if (!box.hidden && rows.length && (ev.key === "ArrowDown" || ev.key === "ArrowUp")) {
-    ev.preventDefault();
-    hitIndex = (hitIndex + (ev.key === "ArrowDown" ? 1 : -1) + rows.length) % rows.length;
-    rows.forEach((r, i) => r.classList.toggle("on", i === hitIndex));
-    return;
-  }
-  if (ev.key === "Enter") {
-    ev.preventDefault();
-    const pick = hitIndex >= 0 && rows[hitIndex] ? rows[hitIndex].textContent : $("ref").value.trim();
-    $("ref").value = pick; box.hidden = true; openDaf(pick);
-  }
-  if (ev.key === "Escape") box.hidden = true;
-};
-$("ref").onblur = () => setTimeout(() => { $("hits").hidden = true; }, 150);
-
-function go(by) {
-  if (!pack) return;
-  const next = step(pack.ref, by);
-  if (next) { $("ref").value = next; openDaf(next); }
-}
-$("prev").onclick = () => go(-1);
-$("next").onclick = () => go(1);
-document.addEventListener("keydown", ev => {
-  if (document.activeElement.tagName === "INPUT") return;
-  if (ev.key === "ArrowLeft") go(1);        // RTL: left is forward
-  if (ev.key === "ArrowRight") go(-1);
-});
-
-/* ---- voice -------------------------------------------------------------
-   Two ways to listen. The browser's recogniser is free and instant but
-   handles one language at a time, which is wrong for a sentence that starts
-   in English and lands in Aramaic. The API path costs a little and copes with
-   that. Both feed the same box, so you can switch mid-session and feel the
-   difference -- which is the ASR question this project has to answer anyway.
-
-   Replies are spoken, the gemara is never spoken. Synthesised Aramaic sounds
-   wrong to exactly the people whose ear is trained enough to matter, and
-   reading it aloud is the learning act being protected -- so Hebrew-script
-   runs are stripped before anything reaches the synthesiser. You read the
-   text; it talks about it.                                                */
-
-const HEBREW = /[\u0590-\u05FF]+(?:[\s\u0590-\u05FF"'\u05f3\u05f4.,:;?!-]*[\u0590-\u05FF]+)*/g;
-let recog = null, listening = false, recorder = null, chunks = [];
-
-function speakable(text) {
-  return text.replace(HEBREW, " — ").replace(/\[\[[^\]]+\]\]/g, "")
-             .replace(/\s{2,}/g, " ").replace(/(\s—\s){2,}/g, " — ").trim();
-}
-
-function speak(text) {
-  if ($("speak").getAttribute("aria-pressed") !== "true") return;
-  if (!window.speechSynthesis) return;
+let handsFree = false;
+function speak(text, then) {
+  if ($("speak").getAttribute("aria-pressed") !== "true" || !window.speechSynthesis)
+    return void (then && then());
   const say = speakable(text);
-  if (!say) return;
+  if (!say) return void (then && then());
   speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(say);
-  u.lang = "en-US"; u.rate = 1.02;
+  u.lang = "en-US"; u.rate = 1.03;
+  u.onend = () => { status("לחץ על המיקרופון ודבר", "idle"); then && then(); };
+  status("מדבר…", "speaking");
   speechSynthesis.speak(u);
 }
 
-function micState(on) {
-  listening = on;
-  $("mic").setAttribute("aria-pressed", String(on));
+async function send(said) {
+  if (!said || !pack) return;
+  history.push({role: "me", text: said});
+  $("last").textContent = said; $("last").classList.add("mine");
+  status("חושב…", "thinking");
+  try {
+    const r = await fetch("/api/say", {method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ref: pack.ref, line, said, session, level: $("level").value})});
+    const data = await r.json();
+    if (!r.ok) { status(data.error || "משהו השתבש", "idle"); console.warn(data.error); return; }
+    history.push({role: "it", text: data.text, trace: data.trace});
+    $("last").textContent = data.text; $("last").classList.remove("mine");
+    // A conversation, not a chat: after it finishes talking, it listens again.
+    speak(data.text, () => { if (handsFree) startListening(); });
+  } catch (e) { status("אין חיבור לשרת", "idle"); console.warn(e); }
 }
 
-function startBrowser() {
+/* ---- listening --------------------------------------------------------- */
+
+let recog = null, quiet = null, buffer = "";
+
+function startListening() {
   const Rec = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!Rec) { note("this browser cannot listen — switch שמיעה to API"); return; }
+  if (!Rec) return void status("הדפדפן הזה לא יודע להאזין", "idle");
+  if (window.speechSynthesis) speechSynthesis.cancel();
   recog = new Rec();
-  recog.lang = $("lang").value;
-  recog.continuous = true;
-  recog.interimResults = true;
-  let settled = "";
+  // Bilingual by design: the sentence starts in English and lands in Aramaic.
+  recog.lang = "he-IL";
+  recog.continuous = true; recog.interimResults = true;
+  buffer = "";
   recog.onresult = ev => {
     let interim = "";
     for (let i = ev.resultIndex; i < ev.results.length; i++) {
-      const r = ev.results[i];
-      if (r.isFinal) settled += r[0].transcript + " "; else interim += r[0].transcript;
+      const res = ev.results[i];
+      if (res.isFinal) buffer += res[0].transcript + " "; else interim += res[0].transcript;
     }
-    $("say").value = (settled + interim).trim();
+    $("last").textContent = (buffer + interim).trim();
+    $("last").classList.add("mine");
+    // Silence ends the turn, the way it does between two people.
+    clearTimeout(quiet);
+    quiet = setTimeout(() => { if (buffer.trim()) stopListening(true); }, 1600);
   };
-  recog.onerror = ev => { note("listening stopped: " + ev.error); micState(false); };
-  recog.onend = () => { if (listening) { try { recog.start(); } catch (e) {} } };
-  recog.start();
-  micState(true);
+  recog.onerror = ev => {
+    if (ev.error === "not-allowed") status("צריך גישה למיקרופון", "idle");
+    else if (ev.error !== "no-speech") status("ההאזנה נפסקה", "idle");
+    handsFree = false; recog = null;
+  };
+  recog.onend = () => { if (recog && $("mic").dataset.state === "listening") {
+    try { recog.start(); } catch (e) {} } };
+  try { recog.start(); } catch (e) {}
+  handsFree = true;
+  status("מקשיב… דבר, ואשתוק עד שתסיים", "listening");
 }
 
-async function startApi() {
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({audio: true});
-    recorder = new MediaRecorder(stream); chunks = [];
-    recorder.ondataavailable = e => chunks.push(e.data);
-    recorder.onstop = async () => {
-      stream.getTracks().forEach(t => t.stop());
-      const blob = new Blob(chunks, {type: "audio/webm"});
-      if (blob.size < 1200) return;
-      note("transcribing…", true);
-      try {
-        const r = await fetch("/api/transcribe", {method:"POST",
-          headers:{"Content-Type":"application/octet-stream"}, body: blob});
-        const data = await r.json();
-        note(data.error || "");
-        if (data.text) { $("say").value = data.text; $("ask").requestSubmit(); }
-      } catch (e) { note("could not transcribe"); }
-    };
-    recorder.start(); micState(true);
-  } catch (e) { note("no microphone access"); micState(false); }
-}
-
-function stopListening() {
-  micState(false);
-  if (recog) { try { recog.stop(); } catch (e) {} recog = null; }
-  if (recorder && recorder.state !== "inactive") recorder.stop();
-  recorder = null;
+function stopListening(andSend) {
+  clearTimeout(quiet);
+  const said = buffer.trim();
+  const r = recog; recog = null;
+  if (r) { try { r.stop(); } catch (e) {} }
+  if (andSend && said) send(said);
+  else { handsFree = false; status("לחץ על המיקרופון ודבר", "idle"); }
+  buffer = "";
 }
 
 $("mic").onclick = () => {
-  if (listening) {
-    stopListening();
-    // The browser recogniser fills the box as you speak, so send what is there.
-    if ($("stt").value === "browser" && $("say").value.trim()) $("ask").requestSubmit();
-    return;
-  }
-  if (speechSynthesis) speechSynthesis.cancel();   // do not talk over the learner
-  ($("stt").value === "api" ? startApi : startBrowser)();
+  if ($("mic").dataset.state === "listening") stopListening(true);
+  else { handsFree = true; startListening(); }
 };
-$("stt").onchange = () => { if (listening) stopListening(); };
-$("lang").onchange = () => { if (listening && recog) { stopListening(); startBrowser(); } };
 $("speak").onclick = () => {
   const on = $("speak").getAttribute("aria-pressed") !== "true";
   $("speak").setAttribute("aria-pressed", String(on));
   if (!on && window.speechSynthesis) speechSynthesis.cancel();
 };
 
-openDaf($("ref").value);
+/* ---- what is behind the page ------------------------------------------- */
+
+function openPanel(build) {
+  const panel = $("panel"); panel.replaceChildren();
+  const x = el("button", "btn close", "✕"); x.onclick = closePanel; panel.append(x);
+  build(panel);
+  $("over").dataset.open = "true";
+}
+const closePanel = () => { $("over").dataset.open = "false"; };
+$("over").onclick = ev => { if (ev.target === $("over")) closePanel(); };
+document.addEventListener("keydown", ev => { if (ev.key === "Escape") closePanel(); });
+
+$("showsrc").onclick = () => openPanel(panel => {
+  const seg = pack?.segments.find(s => s.n === line);
+  panel.append(el("h2", null, "מפרשים"),
+               el("div", "sub", seg ? seg.ref : ""));
+  if (!seg) return;
+  const rows = [];
+  for (const [who, list] of Object.entries(seg.commentaries || {}))
+    for (const e of list) rows.push([who, e]);
+  rows.sort((a, b) => (b[1].weight || 0) - (a[1].weight || 0));
+  if (rows.length) panel.append(el("div", "grp", "על השורה הזאת"));
+  for (const [who, e] of rows) {
+    const box = el("div", "src");
+    const head = el("div", "who", who);
+    if (e.dibur) { head.append(" "); head.append(el("span", "dib", e.dibur)); }
+    box.append(head, el("div", "body", e.he));
+    const shape = el("div", "shape");
+    for (const m of (e.structure ? e.structure.moves : []))
+      shape.append(el("span", "mv " + m.kind, m.marker));
+    if (shape.children.length) box.append(shape);
+    box.append(el("div", "ref", e.ref));
+    const more = el("button", "more", "עוד");
+    more.onclick = () => { box.classList.toggle("open");
+      more.textContent = box.classList.contains("open") ? "פחות" : "עוד"; };
+    box.append(more); panel.append(box);
+  }
+  for (const [label, refs] of [["הלכה", seg.halacha], ["מקבילות", seg.xrefs]]) {
+    if (!refs?.length) continue;
+    panel.append(el("div", "grp", label));
+    for (const r of refs) {
+      const a = el("a", "lnk", r);
+      a.href = "https://www.sefaria.org/" + encodeURIComponent(r.replace(/ /g, "_"));
+      a.target = "_blank"; a.rel = "noopener"; panel.append(a);
+    }
+  }
+});
+
+$("showlog").onclick = () => openPanel(panel => {
+  panel.append(el("h2", null, "תמליל"),
+               el("div", "sub", "מה שנאמר עד כה"));
+  if (!history.length) panel.append(el("div", "sub", "עוד לא דיברתם."));
+  for (const t of history) {
+    const row = el("div", "turn " + (t.role === "me" ? "me" : ""), t.text);
+    if (t.trace) row.append(el("span", "trace",
+      "routed: " + t.trace.kind + (t.trace.claim ? " (claim)" : "") +
+      " · opened: " + (t.trace.opened || []).join(", ")));
+    panel.append(row);
+  }
+});
+
+const toggle = (id, apply) => { $(id).onclick = () => {
+  const on = $(id).getAttribute("aria-pressed") !== "true";
+  $(id).setAttribute("aria-pressed", String(on)); apply(on); }; };
+toggle("eng", on => $("sheet").classList.toggle("showen", on));
+toggle("stops", on => $("daftext").classList.toggle("stops", on));
+
+buildPickers().then(turnTo);
 </script>
 </body>
 </html>

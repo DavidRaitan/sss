@@ -107,6 +107,9 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_file(os.path.join(WEB, "index.html"))
         if url.path == "/api/health":
             return self.send_json(self.health())
+        if url.path == "/api/masechtot":
+            from .commentators import MASECHTOT
+            return self.send_json({"masechtot": MASECHTOT})
         if url.path == "/api/find":
             # Sefaria resolves partial and Hebrew names to real refs, so typing
             # "berachot 2" or "ברכות ב" lands on the daf without knowing how
