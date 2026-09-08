@@ -99,7 +99,14 @@ def get(path, soft=False, **params):
 
 
 def plain(html):
-    """Strip markup, leaving the words a person would read aloud."""
+    """Strip markup, leaving the words a person would read aloud.
+
+    A link's text arrives as a string for a single comment and as a list when
+    the link spans several, so both are flattened here rather than at every
+    call site.
+    """
+    if isinstance(html, (list, tuple)):
+        html = " ".join(plain(part) for part in html)
     return re.sub(r"\s+", " ", TAG.sub("", html or "")).strip()
 
 
@@ -145,7 +152,7 @@ def dibur_patterns(title):
     with a dash, others bold it -- so reading them beats one guessed regex.
     """
     if title not in _SEEN:
-        _SEEN[title] = get("v2/raw_index/%s" % title, soft=True) or {}
+        _SEEN[title] = get("index/%s" % title, soft=True) or {}
     index = _SEEN[title]
     schema = index.get("schema", {})
     if not schema.get("isSegmentLevelDiburHamatchil", True):
@@ -153,32 +160,36 @@ def dibur_patterns(title):
     return [re.compile(p) for p in (schema.get("diburHamatchilRegexes") or FALLBACK_DIBUR)]
 
 
-def available(masechta, names):
-    """Which of these commentators Sefaria actually holds on this masechta."""
+def available_from(links, names, masechta):
+    """Who is actually on this daf, taken from the links we already fetched.
+
+    Asking Sefaria "do you have Rashi on Berakhot" once per commentator is a
+    request each, and answers a slightly different question than the one that
+    matters: not whether a text exists somewhere in the masechta, but whether
+    it is on the page in front of the learner. The links carry that already.
+    """
+    titles = {l.get("index_title") or "" for group in links.values() for l in group}
     found = []
     for name in names:
-        key = "%s on %s" % (name, masechta)
-        if key not in _SEEN:
-            _SEEN[key] = get("v2/raw_index/%s" % key, soft=True) or {}
-        if _SEEN[key]:
+        # Pinned to this masechta on purpose: a daf quotes commentary from
+        # other tractates, and "Rashbam on Pesachim" appearing in Berakhot's
+        # links is not Rashbam being on this page.
+        if any(t == name or t == "%s on %s" % (name, masechta) for t in titles):
             found.append(name)
     return found
 
 
-def wanted_for(masechta, wide=False):
-    """Who to pull for this masechta: the backbone, or the wider bench too.
-
-    The backbone is what is printed on the page and loads with it. The wide
-    bench is only fetched when a question actually reaches for it, so a page
-    opens fast and a session only pays for what it uses.
-    """
+def wanted_for(masechta, wide=True):
+    """Everyone this masechta might want, before we know who is on the daf."""
     asked = backbone_for(masechta) + (wide_for(masechta) if wide else [])
-    return available(masechta, list(dict.fromkeys(asked)))
+    return list(dict.fromkeys(asked))
 
 
 def fetch_daf(ref):
     """Pull the daf itself in both the vocalized source and the Davidson English."""
-    data = get("v3/texts/%s" % ref, version=[VOCALIZED, "english"])
+    # v3 wants "<language>|<title>". A bare title is accepted and silently
+    # returns only the English, which reads downstream as a missing text.
+    data = get("v3/texts/%s" % ref, version=["hebrew|" + VOCALIZED, "english"])
     source, english = [], []
     for version in data.get("versions", []):
         text = version.get("text") or []
@@ -195,10 +206,12 @@ def fetch_daf(ref):
 def fetch_links(ref):
     """Group every link on the daf by segment, then by commentator."""
     by_segment = {}
-    for link in get("links/%s" % ref, with_text=1):
+    for link in get("links/%s" % ref, with_text=1) or []:
+        # anchorRef is already the segment this hangs off ("Berakhot 2a:1").
+        # It was being shortened to the daf, so every per-segment lookup missed
+        # and packs came out with no commentary at all.
         anchor = link.get("anchorRef") or link.get("ref", "")
-        segment = anchor.rsplit(":", 1)[0] if ":" in anchor else anchor
-        by_segment.setdefault(segment, []).append(link)
+        by_segment.setdefault(anchor, []).append(link)
     return by_segment
 
 
@@ -259,6 +272,7 @@ def build_segment(ref, number, source_html, english_html, links, wanted, pattern
 def build(ref, wanted, only=None):
     source, english = fetch_daf(ref)
     links = fetch_links(ref)
+    wanted = available_from(links, wanted, ref.rsplit(" ", 1)[0])
     patterns = {n: dibur_patterns("%s on %s" % (n, ref.rsplit(" ", 1)[0])) for n in wanted}
     segments = []
     for index, html in enumerate(source, start=1):

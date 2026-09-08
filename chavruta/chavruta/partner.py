@@ -4,6 +4,14 @@
 from . import commentators as who
 from . import ground, retrieve
 
+LANGUAGES = {
+    "english": "Answer in English. Quote Hebrew and Aramaic in Hebrew letters, "
+               "untranslated, inside an English sentence -- that is how the "
+               "learner talks and how you should talk back.",
+    "hebrew": "Answer in Hebrew.",
+    "match": "Answer in whichever language they are mostly using.",
+}
+
 LEVELS = {
     "beginner": "They are leaning on the English. Translate any phrase you quote, "
                 "name the players, and say what an unfamiliar term means in passing "
@@ -71,15 +79,35 @@ On depth. When a source would take a while, ask whether they want to read it
 inside or want it summarised, and wait. Quote when reading inside. A summary
 never stands in for the text in a citation.
 
-Write the way a person talks. Short. No headers, no bullet lists, no bold.
-Hebrew and Aramaic in Hebrew letters. They may speak English, Hebrew and
-Aramaic in a single sentence; answer in whichever they are mostly using."""
+On tables. Count the positions before you answer. Three or more -- three tannaim,
+three Rishonim, three answers to one question -- and the answer is a table, not
+paragraphs. This is the most common thing you will get wrong: prose feels
+natural to write and is much worse to read when the sugya has become a list.
+
+    | Who | Holds | Because |
+    |---|---|---|
+    | ר' אליעזר | until the end of the first watch | [[ref]] |
+
+When three or more positions are in play -- tannaim arguing, Rishonim
+splitting, a machlokes with several answers -- stop explaining in prose and draw
+a table. Do it without being asked; noticing that the sugya has become a list of
+positions is your job, not theirs. Markdown pipe table, one row per opinion,
+columns that actually distinguish them: who, what they hold, and what drives it.
+Keep the cells to a few words. Put the citation in the row, and say the one
+sentence that matters underneath it.
+
+Two positions is a sentence, not a table. Do not tabulate a simple dispute.
+
+Write the way a person talks. Short. Prose otherwise -- no headers, no bullet
+lists, no bold. They may speak English, Hebrew and Aramaic in a single
+sentence; that is normal, and you should read straight through it."""
 
 
-def daf_context(pack, n, names, level="standard", window=1):
+def daf_context(pack, n, names, level="standard", language="english", window=3):
     """Everything the partner may know, for one position on the page."""
-    lines = ["DAF: %s" % pack.ref, "WHO YOU ARE LEARNING WITH: %s" % LEVELS.get(
-        level, LEVELS["standard"])]
+    lines = ["DAF: %s" % pack.ref,
+             "WHO YOU ARE LEARNING WITH: %s" % LEVELS.get(level, LEVELS["standard"]),
+             "WHAT LANGUAGE TO ANSWER IN: %s" % LANGUAGES.get(language, LANGUAGES["english"])]
     note = who.note_for(pack.data.get("masechta", ""))
     if note:
         lines.append("ABOUT THIS MASECHTA: %s" % note)
@@ -127,10 +155,11 @@ def daf_context(pack, n, names, level="standard", window=1):
 
 
 class Partner:
-    def __init__(self, pack, llm, level="standard"):
+    def __init__(self, pack, llm, level="standard", language="english"):
         self.pack = pack
         self.llm = llm
         self.level = level
+        self.language = language
         self.known = pack.refs()
 
     def ask(self, n, history, said):
@@ -143,7 +172,7 @@ class Partner:
         route = retrieve.classify(self.llm, said)
         names = retrieve.consult(self.pack, n, route["kind"], route["claim"])
         system = CONSTITUTION + "\n\n" + daf_context(
-            self.pack, n, names, self.level)
+            self.pack, n, names, self.level, self.language)
 
         messages = history + [{"role": "user", "content": said}]
         text = self.llm.say(system, messages, heavy=True)

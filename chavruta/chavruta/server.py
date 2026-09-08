@@ -154,6 +154,7 @@ class Handler(BaseHTTPRequestHandler):
         said = (body.get("said") or "").strip()
         line = int(body.get("line") or 1)
         level = body.get("level") or "standard"
+        language = body.get("language") or "english"
         session = body.get("session") or "default"
         if not ref or not said:
             return self.send_json({"error": "need ref and said"}, 400)
@@ -162,7 +163,7 @@ class Handler(BaseHTTPRequestHandler):
             pack = load_pack(ref)
             with LOCK:
                 history = SESSIONS.get(session, [])
-            partner = Partner(pack, LLM(), level=level)
+            partner = Partner(pack, LLM(), level=level, language=language)
             text, verdict, history, trace = partner.ask(line, history, said)
             with LOCK:
                 # A sitting is bounded; keep it from growing without limit.
