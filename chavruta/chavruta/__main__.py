@@ -29,11 +29,21 @@ def doctor():
 
     print("sefaria    ", end="", flush=True)
     try:
-        got = sefaria.get("v3/texts/Berakhot%202a.1", soft=True, version="source")
-        print("reachable" if got else "UNREACHABLE -- check your network")
-        ok &= bool(got)
+        # Pass the ref unencoded: get() quotes it, and pre-encoding it here
+        # means the % gets escaped again and the request 404s -- which used to
+        # be reported as an unreachable network, sending people to debug wifi.
+        got = sefaria.get("v3/texts/Berakhot 2a:1", version="source")
+        versions = (got or {}).get("versions") or []
+        if versions:
+            print("reachable")
+        else:
+            print("reached it, but got no text back -- the API may have changed")
+            ok = False
+    except SystemExit as exc:
+        print("UNREACHABLE\n           %s" % exc)
+        ok = False
     except Exception as exc:
-        print("UNREACHABLE (%s)" % exc)
+        print("UNREACHABLE\n           %s: %s" % (type(exc).__name__, exc))
         ok = False
 
     if key:
