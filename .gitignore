@@ -9,3 +9,7 @@ service-account*.json
 .DS_Store
 __pycache__/
 *.pyc
+.env
+.venv/
+packs/*.json
+!packs/berakhot_2a.json

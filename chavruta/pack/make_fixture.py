@@ -13,11 +13,11 @@ import os
 import sys
 import time
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 
-import build_pack as bp
-import extract_sugya
-import fixture_source as fx
+from chavruta import sefaria as bp
+from chavruta import sugya as extract_sugya
+from chavruta import fixture_source as fx
 
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "packs")
 
@@ -69,7 +69,6 @@ def main():
         "ref": fx.DAF,
         "masechta": fx.DAF.rsplit(" ", 1)[0],
         "commentators": sorted({c for s in segments for c in s["commentaries"]}),
-        "routing": bp.ROUTING,
         "weights": bp.WEIGHT,
         "built_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "source": "sefaria.org",

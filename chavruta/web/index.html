@@ -6,198 +6,245 @@
 <title>חברותא</title>
 <style>
   :root {
-    --ink: #1a1614; --dim: #6b625c; --faint: #a09890;
-    --ground: #faf7f2; --card: #fff; --line: #e5ded4;
-    --mark: #b4472f; --glow: #fdf3d8;
-    --serif: "SBL Hebrew", "Taamey Frank CLM", "Times New Roman", serif;
-    --ui: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --ink:#1a1614; --dim:#6b625c; --faint:#a09890;
+    --ground:#faf7f2; --card:#fff; --line:#e5ded4;
+    --mark:#b4472f; --glow:#fdf3d8; --me:#eef2f6;
+    --serif:"SBL Hebrew","Taamey Frank CLM","Times New Roman",serif;
+    --ui:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
   }
   @media (prefers-color-scheme: dark) {
-    :root { --ink:#ece6de; --dim:#9a9088; --faint:#6b625c;
-            --ground:#16130f; --card:#1e1a16; --line:#332c25;
-            --mark:#e08a6d; --glow:#2b2317; }
+    :root { --ink:#ece6de; --dim:#9a9088; --faint:#6b625c; --ground:#16130f;
+            --card:#1e1a16; --line:#332c25; --mark:#e08a6d; --glow:#2b2317; --me:#232b33; }
   }
-  * { box-sizing: border-box; }
+  * { box-sizing:border-box; }
   body { margin:0; background:var(--ground); color:var(--ink); font-family:var(--ui); }
-  header { position:sticky; top:0; z-index:5; display:flex; align-items:center;
-    gap:14px; padding:11px 18px; background:var(--card);
-    border-bottom:1px solid var(--line); flex-wrap:wrap; }
-  h1 { margin:0; font-size:16px; font-weight:600; letter-spacing:.01em; }
-  .grow { flex:1; }
-  button { font:inherit; font-size:12.5px; color:var(--dim); cursor:pointer;
-    background:none; border:1px solid var(--line); border-radius:6px; padding:5px 11px; }
+  header { position:sticky; top:0; z-index:5; display:flex; gap:9px; align-items:center;
+    padding:10px 16px; background:var(--card); border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  h1 { margin:0 6px 0 0; font-size:15px; font-weight:600; }
+  input, select, button { font:inherit; font-size:13px; border:1px solid var(--line);
+    background:var(--card); color:var(--ink); border-radius:6px; padding:5px 10px; }
+  input { width:170px; }
+  button { cursor:pointer; color:var(--dim); }
   button:hover { color:var(--ink); border-color:var(--faint); }
-  button[aria-pressed="true"] { color:var(--card); background:var(--ink); border-color:var(--ink); }
-  .warn { width:100%; font-size:12px; color:var(--mark); }
+  button[aria-pressed="true"], button.go { color:#fff; background:var(--ink); border-color:var(--ink); }
+  .grow { flex:1; }
+  .note { width:100%; font-size:12px; color:var(--mark); }
+  .note.busy { color:var(--dim); }
 
-  main { display:grid; grid-template-columns:minmax(0,1fr) 380px; gap:22px;
-    max-width:1180px; margin:0 auto; padding:22px 18px 90px; align-items:start; }
-  @media (max-width:900px) { main { grid-template-columns:minmax(0,1fr); } }
+  main { display:grid; grid-template-columns:minmax(0,1fr) 400px; gap:20px;
+    max-width:1240px; margin:0 auto; padding:20px 16px 40px; align-items:start; }
+  @media (max-width:920px) { main { grid-template-columns:minmax(0,1fr); } }
 
   .seg { background:var(--card); border:1px solid var(--line); border-radius:9px;
-    padding:15px 18px; margin-bottom:11px; cursor:pointer; }
+    padding:14px 17px; margin-bottom:10px; cursor:pointer; }
   .seg:hover { border-color:var(--faint); }
   .seg[aria-current="true"] { border-color:var(--mark); box-shadow:0 0 0 1px var(--mark); }
-  .n { font-family:var(--ui); font-size:11px; color:var(--faint); margin-bottom:7px;
-    display:flex; gap:9px; align-items:center; }
-  .he { font-family:var(--serif); font-size:25px; line-height:1.95; }
-  /* Each clause is a printed stopping point. Showing them is the whole
-     pisuk feature made visible: this is where the sentence actually breaks. */
-  .stops .cl { border-radius:3px; padding:0 2px; }
-  .stops .cl:nth-child(odd) { background:var(--glow); }
-  .en { margin-top:11px; font-size:14.5px; line-height:1.65; color:var(--dim);
+  .n { font-size:11px; color:var(--faint); margin-bottom:6px; display:flex; gap:8px; }
+  .he { font-family:var(--serif); font-size:24px; line-height:1.95; }
+  .stops .cl:nth-child(odd) { background:var(--glow); border-radius:3px; padding:0 2px; }
+  .en { margin-top:10px; font-size:14px; line-height:1.6; color:var(--dim);
     direction:ltr; text-align:left; }
   .en .add { color:var(--faint); font-style:italic; }
-  .tags { display:flex; gap:6px; flex-wrap:wrap; margin-inline-start:auto; }
-  .tag { font-size:10.5px; color:var(--dim); background:var(--ground);
-    border:1px solid var(--line); border-radius:20px; padding:1px 8px; }
+  .tags { display:flex; gap:5px; flex-wrap:wrap; margin-inline-start:auto; }
+  .tag { font-size:10px; color:var(--dim); background:var(--ground);
+    border:1px solid var(--line); border-radius:20px; padding:1px 7px; }
 
-  aside { position:sticky; top:70px; max-height:calc(100vh - 92px); overflow-y:auto;
-    background:var(--card); border:1px solid var(--line); border-radius:9px; padding:15px 17px; }
-  @media (max-width:900px) { aside { position:static; max-height:none; } }
-  aside h2 { margin:0 0 3px; font-size:13px; font-weight:600; }
-  aside .sub { font-size:11.5px; color:var(--faint); margin-bottom:14px; }
-  .grp { font-size:10.5px; letter-spacing:.09em; text-transform:uppercase;
-    color:var(--faint); margin:16px 0 8px; padding-bottom:5px; border-bottom:1px solid var(--line); }
-  .src { margin-bottom:13px; }
+  aside { position:sticky; top:64px; background:var(--card); border:1px solid var(--line);
+    border-radius:9px; display:flex; flex-direction:column; max-height:calc(100vh - 86px); }
+  @media (max-width:920px) { aside { position:static; max-height:none; } }
+  .tabs { display:flex; border-bottom:1px solid var(--line); }
+  .tabs button { border:0; border-radius:0; background:none; padding:10px 14px; font-size:13px; }
+  .tabs button[aria-selected="true"] { color:var(--ink); box-shadow:inset 0 -2px 0 var(--mark); }
+  .pane { overflow-y:auto; padding:14px 16px; flex:1; min-height:280px; }
+  .pane[hidden] { display:none; }
+
+  .msg { margin-bottom:13px; font-size:14.5px; line-height:1.62; white-space:pre-wrap; }
+  .msg.me { background:var(--me); border-radius:9px; padding:8px 11px; }
+  .msg.warn { color:var(--mark); font-size:12px; }
+  .msg .trace { display:block; font-size:10.5px; color:var(--faint); margin-top:5px; direction:ltr; }
+  .ask { display:flex; gap:7px; border-top:1px solid var(--line); padding:10px; }
+  .ask input { flex:1; width:auto; }
+
+  .grp { font-size:10.5px; letter-spacing:.09em; text-transform:uppercase; color:var(--faint);
+    margin:14px 0 7px; padding-bottom:4px; border-bottom:1px solid var(--line); }
+  .src { margin-bottom:12px; }
   .src .who { font-size:12.5px; font-weight:600; }
   .src .dib { font-family:var(--serif); font-size:15px; color:var(--mark); }
-  .src .body { font-family:var(--serif); font-size:16.5px; line-height:1.8;
-    margin-top:5px; max-height:5.6em; overflow:hidden; }
+  .src .body { font-family:var(--serif); font-size:16px; line-height:1.78; margin-top:4px;
+    max-height:5.2em; overflow:hidden; }
   .src.open .body { max-height:none; }
-  .more { font-size:11.5px; color:var(--dim); background:none; border:0; padding:3px 0; }
-  /* The argument the comment states about itself, in its own marker words. */
-  .shape { display:flex; gap:5px; flex-wrap:wrap; margin-top:6px; }
+  .more { border:0; padding:2px 0; font-size:11.5px; background:none; }
+  .shape { display:flex; gap:4px; flex-wrap:wrap; margin-top:5px; }
   .mv { font-size:10px; border-radius:3px; padding:1px 6px; border:1px solid var(--line); color:var(--dim); }
   .mv.difficulty { color:var(--mark); border-color:var(--mark); }
-  .mv.position, .mv.alternative { background:var(--ground); }
-  .ref { font-size:10.5px; color:var(--faint); direction:ltr; margin-top:5px; }
-  .lnk { display:block; font-size:12px; color:var(--dim); direction:ltr;
-    text-align:left; padding:2px 0; text-decoration:none; }
+  .ref { font-size:10.5px; color:var(--faint); direction:ltr; margin-top:4px; }
+  .lnk { display:block; font-size:12px; color:var(--dim); direction:ltr; text-align:left;
+    padding:2px 0; text-decoration:none; }
   .lnk:hover { color:var(--mark); }
 </style>
 </head>
 <body>
 <header>
-  <h1 id="ref">…</h1>
+  <h1>חברותא</h1>
+  <input id="ref" placeholder="Berakhot 2a" value="Berakhot 2a"
+         aria-label="daf reference" autocomplete="off">
+  <button class="go" id="go">פתח</button>
+  <select id="level" aria-label="level">
+    <option value="standard">רגיל — Rashi &amp; Tosafot</option>
+    <option value="beginner">מתחיל — lean on English</option>
+    <option value="fluent">שוטף — no translation</option>
+  </select>
   <button id="stops" aria-pressed="false">עצירות</button>
   <button id="eng" aria-pressed="false">English</button>
   <span class="grow"></span>
-  <span class="warn" id="warn" hidden></span>
+  <span class="note" id="note" hidden></span>
 </header>
 <main>
   <div id="daf"></div>
-  <aside id="panel"><h2>לחצו על שורה</h2>
-    <div class="sub">Sources on a line appear here, heaviest first.</div></aside>
+  <aside>
+    <div class="tabs" role="tablist">
+      <button id="t-chat" role="tab" aria-selected="true" aria-controls="p-chat">חברותא</button>
+      <button id="t-src" role="tab" aria-selected="false" aria-controls="p-src">מפרשים</button>
+    </div>
+    <div class="pane" id="p-chat" role="tabpanel"></div>
+    <div class="pane" id="p-src" role="tabpanel" hidden></div>
+    <form class="ask" id="ask">
+      <input id="say" placeholder="say what you think it means…" autocomplete="off">
+      <button type="submit">→</button>
+    </form>
+  </aside>
 </main>
 <script>
-const PACKS = ["../packs/berakhot_2a.json"];
-// Mirrors Sefaria's own link categories -- the panel is its grouping, not ours.
-const ORDER = ["Commentary", "Halakhah", "Talmud", "Tanakh", "Midrash", "Responsa"];
-let pack = null, current = null;
+const ORDER = ["Commentary","Halakhah","Talmud","Tanakh","Midrash","Responsa"];
+let pack = null, line = 1;
+const session = sessionStorage.getItem("chav") ||
+  (sessionStorage.setItem("chav", Math.random().toString(36).slice(2)),
+   sessionStorage.getItem("chav"));
 
-const el = (t, c, x) => { const n = document.createElement(t);
-  if (c) n.className = c; if (x !== undefined) n.textContent = x; return n; };
+const el = (t,c,x)=>{const n=document.createElement(t);
+  if(c)n.className=c; if(x!==undefined)n.textContent=x; return n;};
+const $ = id => document.getElementById(id);
+
+function note(text, busy) {
+  const n = $("note");
+  n.hidden = !text; n.textContent = text || ""; n.classList.toggle("busy", !!busy);
+}
+
+async function openDaf(ref) {
+  note("fetching " + ref + " from Sefaria…", true);
+  try {
+    const r = await fetch("/api/daf?ref=" + encodeURIComponent(ref));
+    const data = await r.json();
+    if (!r.ok) { note(data.error || "could not open that daf"); return; }
+    pack = data; line = pack.segments[0]?.n || 1;
+    note(pack.fixture ? pack.fixture_note : "");
+    drawDaf(); select(line); $("p-chat").replaceChildren();
+    say_system("Open at " + pack.ref + ". Read a line, then tell me what you think it means.");
+  } catch (e) { note("could not reach the server"); }
+}
 
 function drawDaf() {
-  document.getElementById("ref").textContent = pack.ref;
-  if (pack.fixture) {
-    const w = document.getElementById("warn");
-    w.hidden = false; w.textContent = pack.fixture_note;
-  }
-  const daf = document.getElementById("daf");
-  daf.replaceChildren();
+  const daf = $("daf"); daf.replaceChildren();
   for (const seg of pack.segments) {
-    const box = el("div", "seg");
-    box.dataset.n = seg.n;
-    const head = el("div", "n");
-    head.append(el("span", null, seg.ref));
-    const tags = el("div", "tags");
-    for (const [cat, count] of Object.entries(seg.panel || {}))
-      tags.append(el("span", "tag", cat + " " + count));
+    const box = el("div","seg"); box.dataset.n = seg.n;
+    const head = el("div","n"); head.append(el("span",null,seg.ref));
+    const tags = el("div","tags");
+    for (const [c,k] of Object.entries(seg.panel||{})) tags.append(el("span","tag",c+" "+k));
     head.append(tags);
-    const he = el("div", "he");
-    // One span per printed clause, so the stopping points are addressable.
-    for (const c of (seg.clauses.length ? seg.clauses : [{he: seg.he}]))
-      he.append(el("span", "cl", c.he + " "));
-    box.append(head, he);
-    const en = el("div", "en");
-    for (const span of seg.en || [])
-      en.append(el("span", span.kind === "daf" ? "lit" : "add", span.text + " "));
-    en.hidden = true;
-    box.append(en);
+    const he = el("div","he");
+    for (const c of (seg.clauses?.length ? seg.clauses : [{he:seg.he}]))
+      he.append(el("span","cl", c.he + " "));
+    const en = el("div","en"); en.hidden = $("eng").getAttribute("aria-pressed") !== "true";
+    for (const s of seg.en||[]) en.append(el("span", s.kind==="daf"?"lit":"add", s.text+" "));
+    box.append(head, he, en);
     box.onclick = () => select(seg.n);
     daf.append(box);
   }
+  daf.classList.toggle("stops", $("stops").getAttribute("aria-pressed")==="true");
 }
 
 function select(n) {
-  current = n;
-  for (const box of document.querySelectorAll(".seg"))
-    box.setAttribute("aria-current", String(+box.dataset.n === n));
-  const seg = pack.segments.find(s => s.n === n);
-  const panel = document.getElementById("panel");
-  panel.replaceChildren();
-  panel.append(el("h2", null, seg.ref));
-
+  line = n;
+  for (const b of document.querySelectorAll(".seg"))
+    b.setAttribute("aria-current", String(+b.dataset.n === n));
+  const seg = pack.segments.find(s => s.n === n), pane = $("p-src");
+  pane.replaceChildren();
   const rows = [];
-  for (const [who, list] of Object.entries(seg.commentaries || {}))
-    for (const e of list) rows.push([who, e]);
-  rows.sort((a, b) => (b[1].weight || 0) - (a[1].weight || 0));
-  panel.append(el("div", "sub", rows.length + " sources on this line"));
-
-  if (rows.length) {
-    panel.append(el("div", "grp", "Commentary"));
-    for (const [who, e] of rows) {
-      const box = el("div", "src");
-      const head = el("div", "who", who);
-      if (e.dibur) { head.append(" "); head.append(el("span", "dib", e.dibur)); }
-      box.append(head);
-      const body = el("div", "body", e.he);
-      box.append(body);
-      const shape = el("div", "shape");
-      for (const m of (e.structure ? e.structure.moves : []))
-        shape.append(el("span", "mv " + m.kind, m.marker));
-      if (shape.children.length) box.append(shape);
-      box.append(el("div", "ref", e.ref));
-      const more = el("button", "more", "הצג הכל");
-      more.onclick = () => { box.classList.toggle("open");
-        more.textContent = box.classList.contains("open") ? "הצג פחות" : "הצג הכל"; };
-      box.append(more);
-      panel.append(box);
-    }
+  for (const [who,list] of Object.entries(seg.commentaries||{}))
+    for (const e of list) rows.push([who,e]);
+  rows.sort((a,b)=>(b[1].weight||0)-(a[1].weight||0));
+  if (rows.length) pane.append(el("div","grp","Commentary"));
+  for (const [who,e] of rows) {
+    const box = el("div","src");
+    const head = el("div","who",who);
+    if (e.dibur) { head.append(" "); head.append(el("span","dib",e.dibur)); }
+    box.append(head, el("div","body",e.he));
+    const shape = el("div","shape");
+    for (const m of (e.structure? e.structure.moves : []))
+      shape.append(el("span","mv "+m.kind, m.marker));
+    if (shape.children.length) box.append(shape);
+    box.append(el("div","ref",e.ref));
+    const more = el("button","more","הצג הכל");
+    more.onclick = ev => { ev.stopPropagation(); box.classList.toggle("open");
+      more.textContent = box.classList.contains("open") ? "הצג פחות" : "הצג הכל"; };
+    box.append(more); pane.append(box);
   }
-  for (const [label, refs] of [["Halakhah", seg.halacha], ["Talmud", seg.xrefs]]) {
-    if (!refs || !refs.length) continue;
-    panel.append(el("div", "grp", label));
+  for (const [label,refs] of [["Halakhah",seg.halacha],["Talmud",seg.xrefs]]) {
+    if (!refs?.length) continue;
+    pane.append(el("div","grp",label));
     for (const r of refs) {
-      const a = el("a", "lnk", r);
-      a.href = "https://www.sefaria.org/" + encodeURIComponent(r.replace(/ /g, "_"));
-      a.target = "_blank"; a.rel = "noopener";
-      panel.append(a);
+      const a = el("a","lnk",r);
+      a.href = "https://www.sefaria.org/" + encodeURIComponent(r.replace(/ /g,"_"));
+      a.target="_blank"; a.rel="noopener"; pane.append(a);
     }
   }
 }
 
-function toggle(id, apply) {
-  const b = document.getElementById(id);
-  b.onclick = () => { const on = b.getAttribute("aria-pressed") !== "true";
-    b.setAttribute("aria-pressed", String(on)); apply(on); };
+function bubble(cls, text, trace) {
+  const m = el("div","msg "+cls, text);
+  if (trace) m.append(el("span","trace",
+    "routed: " + trace.kind + (trace.claim ? " (claim)" : "") +
+    " · opened: " + (trace.opened||[]).join(", ")));
+  const pane = $("p-chat"); pane.append(m); pane.scrollTop = pane.scrollHeight;
+  return m;
 }
-toggle("stops", on => document.getElementById("daf").classList.toggle("stops", on));
-toggle("eng", on => document.querySelectorAll(".en").forEach(e => e.hidden = !on));
+const say_system = t => bubble("warn", t);
 
-(async () => {
-  for (const url of PACKS) {
-    try {
-      const r = await fetch(url);
-      if (!r.ok) continue;
-      pack = await r.json(); drawDaf(); select(pack.segments[0].n); return;
-    } catch (e) { /* try the next one */ }
-  }
-  document.getElementById("daf").textContent =
-    "No pack found. Build one first, and serve this over http (not file://).";
-})();
+$("ask").onsubmit = async ev => {
+  ev.preventDefault();
+  const box = $("say"), said = box.value.trim();
+  if (!said || !pack) return;
+  box.value = ""; bubble("me", said);
+  const pending = bubble("", "…");
+  try {
+    const r = await fetch("/api/say", {method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ref: pack.ref, line, said, session, level: $("level").value})});
+    const data = await r.json();
+    pending.remove();
+    if (!r.ok) return void bubble("warn", data.error || "something went wrong");
+    bubble("", data.text, data.trace);
+    if (!data.grounded) bubble("warn", "ungrounded: " + data.problem);
+  } catch (e) { pending.remove(); bubble("warn","could not reach the server"); }
+};
+
+for (const [tab, pane] of [["t-chat","p-chat"],["t-src","p-src"]]) {
+  $(tab).onclick = () => {
+    for (const [t,p] of [["t-chat","p-chat"],["t-src","p-src"]]) {
+      const on = t === tab;
+      $(t).setAttribute("aria-selected", String(on)); $(p).hidden = !on;
+    }
+  };
+}
+const toggle = (id, apply) => { const b = $(id);
+  b.onclick = () => { const on = b.getAttribute("aria-pressed")!=="true";
+    b.setAttribute("aria-pressed", String(on)); apply(on); }; };
+toggle("stops", on => $("daf").classList.toggle("stops", on));
+toggle("eng", on => document.querySelectorAll(".en").forEach(e => e.hidden = !on));
+$("go").onclick = () => openDaf($("ref").value.trim());
+$("ref").onkeydown = e => { if (e.key === "Enter") $("go").click(); };
+
+openDaf($("ref").value);
 </script>
 </body>
 </html>

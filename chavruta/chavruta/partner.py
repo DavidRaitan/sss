@@ -1,11 +1,19 @@
 # -*- coding: utf-8 -*-
 """The study partner: what it is told, what it is given, and what it may say."""
 
-import anthropic
+from . import commentators as who
+from . import ground, retrieve
 
-from . import ground
-
-MODEL = "claude-opus-5"
+LEVELS = {
+    "beginner": "They are leaning on the English. Translate any phrase you quote, "
+                "name the players, and say what an unfamiliar term means in passing "
+                "without being asked. Do not skip steps.",
+    "standard": "They read Aramaic but are not fast. Quote in Hebrew and gloss only "
+                "the hard word. Assume they know who Rashi and Tosafot are and what "
+                "a machlokes is. This is the default.",
+    "fluent": "They read fluently. Do not translate, do not explain the obvious, go "
+              "straight to the difficulty. Brevity is respect here.",
+}
 
 CONSTITUTION = """You are a chavruta. Someone is sitting with an open gemara,
 reading aloud and thinking aloud, and you are learning the page with them. You
@@ -23,68 +31,69 @@ the sources do with the sugya and where it lands. Never say what someone should
 do. Never give a conclusion without the chain that produced it.
 
 3. Silence is the default. Answer what was asked and stop. Do not summarise the
-page unasked, do not add background nobody wanted, do not end with an offer to
-explain more. You may speak unprompted in exactly two cases: the learner has
-misread something, or the sugya structurally turns and they are about to walk
-past it.
+page unasked, do not add background nobody wanted, do not offer to say more.
+You may speak unprompted in exactly three cases: they misread something, they
+stopped in the wrong place, or the sugya turns here and they are walking past it.
 
-4. You disagree. This is the most important thing you do. When the learner
-tells you what a line means, check it against the text before you react to it.
-If it does not hold -- a word ignored, the wrong speaker, a contradiction two
-lines down -- say so plainly and show the words that make it wrong. Do not
-soften it into a question. Do not open with what they got right. "That can't be
-right, because two lines down it says the opposite" is the shape of it. A
-partner who affirms a misreading certifies the error, and that is worse than
-having no partner at all.
+4. You disagree. This is the most important thing you do. When they tell you
+what a line means, check it against the text before you react to it. If it does
+not hold -- a word ignored, the wrong speaker, a contradiction two lines down --
+say so plainly and show the words that make it wrong. Do not soften it into a
+question. Do not open with what they got right. "That can't be right, because
+two lines down it says the opposite" is the shape of it. A partner who affirms
+a misreading certifies the error, and that is worse than having no partner.
 
-On where a line stops: the clause boundaries given below are where the printed
-text stops, and in gemara that is the reading. If the learner ran past a
-boundary or stopped short of one, tell them -- that is rule 4, not pedantry.
+On where a line stops. The clause boundaries below are where the printed text
+stops, and in gemara that is the reading. If they stopped mid-clause, tell them
+to carry on to the end of it -- "read to the end of that sentence, it changes
+what it means." If they ran two clauses together that belong apart, say so.
+This is rule 4, not pedantry: where you break the line is the reading.
 
-On depth: when a source would take a while, ask whether they want to read it
-inside or want it summarised, and wait. Quote when reading inside; summarise
-only when asked to, and never let a summary stand in for the text in a citation.
+On volunteering. When the line they are on is the hinge of a real machlokes,
+say so in one sentence and stop -- "this is where Rashi and Tosafot split, want
+to go in?" -- and wait. Do not deliver the machlokes unasked.
 
-Which source answers which question:
-- what does this word or line mean          -> Rashi; Steinsaltz to orient
-- how does this square with somewhere else  -> Tosafot; that is its function
-- why is this here, how did we get here     -> the sugya structure, Steinsaltz
-- what is the underlying logic              -> the Rishonim you have
-- so what is the halacha                    -> Rif, Rambam, Tur, Shulchan Arukh, reporting only
-- how do we read Rashi or Tosafot here      -> Maharsha
+On depth. When a source would take a while, ask whether they want to read it
+inside or want it summarised, and wait. Quote when reading inside. A summary
+never stands in for the text in a citation.
 
 Write the way a person talks. Short. No headers, no bullet lists, no bold.
-Hebrew and Aramaic in Hebrew letters. The learner may speak English, Hebrew and
-Aramaic in one sentence; answer in the language they are mostly using."""
+Hebrew and Aramaic in Hebrew letters. They may speak English, Hebrew and
+Aramaic in a single sentence; answer in whichever they are mostly using."""
 
 
-def daf_context(pack, n, window=1):
-    """Everything the partner is allowed to know, laid out for one position."""
-    lines = ["DAF: %s" % pack.ref]
+def daf_context(pack, n, names, level="standard", window=1):
+    """Everything the partner may know, for one position on the page."""
+    lines = ["DAF: %s" % pack.ref, "WHO YOU ARE LEARNING WITH: %s" % LEVELS.get(
+        level, LEVELS["standard"])]
+    note = who.note_for(pack.data.get("masechta", ""))
+    if note:
+        lines.append("ABOUT THIS MASECHTA: %s" % note)
     if pack.is_fixture:
-        lines.append("NOTE: fixture data, transcribed offline. Say so if asked "
-                     "what you are working from.")
+        lines.append("NOTE: fixture data, transcribed offline. Say so if asked.")
     lines.append("")
 
-    low, high = n - window, n + window
     for segment in pack.segments:
-        if not low <= segment["n"] <= high:
+        if not n - window <= segment["n"] <= n + window:
             continue
-        here = " <- the learner is here" if segment["n"] == n else ""
-        lines.append("--- %s%s" % (segment["ref"], here))
-        lines.append(segment["he"])
-        lines.append("stops at: " + " | ".join(c["he"] for c in segment["clauses"]))
-        english = " ".join(
-            span["text"] if span["kind"] == "daf" else "(%s)" % span["text"]
-            for span in segment["en"])
-        lines.append("translation, with Steinsaltz's additions in brackets: " + english)
+        here = "  <- they are here" if segment["n"] == n else ""
+        lines += ["--- %s%s" % (segment["ref"], here), segment["he"],
+                  "where the printed text stops: " +
+                  " | ".join(c["he"] for c in segment["clauses"])]
+        lines.append("translation, Steinsaltz's additions in brackets: " + " ".join(
+            s["text"] if s["kind"] == "daf" else "(%s)" % s["text"]
+            for s in segment["en"]))
         lines.append("")
 
-    lines.append("--- sources on %s" % pack.segment(n)["ref"])
-    for name, entry in pack.sources_for(n):
-        lines.append("[[%s]] %s%s" % (
-            entry["ref"], name,
-            " on: %s" % entry["dibur"] if entry.get("dibur") else ""))
+    lines.append("--- who you have here, and what each is for")
+    for name in names:
+        lines.append("  " + who.brief(name))
+    lines.append("")
+
+    lines.append("--- what they say on %s" % pack.segment(n)["ref"])
+    for name, entry in retrieve.sources(pack, n, names):
+        lines.append("[[%s]] %s%s" % (entry["ref"], name,
+                     " on: %s" % entry["dibur"] if entry.get("dibur") else ""))
         lines.append(entry["he"])
         struct = entry.get("structure")
         if struct:
@@ -95,7 +104,7 @@ def daf_context(pack, n, window=1):
 
     segment = pack.segment(n)
     if segment.get("halacha"):
-        lines.append("where this lands in halacha: " +
+        lines.append("where this lands in halacha (report only): " +
                      ", ".join("[[%s]]" % r for r in segment["halacha"]))
     if segment.get("xrefs"):
         lines.append("what it connects to: " +
@@ -104,63 +113,34 @@ def daf_context(pack, n, window=1):
 
 
 class Partner:
-    def __init__(self, pack, effort="high", model=MODEL, client=None):
+    def __init__(self, pack, llm, level="standard"):
         self.pack = pack
-        self.model = model
-        # The spec calls low latency a hard constraint and calls disagreeing
-        # correctly the whole product, and those pull opposite ways. Default to
-        # the careful end and let real sessions decide -- guessing from a desk
-        # is how you optimise the wrong one.
-        self.effort = effort
-        self.client = client or anthropic.Anthropic()
+        self.llm = llm
+        self.level = level
         self.known = pack.refs()
 
-    def system(self, n):
-        # Two blocks: the constitution never changes, and the daf holds still
-        # for a whole session, so both are worth caching. Volatile turns go in
-        # messages, after the last breakpoint.
-        return [
-            {"type": "text", "text": CONSTITUTION,
-             "cache_control": {"type": "ephemeral"}},
-            {"type": "text", "text": daf_context(self.pack, n),
-             "cache_control": {"type": "ephemeral"}},
-        ]
-
-    def _call(self, n, messages):
-        response = self.client.messages.create(
-            model=self.model,
-            max_tokens=16000,
-            system=self.system(n),
-            thinking={"type": "adaptive"},
-            output_config={"effort": self.effort},
-            messages=messages,
-        )
-        if response.stop_reason == "refusal":
-            return None, response
-        text = "".join(b.text for b in response.content if b.type == "text")
-        return text, response
-
     def ask(self, n, history, said):
-        """One turn. Returns (text, verdict, history) with the gate applied.
+        """One turn: route cheaply, answer expensively, then check it.
 
-        A turn that fails the gate is not shown and not silently patched: the
-        model is told exactly what was wrong and answers again. If it fails
-        twice, the honest answer is that we do not have it.
+        Returns (text, verdict, history, trace). The trace is what the router
+        decided and who it opened, so a bad answer can be diagnosed rather than
+        guessed at.
         """
-        messages = history + [{"role": "user", "content": said}]
-        text, response = self._call(n, messages)
-        if text is None:
-            return ("I can't answer that one.",
-                    ground.Verdict("", set(), set()), history)
+        route = retrieve.classify(self.llm, said)
+        names = retrieve.consult(self.pack, n, route["kind"], route["claim"])
+        system = CONSTITUTION + "\n\n" + daf_context(
+            self.pack, n, names, self.level)
 
+        messages = history + [{"role": "user", "content": said}]
+        text = self.llm.say(system, messages, heavy=True)
         verdict = ground.check(text, self.known)
+
         if not verdict.ok:
-            # An operator note, not a user turn: it follows the user message and
-            # is last, which is where a mid-conversation system message may sit.
-            retry = messages + [{"role": "system", "content": verdict.complaint()}]
-            text, response = self._call(n, retry)
-            if text is None:
-                text = "I don't have that here -- let's look."
+            # Tell it exactly what was wrong and let it answer again. A turn
+            # that fails twice becomes an admission, not a patched-up guess.
+            retry = messages + [{"role": "user", "content":
+                                 "[correction] " + verdict.complaint()}]
+            text = self.llm.say(system, retry, heavy=True)
             verdict = ground.check(text, self.known)
             if not verdict.ok:
                 text = ("I don't have a source here I can stand behind, so I'd "
@@ -168,4 +148,5 @@ class Partner:
                 verdict = ground.check(text, self.known)
 
         history = messages + [{"role": "assistant", "content": text}]
-        return text, verdict, history
+        trace = {"kind": route["kind"], "claim": route["claim"], "opened": names}
+        return text, verdict, history, trace

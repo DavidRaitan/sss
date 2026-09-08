@@ -6,55 +6,27 @@
     "Steinsaltz",
     "Tosafot"
   ],
-  "routing": {
-    "meaning": [
-      "Rashi",
-      "Steinsaltz"
-    ],
-    "conflict": [
-      "Tosafot"
-    ],
-    "structure": [
-      "Steinsaltz"
-    ],
-    "logic": [
-      "Ramban",
-      "Rashba",
-      "Ritva",
-      "Ran",
-      "Meiri"
-    ],
-    "halacha": [
-      "Rif",
-      "Rosh"
-    ],
-    "on_the_page": [
-      "Rashi",
-      "Tosafot",
-      "Rabbeinu Chananel"
-    ],
-    "on_commentary": [
-      "Maharsha"
-    ]
-  },
   "weights": {
+    "Steinsaltz": 95,
     "Rashi": 100,
     "Tosafot": 100,
     "Rabbeinu Chananel": 95,
-    "Steinsaltz": 95,
     "Rif": 75,
     "Rosh": 70,
-    "Tosafot HaRosh": 65,
-    "Ramban": 60,
-    "Rashba": 60,
+    "Rambam": 75,
+    "Ramban": 65,
+    "Rashba": 65,
     "Ritva": 60,
-    "Ran": 55,
+    "Ran": 60,
     "Meiri": 55,
+    "Rashbam": 100,
+    "Tosafot HaRosh": 60,
+    "Shita Mekubetzet": 60,
     "Maharsha": 40,
     "Penei Yehoshua": 30,
     "Rashash": 30
   },
-  "built_at": "2026-09-07T15:14:31Z",
+  "built_at": "2026-09-08T00:51:18Z",
   "source": "sefaria.org",
   "fixture": true,
   "fixture_note": "Transcribed offline for testing. Not authoritative -- rebuild with build_pack.py before showing a learner.",
