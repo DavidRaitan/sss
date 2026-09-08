@@ -103,7 +103,8 @@ lists, no bold. They may speak English, Hebrew and Aramaic in a single
 sentence; that is normal, and you should read straight through it."""
 
 
-def daf_context(pack, n, names, level="standard", language="english", window=3):
+def daf_context(pack, n, names, level="standard", language="english",
+                window=3, elsewhere=None):
     """Everything the partner may know, for one position on the page."""
     lines = ["DAF: %s" % pack.ref,
              "WHO YOU ARE LEARNING WITH: %s" % LEVELS.get(level, LEVELS["standard"]),
@@ -144,6 +145,15 @@ def daf_context(pack, n, names, level="standard", language="english", window=3):
                 "; it cites %s" % ", ".join(struct["cites"]) if struct["cites"] else ""))
         lines.append("")
 
+    if elsewhere:
+        lines.append("--- where this comes up elsewhere in the masechta")
+        lines.append("These are pages that share uncommon wording with this line. "
+                     "It is a lead, not a claim: say what they share, and that you "
+                     "have not read them here.")
+        for hit in elsewhere:
+            lines.append("  %s (shares: %s)" % (hit["ref"], ", ".join(hit.get("shares", []))))
+        lines.append("")
+
     segment = pack.segment(n)
     if segment.get("halacha"):
         lines.append("where this lands in halacha (report only): " +
@@ -155,12 +165,21 @@ def daf_context(pack, n, names, level="standard", language="english", window=3):
 
 
 class Partner:
-    def __init__(self, pack, llm, level="standard", language="english"):
+    def __init__(self, pack, llm, level="standard", language="english", index=None):
+        self.index = index
         self.pack = pack
         self.llm = llm
         self.level = level
         self.language = language
         self.known = pack.refs()
+
+    def section_text(self, n):
+        """The unit of learning the line sits in -- mishna, sugya, baraita."""
+        for sec in self.pack.data.get("sections") or []:
+            if sec["from"] <= n <= sec["to"]:
+                return " ".join(self.pack.segment(i)["he_plain"]
+                                for i in range(sec["from"], sec["to"] + 1))
+        return self.pack.segment(n)["he_plain"]
 
     def ask(self, n, history, said):
         """One turn: route cheaply, answer expensively, then check it.
@@ -171,8 +190,16 @@ class Partner:
         """
         route = retrieve.classify(self.llm, said)
         names = retrieve.consult(self.pack, n, route["kind"], route["claim"])
+        # "Didn't we see this ten pages back" is a question about the tractate,
+        # not the page, so the rest of it is only pulled in when asked for.
+        elsewhere = None
+        if self.index and route["kind"] in ("conflict", "structure"):
+            # Match on the whole unit, not the one line. A single line is mostly
+            # structural words -- היכא קאי, מאימתי -- and matching those finds
+            # pages that argue the same shape rather than the same subject.
+            elsewhere = self.index.related(self.section_text(n), exclude=self.pack.ref)
         system = CONSTITUTION + "\n\n" + daf_context(
-            self.pack, n, names, self.level, self.language)
+            self.pack, n, names, self.level, self.language, elsewhere=elsewhere)
 
         messages = history + [{"role": "user", "content": said}]
         text = self.llm.say(system, messages, heavy=True)

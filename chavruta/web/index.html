@@ -13,17 +13,17 @@
     --ui:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
   }
   @media (prefers-color-scheme:dark){
-    :root{ --ink:#ece4d6; --dim:#a49a8c; --faint:#6f6558; --page:#1b1712;
-           --ground:#100e0a; --line:#332c22; --edge:#453b2c; --mark:#e08a63; --soft:#2a2216; }
+    :root{--ink:#ece4d6;--dim:#a49a8c;--faint:#6f6558;--page:#1b1712;
+          --ground:#100e0a;--line:#332c22;--edge:#453b2c;--mark:#e08a63;--soft:#2a2216;}
   }
   *{box-sizing:border-box}
   html,body{height:100%}
   body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--ui);
     display:flex;flex-direction:column;overflow:hidden}
 
-  header{display:flex;align-items:center;gap:9px;padding:8px 15px;background:var(--page);
+  header{display:flex;align-items:center;gap:8px;padding:7px 14px;background:var(--page);
     border-bottom:1px solid var(--line);flex-wrap:wrap;flex:none}
-  .brand{font-family:var(--serif);font-size:18px}
+  .brand{font-family:var(--serif);font-size:17px}
   select,.btn{font:inherit;font-size:12.5px;color:var(--ink);background:var(--page);
     border:1px solid var(--line);border-radius:6px;padding:4px 8px;cursor:pointer}
   .btn:hover,select:hover{border-color:var(--edge)}
@@ -32,69 +32,75 @@
   .grow{flex:1}
   .msg{font-size:11.5px;color:var(--mark)}
 
-  /* ---- the page: gemara down the middle, Rashi and Tosafot beside it ---- */
-  main{flex:1;overflow:hidden;display:flex;justify-content:center;padding:14px}
-  .daf{display:grid;grid-template-columns:1fr 2.1fr 1fr;gap:0;max-width:1500px;width:100%;
+  main{flex:1;overflow:hidden;display:flex;justify-content:center;padding:12px 12px 0}
+  /* RTL puts the first column on the right: Rashi there, Tosafot opposite. */
+  .daf{display:grid;grid-template-columns:1fr 2.15fr 1fr;max-width:1560px;width:100%;
     background:var(--page);border:1px solid var(--line);border-radius:5px;overflow:hidden}
-  .col{overflow-y:auto;padding:16px 18px 40px}
-  .col.side{background:var(--page)}
-  .col.gem{border-inline:1px solid var(--line);background:var(--page)}
-  .colhead{font-family:var(--serif);font-size:17px;color:var(--mark);text-align:center;
-    padding-bottom:8px;margin-bottom:12px;border-bottom:1px solid var(--line);
-    position:sticky;top:-16px;background:var(--page);z-index:2}
+  .col{overflow-y:auto;padding:14px 17px 120px}
+  .col.gem{border-inline:1px solid var(--line)}
+  .colhead{font-family:var(--serif);font-size:16px;color:var(--mark);text-align:center;
+    padding-bottom:7px;margin-bottom:11px;border-bottom:1px solid var(--line);
+    position:sticky;top:-14px;background:var(--page);z-index:2}
   .amudhead{font-family:var(--serif);font-size:15px;color:var(--faint);text-align:center;
-    letter-spacing:.06em;padding-bottom:9px;margin-bottom:14px;border-bottom:1px solid var(--line)}
+    letter-spacing:.06em;padding-bottom:8px;margin-bottom:12px;border-bottom:1px solid var(--line)}
 
-  /* one continuous block of text, justified like a printed column */
-  .gem .flow{font-family:var(--serif);font-size:25px;line-height:1.98;text-align:justify}
+  .flow{font-family:var(--serif);font-size:25px;line-height:1.98;text-align:justify}
   .cl{cursor:pointer;border-radius:3px}
   .cl:hover{background:var(--soft)}
   .cl.on{background:var(--soft);box-shadow:0 0 0 1px var(--edge)}
+  /* Where one unit of learning ends and the next begins. */
+  .sec{display:block;font-family:var(--ui);font-size:10.5px;letter-spacing:.11em;
+    color:var(--mark);margin:16px 0 6px;padding-bottom:3px;border-bottom:1px solid var(--line);
+    cursor:pointer;text-align:center}
+  .sec:hover{color:var(--ink)}
+  .sec.on{background:var(--soft)}
+  .stz{display:block;font-family:var(--serif);font-size:18px;line-height:1.8;color:var(--dim);
+    margin:5px 0 12px;padding-inline-start:11px;border-inline-start:2px solid var(--edge)}
+  .nostz .stz{display:none}
   .en{font-family:var(--ui);font-size:13.5px;line-height:1.6;color:var(--dim);
-    direction:ltr;text-align:left;margin:9px 0 15px;padding-inline-start:11px;
+    direction:ltr;text-align:left;margin:8px 0 14px;padding-inline-start:11px;
     border-inline-start:2px solid var(--line)}
   .en .add{color:var(--faint);font-style:italic}
   .noen .en{display:none}
 
-  /* commentary: dibur hamatchil leads, body follows, name said once at the top */
-  .side .c{font-family:var(--serif);font-size:17px;line-height:1.72;text-align:justify;
-    margin-bottom:13px;cursor:pointer;border-radius:4px;padding:2px 4px}
-  .side .c:hover{background:var(--soft)}
-  .side .c.on{background:var(--soft);box-shadow:inset 2px 0 0 var(--mark)}
-  .side .c b{font-weight:700;color:var(--mark)}
-  .side .c .body{font-weight:400}
-  .side .c .tr{display:block;font-family:var(--ui);font-size:12.5px;color:var(--dim);
-    direction:ltr;text-align:left;margin-top:5px}
-  .side .none{font-size:12px;color:var(--faint);text-align:center;padding-top:14px}
-  .more{margin-top:18px;padding-top:12px;border-top:1px solid var(--line)}
-  .more .who{font-family:var(--serif);font-size:14px;color:var(--mark);margin-bottom:5px}
+  .c{font-family:var(--serif);font-size:17px;line-height:1.72;text-align:justify;
+    margin-bottom:12px;cursor:pointer;border-radius:4px;padding:2px 4px}
+  .c:hover{background:var(--soft)}
+  .c.on{background:var(--soft);box-shadow:inset 2px 0 0 var(--mark)}
+  .c b{font-weight:700;color:var(--mark)}
+  .none{font-size:12px;color:var(--faint);text-align:center;padding-top:12px}
 
-  /* ---- the conversation ---- */
-  footer{flex:none;background:var(--page);border-top:1px solid var(--line)}
-  .talk{max-width:1500px;margin:0 auto;padding:9px 16px 12px}
-  .log{max-height:0;overflow-y:auto;transition:max-height .18s ease}
-  .log.open{max-height:44vh;padding-bottom:9px}
-  .t{margin-bottom:12px;font-size:14.5px;line-height:1.62}
+  /* ---- the ball: this is the product, not a feature bolted on ---- */
+  #ball{position:fixed;inset-block-end:26px;inset-inline-start:50%;transform:translateX(50%);
+    width:76px;height:76px;border-radius:50%;border:1px solid var(--edge);background:var(--page);
+    box-shadow:0 6px 24px rgba(0,0,0,.17);cursor:pointer;z-index:40;font-size:27px;
+    display:flex;align-items:center;justify-content:center;transition:transform .12s}
+  #ball:hover{transform:translateX(50%) scale(1.05)}
+  #ball[data-state="listening"]{background:var(--mark);border-color:var(--mark);color:#fff;
+    animation:pulse 1.15s ease-in-out infinite}
+  #ball[data-state="thinking"]{background:var(--ink);border-color:var(--ink);color:var(--page)}
+  #ball[data-state="speaking"]{background:var(--soft);border-color:var(--mark)}
+  @keyframes pulse{50%{box-shadow:0 0 0 15px rgba(156,59,33,.16),0 6px 24px rgba(0,0,0,.17)}}
+  #hint{position:fixed;inset-block-end:8px;inset-inline-start:0;width:100%;text-align:center;
+    font-size:11.5px;color:var(--faint);z-index:39;pointer-events:none}
+
+  /* ---- transcript: pulled up only when wanted ---- */
+  #log{position:fixed;inset-inline:0;inset-block-end:0;background:var(--page);
+    border-top:1px solid var(--line);max-height:0;overflow:hidden;transition:max-height .2s ease;
+    z-index:35;box-shadow:0 -8px 26px rgba(0,0,0,.10)}
+  #log.open{max-height:52vh;overflow-y:auto}
+  .logpad{max-width:900px;margin:0 auto;padding:16px 20px 108px}
+  .t{margin-bottom:13px;font-size:14.5px;line-height:1.62}
   .t.me{color:var(--dim);font-style:italic}
   .t table{border-collapse:collapse;margin:9px 0;font-size:13px;width:100%}
   .t th,.t td{border:1px solid var(--line);padding:5px 8px;text-align:start;vertical-align:top}
   .t th{background:var(--soft);font-weight:600}
-  .t .cite{font-size:10.5px;color:var(--faint);direction:ltr}
-  .row{display:flex;align-items:center;gap:11px}
-  #mic{width:46px;height:46px;border-radius:50%;border:1px solid var(--edge);background:var(--page);
-    font-size:19px;cursor:pointer;flex:none}
-  #mic[data-state="listening"]{background:var(--mark);border-color:var(--mark);color:#fff;
-    animation:pulse 1.15s ease-in-out infinite}
-  #mic[data-state="thinking"]{background:var(--ink);border-color:var(--ink);color:var(--page)}
-  #mic[data-state="speaking"]{background:var(--soft)}
-  @keyframes pulse{50%{box-shadow:0 0 0 8px rgba(156,59,33,.17)}}
-  #say{flex:1;font:inherit;font-size:14.5px;padding:9px 12px;border:1px solid var(--line);
-    border-radius:8px;background:var(--page);color:var(--ink)}
-  .state{font-size:11px;color:var(--faint);margin-bottom:5px;min-height:14px}
+  .cite{font-size:10.5px;color:var(--faint);direction:ltr}
+  #typed{width:100%;font:inherit;font-size:14px;padding:8px 11px;border:1px solid var(--line);
+    border-radius:7px;background:var(--page);color:var(--ink);margin-top:6px}
   @media (max-width:1000px){
     .daf{grid-template-columns:1fr}
-    .col.side{border-top:1px solid var(--line);max-height:34vh}
-    .col.gem{border-inline:0}
+    .col{max-height:32vh} .col.gem{max-height:none;border-inline:0}
   }
 </style>
 </head>
@@ -105,312 +111,268 @@
   <span class="lbl">daf</span><select id="daf"></select>
   <select id="amud"><option value="a">א</option><option value="b">ב</option></select>
   <button class="btn" id="prev">‹</button><button class="btn" id="next">›</button>
+  <span class="lbl">section</span><select id="section"></select>
   <span class="grow"></span>
-  <select id="level" title="how much it explains">
-    <option value="standard">Rashi &amp; Tosafot</option>
-    <option value="beginner">Beginner</option>
-    <option value="fluent">Fluent</option>
+  <select id="mode" title="what shows in the middle">
+    <option value="gemara">Gemara</option>
+    <option value="steinsaltz">Gemara + Steinsaltz</option>
   </select>
-  <select id="language" title="what language it answers in">
-    <option value="english">Answers in English</option>
-    <option value="hebrew">עונה בעברית</option>
-    <option value="match">Matches me</option>
-  </select>
+  <select id="level"><option value="standard">Rashi &amp; Tosafot</option>
+    <option value="beginner">Beginner</option><option value="fluent">Fluent</option></select>
+  <select id="language"><option value="english">Answers in English</option>
+    <option value="hebrew">Answers in Hebrew</option><option value="match">Matches me</option></select>
   <button class="btn" id="tr" aria-pressed="false">Translation</button>
-  <button class="btn" id="voice" aria-pressed="true">🔊</button>
   <button class="btn" id="logtoggle">Transcript</button>
   <span class="msg" id="msg"></span>
 </header>
 
 <main><div class="daf">
-  <div class="col side" id="tos"><div class="colhead">תוספות</div><div id="tosbody"></div></div>
+  <div class="col" id="ras"><div class="colhead">רש״י</div><div id="rasbody"></div></div>
   <div class="col gem"><div class="amudhead" id="amudhead">…</div><div id="gembody"></div></div>
-  <div class="col side" id="ras"><div class="colhead">רש״י</div><div id="rasbody"></div></div>
+  <div class="col" id="tos"><div class="colhead">תוספות</div><div id="tosbody"></div></div>
 </div></main>
 
-<footer><div class="talk">
-  <div class="log" id="log"></div>
-  <div class="state" id="state">Press the mic and read, or type below.</div>
-  <div class="row">
-    <button id="mic" data-state="idle" title="talk">🎤</button>
-    <input id="say" placeholder="say what you think it means…" autocomplete="off">
-    <button class="btn" id="send">Send</button>
-  </div>
-</div></footer>
+<div id="log"><div class="logpad" id="logbody"></div>
+  <div class="logpad" style="padding-top:0"><input id="typed" placeholder="or type, if you'd rather"></div>
+</div>
+<button id="ball" data-state="idle" title="talk">🎤</button>
+<div id="hint">press to talk</div>
 
 <script>
 const $=id=>document.getElementById(id);
 const el=(t,c,x)=>{const n=document.createElement(t);if(c)n.className=c;
   if(x!==undefined)n.textContent=x;return n;};
-let pack=null,line=1,masechtot=[],turns=[];
+let pack=null,line=1,masechtot=[],audio=null;
 const session=sessionStorage.getItem("chav")||
   (sessionStorage.setItem("chav",Math.random().toString(36).slice(2)),sessionStorage.getItem("chav"));
 
 const ONES=["","א","ב","ג","ד","ה","ו","ז","ח","ט"],TENS=["","י","כ","ל","מ","נ","ס","ע","פ","צ"];
-function hebNum(n){
-  if(n===15)return"טו"; if(n===16)return"טז";
-  const h=Math.floor(n/100),t=Math.floor((n%100)/10),o=n%10;
-  return (h===1?"ק":h===2?"ר":h===3?"ש":"")+TENS[t]+ONES[o];
-}
-const status=(t,s)=>{$("state").textContent=t; if(s)$("mic").dataset.state=s;};
+const hebNum=n=>n===15?"טו":n===16?"טז":
+  ((h=>h===1?"ק":h===2?"ר":h===3?"ש":"")(Math.floor(n/100)))+TENS[Math.floor((n%100)/10)]+ONES[n%10];
+const hint=t=>{$("hint").textContent=t;};
+const state=s=>{$("ball").dataset.state=s;};
 const msg=t=>{$("msg").textContent=t||"";};
 
 /* ---- choosing a page ---- */
 async function pickers(){
-  try{ masechtot=(await (await fetch("/api/masechtot")).json()).masechtot||[]; }catch(e){}
-  const m=$("mas"); m.replaceChildren();
+  try{masechtot=(await(await fetch("/api/masechtot")).json()).masechtot||[];}catch(e){}
+  const m=$("mas");m.replaceChildren();
   for(const x of masechtot){const o=el("option",null,x.he);o.value=x.name;m.append(o);}
-  fillDapim();
-  m.onchange=()=>{fillDapim();turnTo();};
-  $("daf").onchange=turnTo; $("amud").onchange=turnTo;
+  fillDapim();m.onchange=()=>{fillDapim();turnTo();};
+  $("daf").onchange=turnTo;$("amud").onchange=turnTo;
 }
 const cur=()=>masechtot.find(x=>x.name===$("mas").value)||masechtot[0];
-function fillDapim(){
-  const m=cur(); if(!m)return;
-  const d=$("daf"); d.replaceChildren();
+function fillDapim(){const m=cur();if(!m)return;const d=$("daf");d.replaceChildren();
   for(let n=m.first;n<=m.last;n++){const o=el("option",null,hebNum(n));o.value=n;d.append(o);}
-  d.value=m.first;
-}
-function turnTo(){
-  const m=cur(); if(!m)return;
-  const n=+$("daf").value;
+  d.value=m.first;}
+function turnTo(){const m=cur();if(!m)return;const n=+$("daf").value;
   if(n===m.last&&m.last_amud==="a"&&$("amud").value==="b")$("amud").value="a";
-  openDaf(m.name+" "+n+$("amud").value);
-}
-function step(by){
-  const m=cur(); if(!m)return;
-  let n=+$("daf").value, a=$("amud").value;
-  if(by>0){ if(a==="a")a="b"; else{a="a";n++;} } else { if(a==="b")a="a"; else{a="b";n--;} }
+  openDaf(m.name+" "+n+$("amud").value);}
+function step(by){const m=cur();if(!m)return;let n=+$("daf").value,a=$("amud").value;
+  if(by>0){a==="a"?a="b":(a="a",n++);}else{a==="b"?a="a":(a="b",n--);}
   if(n<m.first||n>m.last)return;
   if(n===m.last&&m.last_amud==="a")a="a";
-  $("daf").value=n; $("amud").value=a; turnTo();
-}
-$("prev").onclick=()=>step(-1); $("next").onclick=()=>step(1);
+  $("daf").value=n;$("amud").value=a;turnTo();}
+$("prev").onclick=()=>step(-1);$("next").onclick=()=>step(1);
 
 async function openDaf(ref){
-  msg(""); status("Opening "+ref+"…","thinking");
+  msg("");hint("opening "+ref+"…");state("thinking");
   try{
     const r=await fetch("/api/daf?ref="+encodeURIComponent(ref));
     const d=await r.json();
-    if(!r.ok){status("Could not open that daf","idle");msg(d.error||"");return;}
-    pack=d; turns=[]; $("log").replaceChildren();
-    draw(); select(pack.segments[0]?.n||1);
-    status("Press the mic and read, or type below.","idle");
+    if(!r.ok){hint("could not open that daf");state("idle");msg(d.error||"");return;}
+    pack=d;$("logbody").replaceChildren();
+    draw();select(pack.segments[0]?.n||1);
+    hint("press to talk");state("idle");
     if(pack.fixture)msg("test data — not the real daf");
-  }catch(e){status("No connection to the server","idle");}
+  }catch(e){hint("no connection to the server");state("idle");}
 }
 
 /* ---- the page ---- */
 function draw(){
-  const m=cur(), p=pack.ref.match(/(\d+)([ab])$/);
+  const m=cur(),p=pack.ref.match(/(\d+)([ab])$/);
   $("amudhead").textContent=(m?m.he:pack.ref)+
     (p?" · דף "+hebNum(+p[1])+" עמוד "+(p[2]==="a"?"א":"ב"):"");
-  // One flowing column. The gemara is not a list of rows; breaking it into
-  // cards was the thing that stopped it reading like a page.
-  const g=$("gembody"); g.replaceChildren();
+  const secs=pack.sections||[];
+  const sel=$("section");sel.replaceChildren();
+  const all=el("option",null,"whole amud");all.value="";sel.append(all);
+  for(const s of secs){
+    const o=el("option",null,(s.label||"—")+"  ("+s.from+"–"+s.to+")");
+    o.value=s.from;sel.append(o);
+  }
+  sel.onchange=()=>{if(sel.value)select(+sel.value);};
+
+  const g=$("gembody");g.replaceChildren();
   const flow=el("div","flow");
   for(const seg of pack.segments){
-    const span=el("span","cl"); span.dataset.n=seg.n;
+    const sec=secs.find(s=>s.from===seg.n);
+    if(sec&&sec.label){
+      const h=el("span","sec",sec.label);
+      h.onclick=()=>{select(sec.from);sel.value=String(sec.from);};
+      flow.append(h);
+    }
+    const span=el("span","cl");span.dataset.n=seg.n;
     span.textContent=seg.he+" ";
     span.onclick=()=>select(seg.n);
     flow.append(span);
+    // Beginner reading: Steinsaltz interleaved after each line of gemara.
+    const stz=(seg.commentaries?.Steinsaltz||[])[0];
+    if(stz)flow.append(el("span","stz",stz.he));
   }
   g.append(flow);
   const en=el("div","en");
   for(const seg of pack.segments)
-    for(const s of seg.en||[]) en.append(el("span",s.kind==="daf"?"":"add",s.text+" "));
+    for(const s of seg.en||[])en.append(el("span",s.kind==="daf"?"":"add",s.text+" "));
   g.append(en);
-  drawSides();
+  sides();
 }
 
-function commentsOf(name){
-  const out=[];
-  for(const seg of pack.segments)
-    for(const e of (seg.commentaries?.[name]||[])) out.push([seg.n,e]);
-  return out;
-}
-
-function drawSides(){
+function sides(){
   for(const [name,box] of [["Rashi",$("rasbody")],["Tosafot",$("tosbody")]]){
     box.replaceChildren();
-    const rows=commentsOf(name);
+    const rows=[];
+    for(const seg of pack.segments)
+      for(const e of (seg.commentaries?.[name]||[]))rows.push([seg.n,e]);
     if(!rows.length){box.append(el("div","none","nothing on this amud"));continue;}
     for(const [n,e] of rows){
-      const c=el("div","c"); c.dataset.n=n; c.dataset.ref=e.ref;
-      // The lemma leads in bold and the comment runs on from it, the way it is
-      // printed. The name belongs at the top of the column, not on every entry.
-      const body=e.he||"";
-      const lead=e.dibur&&body.startsWith(e.dibur)?e.dibur:null;
-      if(lead){
-        c.append(el("b",null,lead));
-        c.append(el("span","body",body.slice(lead.length)));
-      } else {
-        if(e.dibur)c.append(el("b",null,e.dibur+" "));
-        c.append(el("span","body",body));
-      }
+      const c=el("div","c");c.dataset.n=n;
+      const body=e.he||"",lead=e.dibur&&body.startsWith(e.dibur)?e.dibur:null;
+      if(lead){c.append(el("b",null,lead));c.append(el("span",null,body.slice(lead.length)));}
+      else{if(e.dibur)c.append(el("b",null,e.dibur+" "));c.append(el("span",null,body));}
       c.onclick=()=>select(n);
       box.append(c);
     }
-  }
-  // Everyone else who is on this amud, named, below the two that are on the page.
-  const others=new Set();
-  for(const seg of pack.segments) for(const k of Object.keys(seg.commentaries||{})) others.add(k);
-  for(const k of ["Rashi","Tosafot","Steinsaltz"]) others.delete(k);
-  if(others.size){
-    const wrap=el("div","more");
-    wrap.append(el("div","who","גם על הדף"));
-    wrap.append(el("div","none",[...others].join(" · ")));
-    $("tosbody").append(wrap);
   }
 }
 
 function select(n){
   line=n;
-  for(const s of document.querySelectorAll(".cl"))
-    s.classList.toggle("on",+s.dataset.n===n);
-  // Clicking a line brings its Rashi and Tosafot with it.
-  for(const c of document.querySelectorAll(".side .c")){
-    const on=+c.dataset.n===n;
-    c.classList.toggle("on",on);
+  for(const s of document.querySelectorAll(".cl"))s.classList.toggle("on",+s.dataset.n===n);
+  for(const c of document.querySelectorAll(".c")){
+    const on=+c.dataset.n===n;c.classList.toggle("on",on);
     if(on)c.scrollIntoView({block:"nearest",behavior:"smooth"});
   }
 }
 
-/* ---- rendering what it says, tables included ---- */
+/* ---- what it says ---- */
 function renderMarkdown(text,into){
-  const lines=text.split("\n");
-  let i=0;
+  const lines=text.split("\n");let i=0;
   while(i<lines.length){
     if(/^\s*\|/.test(lines[i])&&/^\s*\|[\s:|-]+\|\s*$/.test(lines[i+1]||"")){
-      const head=lines[i].split("|").slice(1,-1).map(s=>s.trim());
-      i+=2;
-      const table=el("table"), thead=el("thead"), hr=el("tr");
-      head.forEach(h=>hr.append(el("th",null,h)));
-      thead.append(hr); table.append(thead);
+      const head=lines[i].split("|").slice(1,-1).map(s=>s.trim());i+=2;
+      const table=el("table"),thead=el("thead"),hr=el("tr");
+      head.forEach(h=>hr.append(el("th",null,h)));thead.append(hr);table.append(thead);
       const tb=el("tbody");
       while(i<lines.length&&/^\s*\|/.test(lines[i])){
         const tr=el("tr");
-        lines[i].split("|").slice(1,-1).forEach(cell=>{
-          const td=el("td"); inline(cell.trim(),td); tr.append(td);
-        });
-        tb.append(tr); i++;
+        lines[i].split("|").slice(1,-1).forEach(cell=>{const td=el("td");inline(cell.trim(),td);tr.append(td);});
+        tb.append(tr);i++;
       }
-      table.append(tb); into.append(table); continue;
+      table.append(tb);into.append(table);continue;
     }
     if(lines[i].trim()){const p=el("div");inline(lines[i],p);into.append(p);}
     i++;
   }
 }
 function inline(text,into){
-  // Citations arrive as [[ref]]; show them small and out of the way.
-  const parts=text.split(/(\[\[[^\]]+\]\]|\*\*[^*]+\*\*)/g);
-  for(const part of parts){
+  for(const part of text.split(/(\[\[[^\]]+\]\]|\*\*[^*]+\*\*)/g)){
     if(!part)continue;
-    if(part.startsWith("[[")) into.append(el("span","cite"," ("+part.slice(2,-2)+") "));
-    else if(part.startsWith("**")) into.append(el("b",null,part.slice(2,-2)));
+    if(part.startsWith("[["))into.append(el("span","cite"," ("+part.slice(2,-2)+") "));
+    else if(part.startsWith("**"))into.append(el("b",null,part.slice(2,-2)));
     else into.append(document.createTextNode(part));
   }
 }
-
-/* ---- talking ---- */
-const HEBREW=/[֐-׿]+(?:[\s֐-׿"'׳״.,:;?!-]*[֐-׿]+)*/g;
-const speakable=t=>t.replace(/\|[^\n]*\|/g,"").replace(HEBREW," — ")
-  .replace(/\[\[[^\]]+\]\]/g,"").replace(/\*\*/g,"")
-  .replace(/\s{2,}/g," ").replace(/(\s—\s){2,}/g," — ").trim();
-
-let voices=[];
-if(window.speechSynthesis){
-  const load=()=>{voices=speechSynthesis.getVoices();};
-  load(); speechSynthesis.onvoiceschanged=load;
-}
-let handsFree=false;
-function speak(text,then){
-  if($("voice").getAttribute("aria-pressed")!=="true"||!window.speechSynthesis)
-    return void(then&&then());
-  const say=speakable(text);
-  if(!say)return void(then&&then());
-  speechSynthesis.cancel();
-  const u=new SpeechSynthesisUtterance(say);
-  const v=voices.find(v=>/en[-_]US/i.test(v.lang))||voices[0];
-  if(v)u.voice=v;
-  u.lang="en-US"; u.rate=1.03;
-  u.onend=()=>{status("Press the mic and read, or type below.","idle");then&&then();};
-  u.onerror=()=>{status("Could not speak — check system audio","idle");then&&then();};
-  status("Speaking…","speaking");
-  speechSynthesis.speak(u);
-}
-
 function addTurn(text,mine,trace){
   const t=el("div","t"+(mine?" me":""));
-  if(mine)t.textContent=text; else renderMarkdown(text,t);
+  if(mine)t.textContent=text;else renderMarkdown(text,t);
   if(trace)t.append(el("div","cite","routed "+trace.kind+" · "+(trace.opened||[]).join(", ")));
-  $("log").append(t); $("log").classList.add("open");
-  $("log").scrollTop=$("log").scrollHeight;
+  $("logbody").append(t);$("log").scrollTop=$("log").scrollHeight;
+}
+
+/* ---- speaking: one multilingual voice reads the whole sentence ---- */
+async function speak(text,then){
+  try{
+    const r=await fetch("/api/speak",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({text})});
+    if(!r.ok)throw new Error("tts");
+    const url=URL.createObjectURL(await r.blob());
+    if(audio)audio.pause();
+    audio=new Audio(url);
+    state("speaking");hint("speaking — press to interrupt");
+    audio.onended=()=>{URL.revokeObjectURL(url);then&&then();};
+    audio.onerror=()=>{then&&then();};
+    await audio.play();
+  }catch(e){
+    // If the voice service is unreachable, say so rather than going quiet.
+    msg("could not speak (check the console)");console.warn(e);
+    then&&then();
+  }
 }
 
 async function send(said){
   if(!said||!pack)return;
-  addTurn(said,true); $("say").value="";
-  status("Thinking…","thinking");
+  addTurn(said,true);$("typed").value="";
+  state("thinking");hint("thinking…");
   try{
     const r=await fetch("/api/say",{method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({ref:pack.ref,line,said,session,
         level:$("level").value,language:$("language").value})});
     const d=await r.json();
-    if(!r.ok){status("","idle");msg(d.error||"something went wrong");return;}
+    if(!r.ok){state("idle");hint("press to talk");msg(d.error||"something went wrong");return;}
     addTurn(d.text,false,d.trace);
     if(!d.grounded)msg("ungrounded: "+d.problem);
-    speak(d.text,()=>{if(handsFree)listen();});
-  }catch(e){status("No connection to the server","idle");}
+    // It answers, then listens again, the way a person would.
+    speak(d.text,()=>{state("idle");hint("press to talk");listen();});
+  }catch(e){state("idle");hint("no connection to the server");}
 }
-$("send").onclick=()=>send($("say").value.trim());
-$("say").onkeydown=e=>{if(e.key==="Enter")send($("say").value.trim());};
+$("typed").onkeydown=e=>{if(e.key==="Enter")send($("typed").value.trim());};
 
 /* ---- listening ---- */
 let recog=null,quiet=null,buffer="";
 function listen(){
   const R=window.SpeechRecognition||window.webkitSpeechRecognition;
-  if(!R)return void status("This browser cannot listen","idle");
-  if(window.speechSynthesis)speechSynthesis.cancel();
-  recog=new R(); recog.lang="he-IL"; recog.continuous=true; recog.interimResults=true;
+  if(!R){hint("this browser cannot listen");return;}
+  if(audio)audio.pause();
+  recog=new R();recog.lang="he-IL";recog.continuous=true;recog.interimResults=true;
   buffer="";
   recog.onresult=ev=>{
     let interim="";
     for(let i=ev.resultIndex;i<ev.results.length;i++){
       const r=ev.results[i];
-      if(r.isFinal)buffer+=r[0].transcript+" "; else interim+=r[0].transcript;
+      if(r.isFinal)buffer+=r[0].transcript+" ";else interim+=r[0].transcript;
     }
-    $("say").value=(buffer+interim).trim();
+    hint((buffer+interim).trim().slice(-90)||"listening…");
     clearTimeout(quiet);
-    // Long enough to think mid-sentence; Send is there when you are ready.
     quiet=setTimeout(()=>{if(buffer.trim())stop(true);},2600);
   };
   recog.onerror=ev=>{
-    status(ev.error==="not-allowed"?"Microphone access needed":"Listening stopped","idle");
-    handsFree=false;recog=null;
+    hint(ev.error==="not-allowed"?"microphone access needed":"press to talk");
+    state("idle");recog=null;
   };
-  recog.onend=()=>{if(recog&&$("mic").dataset.state==="listening"){try{recog.start();}catch(e){}}};
+  recog.onend=()=>{if(recog&&$("ball").dataset.state==="listening"){try{recog.start();}catch(e){}}};
   try{recog.start();}catch(e){}
-  status("Listening… press Send or pause when you're done","listening");
+  state("listening");hint("listening — press again when you're done");
 }
 function stop(andSend){
   clearTimeout(quiet);
-  const said=buffer.trim(), r=recog; recog=null;
+  const said=buffer.trim(),r=recog;recog=null;buffer="";
   if(r){try{r.stop();}catch(e){}}
-  buffer="";
-  if(andSend&&said)send(said); else status("Press the mic and read, or type below.","idle");
+  if(andSend&&said)send(said);else{state("idle");hint("press to talk");}
 }
-$("mic").onclick=()=>{
-  if($("mic").dataset.state==="listening")stop(true);
-  else{handsFree=true;listen();}
+$("ball").onclick=()=>{
+  const s=$("ball").dataset.state;
+  if(s==="listening")stop(true);
+  else if(s==="speaking"){if(audio)audio.pause();state("idle");hint("press to talk");}
+  else listen();
 };
 
 const toggle=(id,fn)=>{$(id).onclick=()=>{const on=$(id).getAttribute("aria-pressed")!=="true";
   $(id).setAttribute("aria-pressed",String(on));fn(on);};};
 toggle("tr",on=>document.querySelector("main").classList.toggle("noen",!on));
-toggle("voice",on=>{if(!on&&window.speechSynthesis)speechSynthesis.cancel();});
-document.querySelector("main").classList.add("noen");
 $("logtoggle").onclick=()=>$("log").classList.toggle("open");
+$("mode").onchange=()=>document.querySelector("main")
+  .classList.toggle("nostz",$("mode").value!=="steinsaltz");
+document.querySelector("main").classList.add("noen","nostz");
 
 pickers().then(turnTo);
 </script>

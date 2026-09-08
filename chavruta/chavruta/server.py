@@ -16,6 +16,7 @@ import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from . import sefaria
+from .masechta_index import Index
 from .llm import LLM, ModelError
 from .pack import Pack
 from .partner import Partner
@@ -30,6 +31,14 @@ TYPES = {".html": "text/html; charset=utf-8", ".js": "text/javascript",
 # Conversations, per browser tab. In memory: a session is one sitting.
 SESSIONS = {}
 LOCK = threading.Lock()
+INDEXES = {}
+
+
+def index_for(masechta):
+    """The whole-tractate index, loaded once and kept."""
+    if masechta not in INDEXES:
+        INDEXES[masechta] = Index.load(PACKS, masechta)
+    return INDEXES[masechta]
 
 
 def pack_path(ref):
@@ -140,6 +149,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         route = urllib.parse.urlparse(self.path).path
+        if route == "/api/speak":
+            return self.speak()
         if route == "/api/transcribe":
             return self.transcribe()
         if route != "/api/say":
@@ -163,7 +174,8 @@ class Handler(BaseHTTPRequestHandler):
             pack = load_pack(ref)
             with LOCK:
                 history = SESSIONS.get(session, [])
-            partner = Partner(pack, LLM(), level=level, language=language)
+            partner = Partner(pack, LLM(), level=level, language=language,
+                              index=index_for(pack.data.get("masechta", "")))
             text, verdict, history, trace = partner.ask(line, history, said)
             with LOCK:
                 # A sitting is bounded; keep it from growing without limit.
@@ -178,6 +190,41 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as exc:
             traceback.print_exc()
             return self.send_json({"error": "%s: %s" % (type(exc).__name__, exc)}, 500)
+
+    def speak(self):
+        """Text in, spoken audio out.
+
+        The browser's own synthesiser reads one language and mangles the other,
+        which for a sentence of English with Aramaic inside it means the Aramaic
+        is either skipped or mispronounced. One multilingual model reads the
+        whole sentence, switching where the sentence switches.
+        """
+        length = int(self.headers.get("Content-Length") or 0)
+        try:
+            body = json.loads(self.rfile.read(length) or b"{}")
+        except json.JSONDecodeError:
+            return self.send_json({"error": "bad json"}, 400)
+        text = (body.get("text") or "").strip()
+        if not text:
+            return self.send_json({"error": "nothing to say"}, 400)
+        try:
+            from .llm import LLM
+            audio = LLM().client.audio.speech.create(
+                model=os.environ.get("CHAVRUTA_MODEL_TTS", "gpt-4o-mini-tts"),
+                voice=os.environ.get("CHAVRUTA_VOICE", "alloy"),
+                input=text[:3800],
+                instructions=("You are a study partner talking, not reading a script. "
+                              "Hebrew and Aramaic phrases are read in Hebrew with proper "
+                              "pronunciation; the English around them in English. "
+                              "Unhurried, like someone thinking alongside you."),
+            ).read()
+        except Exception as exc:
+            return self.send_json({"error": "%s: %s" % (type(exc).__name__, exc)}, 502)
+        self.send_response(200)
+        self.send_header("Content-Type", "audio/mpeg")
+        self.send_header("Content-Length", str(len(audio)))
+        self.end_headers()
+        self.wfile.write(audio)
 
     def transcribe(self):
         """Audio in, text out, for speech the browser cannot handle.

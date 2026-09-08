@@ -293,6 +293,8 @@ def build(ref, wanted, only=None):
         "source": "sefaria.org",
         # No sugya map yet -- it is written separately and checked against this.
         "sugyot": [],
+        # Where a learner would start and stop: mishna, gemara, a baraita.
+        "sections": sugya.sections(segments),
         "segments": segments,
     }
 
