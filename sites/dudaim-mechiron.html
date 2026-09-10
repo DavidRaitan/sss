@@ -1,0 +1,1083 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wedding Pricing 2026</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@400;500;700&family=Assistant:wght@300;400;600;700&family=Noto+Serif:wght@400;500;700&family=Noto+Sans:wght@300;400;600;700&display=swap">
+<style>
+  :root {
+    --ink:        #182B3A;
+    --ink-soft:   #4A5A67;
+    --paper:      #F4F5F2;
+    --paper-lift: #FFFFFF;
+    --brass:      #96762F;
+    --brass-soft: #B99A57;
+    --sage:       #63756A;
+    --rule:       #CFD3CD;
+    --rule-soft:  #E2E5E0;
+    --on-ink:     #EDEDE6;
+    --on-ink-dim: #A9B3B8;
+
+    --f-display: "Frank Ruhl Libre", "Noto Serif", "David Libre", Georgia, serif;
+    --f-body: "Assistant", "Noto Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ink:        #E7E7E0;
+      --ink-soft:   #A3ADB4;
+      --paper:      #141C23;
+      --paper-lift: #1C262E;
+      --brass:      #C7A35C;
+      --brass-soft: #8E7538;
+      --sage:       #8FA396;
+      --rule:       #34414B;
+      --rule-soft:  #253038;
+      --on-ink:     #12191F;
+      --on-ink-dim: #46545E;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ink:        #E7E7E0;
+    --ink-soft:   #A3ADB4;
+    --paper:      #141C23;
+    --paper-lift: #1C262E;
+    --brass:      #C7A35C;
+    --brass-soft: #8E7538;
+    --sage:       #8FA396;
+    --rule:       #34414B;
+    --rule-soft:  #253038;
+    --on-ink:     #12191F;
+    --on-ink-dim: #46545E;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--f-body);
+    font-weight: 400;
+    font-size: 16px;
+    line-height: 1.65;
+    padding-block: clamp(2.5rem, 7vw, 5rem);
+    padding-inline: max(18px, calc((100% - 1080px) / 2));
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .sheet { display: flex; flex-direction: column; }
+
+  /* The masthead bar never mirrors, so switching languages does not move it. */
+  .brand {
+    direction: ltr;
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: .35rem 1rem;
+    padding-bottom: 1.5rem; margin-bottom: 2rem;
+    border-bottom: 1px solid var(--rule-soft);
+  }
+  .brand__mark {
+    font-family: var(--f-display); font-weight: 700;
+    font-size: 1.35rem; letter-spacing: .06em; color: var(--ink);
+  }
+
+  /* Everything below the bar crossfades on a language change. */
+  .swap {
+    display: flex; flex-direction: column;
+    gap: clamp(2.5rem, 5vw, 3.75rem);
+    transition: opacity .2s ease;
+  }
+  .swap.is-swapping { opacity: 0; }
+  @media (prefers-reduced-motion: reduce) { .swap { transition: none; } }
+
+  /* ---- language switcher ---- */
+  .langs {
+    margin-inline-start: auto;
+    display: flex; flex-wrap: wrap; align-items: baseline;
+    gap: .1rem .45rem;
+  }
+  .langs__btn {
+    appearance: none; -webkit-appearance: none;
+    background: none; border: 0; border-bottom: 1px solid transparent;
+    margin: 0; padding: .1rem 0;
+    font-family: var(--f-body); font-size: .84rem; line-height: 1.4;
+    letter-spacing: .02em; color: var(--ink-soft);
+    cursor: pointer; transition: color .15s ease, border-color .15s ease;
+  }
+  .langs__btn:hover { color: var(--brass); }
+  .langs__btn[aria-current="true"] {
+    color: var(--ink); font-weight: 600; border-bottom-color: var(--brass);
+    cursor: default;
+  }
+  .langs__btn:focus-visible { outline: 2px solid var(--brass); outline-offset: 3px; }
+  .langs__sep { color: var(--rule); font-size: .8rem; user-select: none; }
+
+  @media (prefers-reduced-motion: reduce) { .langs__btn { transition: none; } }
+
+  /* ---- masthead ---- */
+  .masthead { display: flex; flex-direction: column; gap: .5rem; }
+  .masthead__row {
+    display: flex; flex-wrap: wrap; align-items: center;
+    justify-content: space-between; gap: 1.5rem 3rem;
+  }
+  .masthead__text { display: flex; flex-direction: column; gap: .5rem; flex: 1 1 24rem; min-width: 0; }
+  .masthead__cta {
+    flex: none;
+    display: inline-flex; align-items: center; gap: .55rem;
+    border: 1px solid var(--brass); color: var(--brass); background: none;
+    text-decoration: none; font-weight: 700; font-size: .95rem;
+    padding: .7rem 1.4rem; white-space: nowrap;
+    transition: background .15s ease, color .15s ease;
+  }
+  .masthead__cta:hover { background: var(--brass); color: var(--paper-lift); }
+  .masthead__cta:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+  .masthead__cta svg { width: 1.15em; height: 1.15em; fill: currentColor; flex: none; }
+  .masthead__cta-arrow { opacity: .7; font-weight: 400; }
+  @media (prefers-reduced-motion: reduce) { .masthead__cta { transition: none; } }
+  @media (max-width: 560px) { .masthead__cta { width: 100%; justify-content: center; } }
+  .eyebrow {
+    font-size: .74rem; font-weight: 700; letter-spacing: .18em;
+    text-transform: uppercase; color: var(--brass);
+  }
+  .masthead h1 {
+    font-family: var(--f-display); font-weight: 500;
+    font-size: clamp(2rem, 5.5vw, 3rem); line-height: 1.15;
+    margin: 0; text-wrap: balance;
+  }
+  .masthead p {
+    margin: 0; max-width: 60ch; color: var(--ink-soft); font-size: 1.05rem;
+  }
+  .masthead .rule {
+    height: 1px; background: var(--rule); margin-top: 1.25rem;
+  }
+
+  /* ---- packages ---- */
+  .packages {
+    display: grid; gap: 1.25rem;
+    grid-template-columns: repeat(3, 1fr);
+    align-items: start;
+  }
+  @media (max-width: 860px) { .packages { grid-template-columns: 1fr; } }
+
+  .pkg {
+    display: flex; flex-direction: column; gap: 1rem;
+    border: 1px solid var(--rule);
+    background: var(--paper-lift);
+    padding: 1.75rem 1.5rem;
+  }
+  .pkg--pick {
+    border-color: var(--brass);
+    box-shadow: 0 1px 0 0 var(--brass) inset, 0 -1px 0 0 var(--brass) inset;
+  }
+  .pkg__tag {
+    align-self: flex-start;
+    font-size: .7rem; font-weight: 700; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--brass);
+    border: 1px solid var(--brass-soft); padding: .15rem .6rem;
+  }
+  .pkg__name {
+    font-family: var(--f-display); font-weight: 500;
+    font-size: 1.5rem; line-height: 1.2; margin: 0;
+  }
+  .pkg__price {
+    font-family: var(--f-display); font-weight: 700;
+    font-size: 2.35rem; line-height: 1;
+    direction: ltr; unicode-bidi: isolate; text-align: left;
+    font-variant-numeric: tabular-nums;
+  }
+  [dir="rtl"] .pkg__price { text-align: right; }
+  .pkg__price small {
+    display: block; font-family: var(--f-body); font-weight: 400;
+    font-size: .8rem; color: var(--ink-soft); letter-spacing: .04em;
+    margin-top: .35rem; direction: ltr;
+  }
+  [dir="rtl"] .pkg__price small { direction: rtl; }
+  .pkg__lead { margin: 0; font-size: .93rem; color: var(--ink-soft); }
+
+  .feats { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .55rem; }
+  .feats li { position: relative; padding-inline-start: 1.1rem; font-size: .94rem; }
+  .feats li::before {
+    content: ""; position: absolute; inset-inline-start: 0; top: .78em;
+    width: .55rem; height: 1px; background: var(--brass);
+  }
+  .feats .sub { color: var(--ink-soft); font-size: .86rem; }
+
+  .stack {
+    border-top: 1px dotted var(--rule);
+    padding-top: .9rem; margin-top: auto;
+    font-size: .82rem; color: var(--ink-soft); line-height: 1.55;
+  }
+  .stack b { color: var(--ink); font-weight: 600; }
+
+  /* ---- section headers ---- */
+  .sec { display: flex; flex-direction: column; gap: 1.25rem; }
+  .sec__head { display: flex; align-items: baseline; gap: 1rem; }
+  .sec__head h2 {
+    font-family: var(--f-display); font-weight: 500;
+    font-size: 1.6rem; margin: 0; white-space: nowrap;
+  }
+  .sec__head .rule { flex: 1; height: 1px; background: var(--rule); }
+  .sec__note { margin: 0; color: var(--ink-soft); font-size: .95rem; max-width: 62ch; }
+
+  /* ---- add-ons: menu with dotted leaders ---- */
+  .addons { display: grid; grid-template-columns: repeat(2, 1fr); gap: .3rem 2.5rem; }
+  @media (max-width: 720px) { .addons { grid-template-columns: 1fr; } }
+  .addon { display: flex; align-items: baseline; gap: .6rem; padding-block: .45rem; }
+  .addon__name { font-size: .96rem; }
+  .addon__name em { display: block; font-style: normal; font-size: .82rem; color: var(--ink-soft); }
+  .addon__leader { flex: 1; border-bottom: 1px dotted var(--rule); transform: translateY(-.3em); min-width: 1.5rem; }
+  .addon__price {
+    font-weight: 600; font-variant-numeric: tabular-nums;
+    direction: ltr; unicode-bidi: isolate; white-space: nowrap;
+  }
+
+  /* ---- terms ---- */
+  .terms {
+    border-inline-start: 2px solid var(--brass);
+    background: var(--paper-lift);
+    padding: 1.25rem 1.4rem;
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: .5rem 2rem;
+  }
+  @media (max-width: 720px) { .terms { grid-template-columns: 1fr; } }
+  .terms p { margin: 0; font-size: .89rem; color: var(--ink-soft); }
+  .terms strong { color: var(--ink); font-weight: 600; }
+
+  /* ---- contact ---- */
+  .cta {
+    border: 1px solid var(--brass);
+    background: var(--paper-lift);
+    padding: clamp(1.5rem, 4vw, 2.25rem);
+    display: flex; flex-wrap: wrap; align-items: center;
+    justify-content: space-between; gap: 1.25rem 2rem;
+  }
+  .cta__text { display: flex; flex-direction: column; gap: .3rem; }
+  .cta__text h2 {
+    font-family: var(--f-display); font-weight: 500;
+    font-size: 1.6rem; margin: 0;
+  }
+  .cta__text p { margin: 0; color: var(--ink-soft); font-size: .95rem; max-width: 46ch; }
+  .cta__note {
+    margin: .5rem 0 0; max-width: 46ch;
+    padding-inline-start: .7rem;
+    border-inline-start: 1px solid var(--brass-soft);
+    font-size: .8rem; line-height: 1.5; color: var(--ink-soft);
+  }
+  .cta__btn {
+    display: inline-flex; align-items: center; gap: .55rem;
+    background: var(--brass); color: var(--paper-lift);
+    text-decoration: none; font-weight: 700; font-size: 1rem;
+    padding: .8rem 1.6rem; white-space: nowrap;
+    transition: background .15s ease;
+  }
+  .cta__btn:hover { background: var(--ink); }
+  .cta__btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+  .cta__btn svg { width: 1.15em; height: 1.15em; fill: currentColor; flex: none; }
+  @media (prefers-reduced-motion: reduce) { .cta__btn { transition: none; } }
+
+  footer {
+    border-top: 1px solid var(--rule);
+    padding-top: 1.25rem;
+    font-size: .85rem; color: var(--ink-soft);
+    display: flex; flex-wrap: wrap; gap: .4rem 1.5rem; justify-content: space-between;
+  }
+  .num { direction: ltr; unicode-bidi: isolate; }
+  html { color-scheme: light dark; scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  .cta { scroll-margin-block: 1.5rem; }
+  body { margin: 0; }
+  img { max-width: 100%; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="sheet">
+
+  <div class="brand">
+    <span class="brand__mark" data-i18n="brand">Dudaim</span>
+    <nav class="langs" id="langs" data-i18n-label="langsLabel" aria-label="Language"></nav>
+  </div>
+
+  <div class="swap" id="swap">
+
+    <header class="masthead">
+      <div class="masthead__row">
+        <div class="masthead__text">
+          <span class="eyebrow" data-i18n="eyebrow">Price list 2026</span>
+          <h1 data-i18n="h1">Your wedding, from the first invitation to the last photo</h1>
+        </div>
+        <a class="masthead__cta" href="#contact">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38c1.45.79 3.08 1.21 4.79 1.21h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2Zm0 18.15h-.01a8.2 8.2 0 0 1-4.19-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.18 8.18 0 0 1-1.26-4.38c0-4.54 3.7-8.23 8.24-8.23 2.2 0 4.27.86 5.83 2.41a8.18 8.18 0 0 1 2.41 5.83c0 4.54-3.69 8.23-8.23 8.23Zm4.52-6.16c-.25-.12-1.47-.72-1.69-.81-.23-.08-.39-.12-.56.13-.16.24-.64.8-.78.97-.15.16-.29.18-.54.06-.25-.13-1.05-.39-1.99-1.23-.74-.66-1.23-1.47-1.38-1.72-.14-.25-.01-.38.11-.5.11-.11.25-.29.37-.43.13-.15.17-.25.25-.41.08-.17.04-.31-.02-.43-.06-.12-.56-1.34-.76-1.84-.2-.48-.4-.42-.56-.43h-.48c-.16 0-.43.06-.65.31-.22.25-.85.83-.85 2.03s.87 2.35.99 2.51c.12.16 1.71 2.61 4.15 3.66.58.25 1.03.4 1.39.51.58.19 1.11.16 1.53.1.47-.07 1.44-.59 1.64-1.16.2-.57.2-1.05.14-1.16-.06-.1-.22-.16-.47-.28Z"/></svg>
+          <span data-i18n="jump">Let&rsquo;s talk</span>
+          <span class="masthead__cta-arrow" aria-hidden="true">&darr;</span>
+        </a>
+      </div>
+      <div class="rule"></div>
+    </header>
+
+    <section class="packages" data-i18n-label="packagesLabel" aria-label="Packages">
+
+      <article class="pkg">
+        <h2 class="pkg__name" data-i18n="p1.name">The Website</h2>
+        <div class="pkg__price">&#8362;2,000<small data-i18n="p1.note">One-time price, no monthly fees</small></div>
+        <p class="pkg__lead" data-i18n="p1.lead">Everything your guests need to know when, where and how &mdash; and everything you need to know exactly how many are coming.</p>
+        <ul class="feats">
+          <li data-i18n="p1.f1">A personal wedding website, built mobile-first</li>
+          <li data-i18n="p1.f2">Up to <b>3 languages</b> &mdash; Hebrew, English and any other language you choose</li>
+          <li data-i18n="p1.f3">RSVPs with live updates straight into your Google Sheet</li>
+          <li data-i18n="p1.f4">Full tracking: who confirmed, who has not replied yet, how many meals</li>
+          <li data-i18n="p1.f5">Location and Waze navigation, schedule, dress code, gift details</li>
+          <li data-i18n="p1.f6"><b>A personal monogram</b> &mdash; on the site, on the QR code and on the table cards</li>
+          <li data-i18n="p1.f8">The site stays online for a full year after the wedding</li>
+        </ul>
+      </article>
+
+      <article class="pkg pkg--pick">
+        <span class="pkg__tag" data-i18n="p2.tag">Most chosen</span>
+        <h2 class="pkg__name" data-i18n="p2.name">Website + Gallery</h2>
+        <div class="pkg__price">&#8362;2,500<small data-i18n="p2.note">&#8362;500 more than the Website package</small></div>
+        <p class="pkg__lead" data-i18n="p2.lead">The full website, plus every guest photo in one place &mdash; instead of scattered across 300 phones.</p>
+        <ul class="feats">
+          <li data-i18n="p2.f1"><b>Everything included in the Website package</b></li>
+          <li data-i18n="p2.f2">A photo <b>and video</b> gallery with a <b>personalized QR code</b> &mdash; your own picture built into it</li>
+          <li data-i18n="p2.f3">Guests scan and upload &mdash; no app, no sign-up</li>
+          <li data-i18n="p2.f4">Up to 1,000 files at original quality</li>
+          <li data-i18n="p2.f5">Every guest sees the gallery and leaves a blessing</li>
+          <li data-i18n="p2.f8">An admin panel of your own &mdash; add, remove or reorder anything in the gallery</li>
+          <li data-i18n="p2.f6">Download everything in a single file at the end</li>
+          <li data-i18n="p2.f7">The gallery stays online for a full year after the wedding</li>
+        </ul>
+        <div class="stack" data-i18n="p2.stack">
+          Separately: website <span class="num">&#8362;1,600</span> &middot; RSVPs <span class="num">&#8362;700</span> &middot; gallery <span class="num">&#8362;900</span> &middot; QR design <span class="num">&#8362;300</span> &mdash; <b>total <span class="num">&#8362;3,500</span></b>
+        </div>
+      </article>
+
+      <article class="pkg">
+        <h2 class="pkg__name" data-i18n="p3.name">Custom</h2>
+        <div class="pkg__price">&#8362;4,500<small data-i18n="p3.note">Starting price, depending on the scope of the design</small></div>
+        <p class="pkg__lead" data-i18n="p3.lead">For couples who want the site to look exactly like their invitation, and not like a template.</p>
+        <ul class="feats">
+          <li data-i18n="p3.f1"><b>Everything included in the Website + Gallery package</b></li>
+          <li data-i18n="p3.f2">Designed from scratch, following your invitation or your design direction</li>
+          <li data-i18n="p3.f3">A full personal domain, first year included</li>
+          <li data-i18n="p3.f4">Up to 5 languages, whichever you choose</li>
+          <li data-i18n="p3.f7"><b>Unlimited</b> photos and videos, for a full year</li>
+          <li data-i18n="p3.f5">Priority in the schedule</li>
+          <li data-i18n="p3.f6">Unlimited rounds of revisions</li>
+        </ul>
+      </article>
+
+    </section>
+
+    <section class="sec">
+      <div class="sec__head">
+        <h2 data-i18n="addonsTitle">Add-ons</h2>
+        <div class="rule"></div>
+      </div>
+      <p class="sec__note" data-i18n="addonsNote">Can be added to any package, even once the site is already live.</p>
+      <div class="addons">
+
+        <div class="addon">
+          <span class="addon__name" data-i18n="a1">Additional language<em>Any language, beyond those included in the package</em></span>
+          <span class="addon__leader"></span>
+          <span class="addon__price">&#8362;200</span>
+        </div>
+
+        <div class="addon">
+          <span class="addon__name" data-i18n="a2">Allergy and special-meal report<em>Ready to send to the caterer</em></span>
+          <span class="addon__leader"></span>
+          <span class="addon__price">&#8362;200</span>
+        </div>
+
+        <div class="addon">
+          <span class="addon__name" data-i18n="a3">Printable table cards<em>A ready file, with a QR code and table number for every table</em></span>
+          <span class="addon__leader"></span>
+          <span class="addon__price">&#8362;250</span>
+        </div>
+
+        <div class="addon">
+          <span class="addon__name" data-i18n="a4">Printing and delivery of the cards<em>Up to 25 cards, printed and delivered to you</em></span>
+          <span class="addon__leader"></span>
+          <span class="addon__price">&#8362;500</span>
+        </div>
+
+        <div class="addon">
+          <span class="addon__name" data-i18n="a5">A full personal domain<em>First year included</em></span>
+          <span class="addon__leader"></span>
+          <span class="addon__price">&#8362;350</span>
+        </div>
+
+        <div class="addon">
+          <span class="addon__name" data-i18n="a6">&ldquo;Find your table&rdquo;<em>The guest types their name at the entrance and gets a table number</em></span>
+          <span class="addon__leader"></span>
+          <span class="addon__price">&#8362;500</span>
+        </div>
+
+        <div class="addon">
+          <span class="addon__name" data-i18n="a7">Digital gifts<em>Up to 3 methods of your choice &mdash; Bit, Paybox, PayPal, Wise, Revolut &mdash; plus a record of who sent what, ready for your thank-you list</em></span>
+          <span class="addon__leader"></span>
+          <span class="addon__price">&#8362;250</span>
+        </div>
+
+        <div class="addon">
+          <span class="addon__name" data-i18n="a8">An additional payment method<em>For guests from abroad, beyond the three included</em></span>
+          <span class="addon__leader"></span>
+          <span class="addon__price">&#8362;100</span>
+        </div>
+
+        <div class="addon">
+          <span class="addon__name" data-i18n="a9">Extending the site and the gallery<em>Beyond the year included</em></span>
+          <span class="addon__leader"></span>
+          <span class="addon__price" data-i18n="a9.price">&#8362;150 / year</span>
+        </div>
+
+        <div class="addon">
+          <span class="addon__name" data-i18n="a10">Rush delivery<em>Less than 30 days before the wedding</em></span>
+          <span class="addon__leader"></span>
+          <span class="addon__price">+30%</span>
+        </div>
+
+      </div>
+    </section>
+
+    <section class="sec">
+      <div class="sec__head">
+        <h2 data-i18n="termsTitle">Terms</h2>
+        <div class="rule"></div>
+      </div>
+      <div class="terms">
+        <p data-i18n="t1"><strong>Payment.</strong> 50% on order, the balance before the site goes live.</p>
+        <p data-i18n="t2"><strong>Revisions.</strong> Two rounds included; an extra round <span class="num">&#8362;200</span>. Unlimited on the Custom package.</p>
+        <p data-i18n="t3"><strong>Delivery.</strong> Up to 10 business days from the moment the content is received.</p>
+        <p data-i18n="t4"><strong>Rush.</strong> Less than 30 days to the wedding &mdash; 30% added to the total.</p>
+        <p data-i18n="t5"><strong>On the day.</strong> No phone support during the wedding itself; everything is tested and approved in advance.</p>
+        <p data-i18n="t6"><strong>Not listed?</strong> The site is built from scratch, so almost any request can be added. Tell me what is missing and I will price it.</p>
+      </div>
+    </section>
+
+    <section class="cta" id="contact">
+      <div class="cta__text">
+        <h2 data-i18n="ctaTitle">Shall we talk?</h2>
+        <p data-i18n="ctaText">Send a WhatsApp message with the date of your event, and I will get back to you with availability and a schedule.</p>
+        <p class="cta__note" data-i18n="ctaNote" hidden></p>
+      </div>
+      <a class="cta__btn" data-wa href="https://wa.me/972547699701" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38c1.45.79 3.08 1.21 4.79 1.21h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2Zm0 18.15h-.01a8.2 8.2 0 0 1-4.19-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.18 8.18 0 0 1-1.26-4.38c0-4.54 3.7-8.23 8.24-8.23 2.2 0 4.27.86 5.83 2.41a8.18 8.18 0 0 1 2.41 5.83c0 4.54-3.69 8.23-8.23 8.23Zm4.52-6.16c-.25-.12-1.47-.72-1.69-.81-.23-.08-.39-.12-.56.13-.16.24-.64.8-.78.97-.15.16-.29.18-.54.06-.25-.13-1.05-.39-1.99-1.23-.74-.66-1.23-1.47-1.38-1.72-.14-.25-.01-.38.11-.5.11-.11.25-.29.37-.43.13-.15.17-.25.25-.41.08-.17.04-.31-.02-.43-.06-.12-.56-1.34-.76-1.84-.2-.48-.4-.42-.56-.43h-.48c-.16 0-.43.06-.65.31-.22.25-.85.83-.85 2.03s.87 2.35.99 2.51c.12.16 1.71 2.61 4.15 3.66.58.25 1.03.4 1.39.51.58.19 1.11.16 1.53.1.47-.07 1.44-.59 1.64-1.16.2-.57.2-1.05.14-1.16-.06-.1-.22-.16-.47-.28Z"/></svg>
+        <span data-i18n="ctaBtn">Message me on WhatsApp</span>
+      </a>
+    </section>
+
+    <footer>
+      <span data-i18n="foot1">Dudaim &middot; The details before, the memories after</span>
+      <span data-i18n="foot2">This price list is valid for 30 days from the date it was sent</span>
+    </footer>
+
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* Set to false to always open in English, ignoring the browser language. */
+  var AUTO_DETECT = true;
+
+  var STORE_KEY = "dudaim-lang";
+  var WA_BASE = "https://wa.me/972547699701?text=";
+
+  var LANGS = [
+    { code: "en", name: "English",  dir: "ltr" },
+    { code: "he", name: "עברית",    dir: "rtl" },
+    { code: "es", name: "Español",  dir: "ltr" },
+    { code: "fr", name: "Français", dir: "ltr" },
+    { code: "it", name: "Italiano", dir: "ltr" },
+    { code: "ru", name: "Русский",  dir: "ltr" }
+  ];
+
+  /* A key set to "" hides its element — used for the note that only Russian carries. */
+  var T = {};
+
+  T.en = {
+    title: "Wedding Pricing 2026",
+    langsLabel: "Language",
+    jump: "Let’s talk",
+    brand: "Dudaim",
+    eyebrow: "Price list 2026",
+    h1: "Your wedding, from the first invitation to the last photo",
+    packagesLabel: "Packages",
+
+    "p1.name": "The Website",
+    "p1.note": "One-time price, no monthly fees",
+    "p1.lead": "Everything your guests need to know when, where and how — and everything you need to know exactly how many are coming.",
+    "p1.f1": "A personal wedding website, built mobile-first",
+    "p1.f2": "Up to <b>3 languages</b> — Hebrew, English and any other language you choose",
+    "p1.f3": "RSVPs with live updates straight into your Google Sheet",
+    "p1.f4": "Full tracking: who confirmed, who has not replied yet, how many meals",
+    "p1.f5": "Location and Waze navigation, schedule, dress code, gift details",
+    "p1.f6": "<b>A personal monogram</b> — on the site, on the QR code and on the table cards",
+    "p1.f8": "The site stays online for a full year after the wedding",
+
+    "p2.tag": "Most chosen",
+    "p2.name": "Website + Gallery",
+    "p2.note": "₪500 more than the Website package",
+    "p2.lead": "The full website, plus every guest photo in one place — instead of scattered across 300 phones.",
+    "p2.f1": "<b>Everything included in the Website package</b>",
+    "p2.f2": "A photo <b>and video</b> gallery with a <b>personalized QR code</b> — your own picture built into it",
+    "p2.f3": "Guests scan and upload — no app, no sign-up",
+    "p2.f4": "Up to 1,000 files at original quality",
+    "p2.f5": "Every guest sees the gallery and leaves a blessing",
+    "p2.f6": "Download everything in a single file at the end",
+    "p2.f7": "The gallery stays online for a full year after the wedding",
+    "p2.f8": "An admin panel of your own — add, remove or reorder anything in the gallery",
+    "p2.stack": "Separately: website <span class=\"num\">₪1,600</span> · RSVPs <span class=\"num\">₪700</span> · gallery <span class=\"num\">₪900</span> · QR design <span class=\"num\">₪300</span> — <b>total <span class=\"num\">₪3,500</span></b>",
+
+    "p3.name": "Custom",
+    "p3.note": "Starting price, depending on the scope of the design",
+    "p3.lead": "For couples who want the site to look exactly like their invitation, and not like a template.",
+    "p3.f1": "<b>Everything included in the Website + Gallery package</b>",
+    "p3.f2": "Designed from scratch, following your invitation or your design direction",
+    "p3.f3": "A full personal domain, first year included",
+    "p3.f4": "Up to 5 languages, whichever you choose",
+    "p3.f5": "Priority in the schedule",
+    "p3.f6": "Unlimited rounds of revisions",
+    "p3.f7": "<b>Unlimited</b> photos and videos, for a full year",
+
+    addonsTitle: "Add-ons",
+    addonsNote: "Can be added to any package, even once the site is already live.",
+    a1: "Additional language<em>Any language, beyond those included in the package</em>",
+    a2: "Allergy and special-meal report<em>Ready to send to the caterer</em>",
+    a3: "Printable table cards<em>A ready file, with a QR code and table number for every table</em>",
+    a4: "Printing and delivery of the cards<em>Up to 25 cards, printed and delivered to you</em>",
+    a5: "A full personal domain<em>First year included</em>",
+    a6: "“Find your table”<em>The guest types their name at the entrance and gets a table number</em>",
+    a7: "Digital gifts<em>Up to 3 methods of your choice — Bit, Paybox, PayPal, Wise, Revolut — plus a record of who sent what, ready for your thank-you list</em>",
+    a8: "An additional payment method<em>For guests from abroad, beyond the three included</em>",
+    a9: "Extending the site and the gallery<em>Beyond the year included</em>",
+    "a9.price": "₪150 / year",
+    a10: "Rush delivery<em>Less than 30 days before the wedding</em>",
+
+    termsTitle: "Terms",
+    t1: "<strong>Payment.</strong> 50% on order, the balance before the site goes live.",
+    t2: "<strong>Revisions.</strong> Two rounds included; an extra round <span class=\"num\">₪200</span>. Unlimited on the Custom package.",
+    t3: "<strong>Delivery.</strong> Up to 10 business days from the moment the content is received.",
+    t4: "<strong>Rush.</strong> Less than 30 days to the wedding — 30% added to the total.",
+    t5: "<strong>On the day.</strong> No phone support during the wedding itself; everything is tested and approved in advance.",
+    t6: "<strong>Not listed?</strong> The site is built from scratch, so almost any request can be added. Tell me what is missing and I will price it.",
+
+    ctaNote: "",
+    ctaTitle: "Shall we talk?",
+    ctaText: "Send a WhatsApp message with the date of your event, and I will get back to you with availability and a schedule.",
+    ctaBtn: "Message me on WhatsApp",
+    waText: "Hi! I saw the price list and I am in. I would like the most chosen package — Website + Gallery. When do we start?",
+
+    foot1: "Dudaim · The details before, the memories after",
+    foot2: "This price list is valid for 30 days from the date it was sent"
+  };
+
+  T.he = {
+    title: "מחירון חתונות 2026",
+    langsLabel: "שפה",
+    jump: "נדבר?",
+    brand: "דודאים",
+    eyebrow: "מחירון 2026",
+    h1: "החתונה שלכם, מההזמנה הראשונה ועד התמונה האחרונה",
+    packagesLabel: "חבילות",
+
+    "p1.name": "האתר",
+    "p1.note": "מחיר קבוע, ללא דמי חודשי",
+    "p1.lead": "כל מה שצריך כדי שהאורחים ידעו מתי, איפה, ואיך — ושתדעו בדיוק כמה מגיעים.",
+    "p1.f1": "אתר חתונה אישי, בנוי קודם כול לנייד",
+    "p1.f2": "עד <b>3 שפות</b> — עברית, אנגלית וכל שפה נוספת שתבחרו",
+    "p1.f3": "אישורי הגעה עם עדכון חי לגיליון גוגל שלכם",
+    "p1.f4": "מעקב מלא: מי אישר, מי טרם ענה, כמה מנות",
+    "p1.f5": "מיקום וניווט בוויז, לוח זמנים, קוד לבוש, פרטי מתנה",
+    "p1.f6": "<b>מונוגרם אישי</b> — על האתר, על קוד ה־QR ועל כרטיסי השולחן",
+    "p1.f8": "האתר באוויר שנה מלאה אחרי החתונה",
+
+    "p2.tag": "הכי נבחר",
+    "p2.name": "האתר + הגלריה",
+    "p2.note": "תוספת של ₪500 על חבילת האתר",
+    "p2.lead": "האתר המלא, ובנוסף כל התמונות של האורחים במקום אחד — במקום מפוזרות על 300 טלפונים.",
+    "p2.f1": "<b>כל מה שכלול בחבילת האתר</b>",
+    "p2.f2": "גלריית תמונות <b>וּוידאו</b> עם <b>קוד QR מותאם אישית</b> — עם התמונה שלכם בתוכו",
+    "p2.f3": "האורחים סורקים ומעלים — בלי אפליקציה, בלי הרשמה",
+    "p2.f4": "עד 1,000 קבצים באיכות המקורית",
+    "p2.f5": "כל אורח רואה את הגלריה ומשאיר ברכה",
+    "p2.f6": "הורדה של הכול בקובץ אחד בסוף",
+    "p2.f7": "הגלריה באוויר שנה מלאה אחרי החתונה",
+    "p2.f8": "פאנל ניהול משלכם — להוסיף, למחוק ולסדר כל מה שעולה לגלריה",
+    "p2.stack": "בנפרד: אתר <span class=\"num\">₪1,600</span> · אישורי הגעה <span class=\"num\">₪700</span> · גלריה <span class=\"num\">₪900</span> · עיצוב QR <span class=\"num\">₪300</span> — <b>סה״כ <span class=\"num\">₪3,500</span></b>",
+
+    "p3.name": "מותאם אישית",
+    "p3.note": "מחיר התחלתי, לפי היקף העיצוב",
+    "p3.lead": "לזוגות שרוצים שהאתר ייראה בדיוק כמו ההזמנה שלהם, ולא כמו תבנית.",
+    "p3.f1": "<b>כל מה שכלול בחבילת האתר + הגלריה</b>",
+    "p3.f2": "עיצוב מאפס לפי ההזמנה או הכיוון העיצובי שלכם",
+    "p3.f3": "דומיין אישי מלא, שנה ראשונה כלולה",
+    "p3.f4": "עד 5 שפות, לבחירתכם",
+    "p3.f5": "עדיפות בלוח הזמנים",
+    "p3.f6": "סבבי תיקונים ללא הגבלה",
+    "p3.f7": "תמונות ווידאו <b>ללא הגבלה</b>, שנה שלמה",
+
+    addonsTitle: "תוספות",
+    addonsNote: "אפשר להוסיף לכל חבילה, גם אחרי שהאתר כבר באוויר.",
+    a1: "שפה נוספת<em>כל שפה, מעבר לשפות הכלולות בחבילה</em>",
+    a2: "דוח אלרגיות ומנות מיוחדות<em>מוכן לשליחה לקייטרינג</em>",
+    a3: "כרטיסי שולחן להדפסה<em>קובץ מוכן, קוד QR ומספר שולחן לכל שולחן</em>",
+    a4: "הדפסה ומשלוח של הכרטיסים<em>עד 25 כרטיסים, מודפסים ומגיעים אליכם</em>",
+    a5: "דומיין אישי מלא<em>שנה ראשונה כלולה</em>",
+    a6: "״מצא את השולחן שלך״<em>האורח מקליד שם בכניסה ומקבל מספר שולחן</em>",
+    a7: "מתנות דיגיטליות<em>עד 3 אמצעים לבחירתכם — ביט, פייבוקס, PayPal, Wise, Revolut — ורישום של מי שלח, מוכן לרשימת התודות</em>",
+    a8: "אמצעי תשלום נוסף<em>לאורחים מחו״ל, מעבר לשלושה הכלולים</em>",
+    a9: "הארכת האתר והגלריה<em>מעבר לשנה הכלולה</em>",
+    "a9.price": "₪150 / שנה",
+    a10: "אספקה דחופה<em>פחות מ־30 יום לפני החתונה</em>",
+
+    termsTitle: "תנאים",
+    t1: "<strong>תשלום.</strong> 50% בהזמנה, היתרה לפני שהאתר עולה לאוויר.",
+    t2: "<strong>תיקונים.</strong> שני סבבים כלולים; סבב נוסף <span class=\"num\">₪200</span>. בחבילה המותאמת אישית — ללא הגבלה.",
+    t3: "<strong>אספקה.</strong> עד 10 ימי עסקים מרגע קבלת התכנים.",
+    t4: "<strong>דחוף.</strong> פחות מ־30 יום לחתונה — תוספת 30% על כל הסכום.",
+    t5: "<strong>ביום האירוע.</strong> אין ליווי טלפוני בזמן החתונה; הכול נבדק ומאושר מראש.",
+    t6: "<strong>לא מצאתם?</strong> האתר נבנה מאפס, כך שכמעט כל בקשה אפשר להוסיף. ספרו לי מה חסר ואתמחר.",
+
+    ctaNote: "",
+    ctaTitle: "נדבר?",
+    ctaText: "שלחו הודעה בוואטסאפ עם התאריך של האירוע, ואחזור אליכם עם זמינות ולוח זמנים.",
+    ctaBtn: "שליחת הודעה בוואטסאפ",
+    waText: "היי! ראיתי את המחירון ואני בפנים. אני רוצה את החבילה הכי נבחרת — האתר + הגלריה. מתי מתחילים?",
+
+    foot1: "דודאים · כל הפרטים לפני, כל הזיכרונות אחרי",
+    foot2: "המחירון תקף 30 יום מיום המסירה"
+  };
+
+  T.es = {
+    title: "Precios de boda 2026",
+    langsLabel: "Idioma",
+    jump: "¿Hablamos?",
+    brand: "Dudaim",
+    eyebrow: "Precios 2026",
+    h1: "Tu boda, desde la primera invitación hasta la última foto",
+    packagesLabel: "Paquetes",
+
+    "p1.name": "La web",
+    "p1.note": "Pago único, sin cuotas mensuales",
+    "p1.lead": "Todo lo que los invitados necesitan saber: cuándo, dónde y cómo llegar. Y el número exacto de los que vienen.",
+    "p1.f1": "Web de boda propia, hecha para verse en el móvil",
+    "p1.f2": "Hasta <b>3 idiomas</b>: hebreo, inglés y el que haga falta",
+    "p1.f3": "Las confirmaciones se vuelcan solas en una hoja de Google",
+    "p1.f4": "Quién ha confirmado, quién falta por responder y cuántos menús salen",
+    "p1.f5": "Ubicación con Waze, horario, código de vestimenta y datos para el regalo",
+    "p1.f6": "<b>Monograma propio</b> en la web, en el QR y en las tarjetas de mesa",
+    "p1.f8": "La web sigue online un año entero después de la boda",
+
+    "p2.tag": "El más elegido",
+    "p2.name": "Web + galería",
+    "p2.note": "Solo ₪500 más que el paquete de web",
+    "p2.lead": "Todo lo anterior y, además, las fotos de los invitados juntas en un mismo sitio, no repartidas entre 300 móviles.",
+    "p2.f1": "<b>Todo lo del paquete de web</b>",
+    "p2.f2": "Galería de fotos <b>y vídeos</b>, con un <b>QR personalizado</b>, hecho con una foto de la boda",
+    "p2.f3": "Los invitados escanean y suben. Sin app y sin registrarse.",
+    "p2.f4": "Hasta 1.000 archivos, en su calidad original",
+    "p2.f5": "Cada invitado ve la galería y deja una felicitación",
+    "p2.f6": "Al final se descarga todo de una vez, en un solo archivo",
+    "p2.f7": "La galería sigue online un año entero después de la boda",
+    "p2.f8": "Un panel de administración propio: añadir, borrar o reordenar lo que haya en la galería",
+    "p2.stack": "Por separado: web <span class=\"num\">₪1,600</span> · confirmaciones <span class=\"num\">₪700</span> · galería <span class=\"num\">₪900</span> · diseño del QR <span class=\"num\">₪300</span> — <b>total <span class=\"num\">₪3,500</span></b>",
+
+    "p3.name": "A medida",
+    "p3.note": "Precio de partida, según el diseño",
+    "p3.lead": "Para quien quiere una web idéntica a su invitación, no una plantilla con otro color.",
+    "p3.f1": "<b>Todo lo del paquete web + galería</b>",
+    "p3.f2": "Diseño desde cero, a partir de la invitación o de la línea gráfica que ya exista",
+    "p3.f3": "Dominio propio, con el primer año incluido",
+    "p3.f4": "Hasta 5 idiomas, los que hagan falta",
+    "p3.f5": "Prioridad en el calendario de trabajo",
+    "p3.f6": "Rondas de cambios ilimitadas",
+    "p3.f7": "Fotos y vídeos <b>sin límite</b>, durante un año entero",
+
+    addonsTitle: "Extras",
+    addonsNote: "Se añaden a cualquier paquete, incluso con la web ya publicada.",
+    a1: "Un idioma más<em>El que sea, además de los que incluye el paquete</em>",
+    a2: "Informe de alergias y menús especiales<em>Listo para enviárselo al catering</em>",
+    a3: "Tarjetas de mesa para imprimir<em>Archivo listo, con su QR y su número en cada mesa</em>",
+    a4: "Impresión y envío de las tarjetas<em>Hasta 25 tarjetas, impresas y enviadas a casa</em>",
+    a5: "Dominio propio<em>Primer año incluido</em>",
+    a6: "«Encuentra tu mesa»<em>El invitado escribe su nombre al entrar y le sale el número de mesa</em>",
+    a7: "Regalos digitales<em>Hasta 3 medios a elegir — Bit, Paybox, PayPal, Wise, Revolut — y el registro de quién ha enviado, listo para la lista de agradecimientos</em>",
+    a8: "Un medio de pago más<em>Para los invitados de fuera, además de los tres incluidos</em>",
+    a9: "Ampliar la web y la galería<em>Más allá del año incluido</em>",
+    "a9.price": "₪150 / año",
+    a10: "Entrega urgente<em>A menos de 30 días de la boda</em>",
+
+    termsTitle: "Condiciones",
+    t1: "<strong>Pago.</strong> 50% al encargar y el resto antes de publicar la web.",
+    t2: "<strong>Cambios.</strong> Dos rondas incluidas; cada ronda extra, <span class=\"num\">₪200</span>. En el paquete a medida, sin límite.",
+    t3: "<strong>Plazo.</strong> 10 días laborables desde que llegan los contenidos.",
+    t4: "<strong>Urgencias.</strong> A menos de 30 días de la boda, un 30% sobre el total.",
+    t5: "<strong>El día de la boda.</strong> No hay soporte por teléfono durante el evento: todo queda probado y aprobado antes.",
+    t6: "<strong>¿Falta algo?</strong> La web se hace desde cero, así que casi todo se puede añadir. Dime qué necesitas y te paso el precio.",
+
+    ctaNote: "",
+    ctaTitle: "¿Hablamos?",
+    ctaText: "Escríbeme por WhatsApp con la fecha de la boda y te contesto con disponibilidad y plazos.",
+    ctaBtn: "Escribir por WhatsApp",
+    waText: "¡Hola! He visto los precios y me encaja. Quiero el paquete de web + galería. ¿Cuándo podemos empezar?",
+
+    foot1: "Dudaim · Los detalles antes, los recuerdos después",
+    foot2: "Precios válidos durante 30 días desde el envío"
+  };
+
+  T.fr = {
+    title: "Tarifs mariage 2026",
+    langsLabel: "Langue",
+    jump: "On en parle ?",
+    brand: "Dudaim",
+    eyebrow: "Tarifs 2026",
+    h1: "Votre mariage, de la première invitation à la dernière photo",
+    packagesLabel: "Forfaits",
+
+    "p1.name": "Le site",
+    "p1.note": "Prix unique, sans abonnement",
+    "p1.lead": "Tout ce qu’il faut pour que les invités sachent quand, où et comment venir — et pour savoir exactement combien seront là.",
+    "p1.f1": "Un site de mariage sur mesure, pensé pour le téléphone",
+    "p1.f2": "Jusqu’à <b>3 langues</b> : hébreu, anglais et celle de votre choix",
+    "p1.f3": "Les réponses arrivent directement dans votre feuille Google",
+    "p1.f4": "Qui a répondu, qui n’a rien dit, combien de couverts",
+    "p1.f5": "Le lieu et l’itinéraire Waze, le déroulé, le dress code, les infos pour le cadeau",
+    "p1.f6": "<b>Un monogramme à vous</b> : sur le site, sur le QR code et sur les cartons de table",
+    "p1.f8": "Le site reste en ligne un an après le mariage",
+
+    "p2.tag": "Le plus demandé",
+    "p2.name": "Site + galerie",
+    "p2.note": "₪500 de plus que le forfait site",
+    "p2.lead": "Le site complet, et toutes les photos des invités au même endroit — plutôt que dispersées sur 300 téléphones.",
+    "p2.f1": "<b>Tout le forfait site</b>",
+    "p2.f2": "Galerie photo <b>et vidéo</b>, avec un <b>QR code personnalisé</b>, créé à partir d’une de vos photos",
+    "p2.f3": "Les invités scannent et déposent leurs photos. Sans appli, sans compte à créer.",
+    "p2.f4": "Jusqu’à 1 000 fichiers, en qualité d’origine",
+    "p2.f5": "Chacun voit la galerie et laisse un mot aux mariés",
+    "p2.f6": "Tout se télécharge d’un coup, en un seul fichier",
+    "p2.f7": "La galerie reste en ligne un an après le mariage",
+    "p2.f8": "Un espace d’administration rien qu’à vous : ajouter, retirer ou remettre en ordre ce qui arrive dans la galerie",
+    "p2.stack": "Séparément : site <span class=\"num\">₪1,600</span> · réponses <span class=\"num\">₪700</span> · galerie <span class=\"num\">₪900</span> · QR code <span class=\"num\">₪300</span> — <b>total <span class=\"num\">₪3,500</span></b>",
+
+    "p3.name": "Sur mesure",
+    "p3.note": "À partir de, selon le travail de création",
+    "p3.lead": "Pour ceux qui veulent un site à l’image exacte de leur faire-part — pas un modèle repeint.",
+    "p3.f1": "<b>Tout le forfait site + galerie</b>",
+    "p3.f2": "Création entièrement sur mesure, d’après votre faire-part ou votre univers graphique",
+    "p3.f3": "Votre nom de domaine, première année comprise",
+    "p3.f4": "Jusqu’à 5 langues, celles que vous voulez",
+    "p3.f5": "Priorité dans le planning",
+    "p3.f6": "Modifications illimitées",
+    "p3.f7": "Photos et vidéos <b>en illimité</b>, pendant un an",
+
+    addonsTitle: "Options",
+    addonsNote: "À ajouter à n’importe quel forfait, même une fois le site en ligne.",
+    a1: "Une langue de plus<em>Celle que vous voulez, en plus de celles du forfait</em>",
+    a2: "Récapitulatif des allergies et repas spéciaux<em>Prêt à envoyer au traiteur</em>",
+    a3: "Cartons de table à imprimer<em>Fichier prêt : QR code et numéro pour chaque table</em>",
+    a4: "Impression et envoi des cartons<em>Jusqu’à 25 cartons, imprimés et livrés chez vous</em>",
+    a5: "Votre nom de domaine<em>Première année comprise</em>",
+    a6: "« Trouver sa table »<em>L’invité tape son nom à l’entrée, son numéro de table s’affiche</em>",
+    a7: "Cadeaux en ligne<em>Jusqu’à 3 moyens au choix — Bit, Paybox, PayPal, Wise, Revolut — et la liste de qui a envoyé quoi, prête pour les remerciements</em>",
+    a8: "Un moyen de paiement de plus<em>Pour les invités de l’étranger, au-delà des trois compris</em>",
+    a9: "Prolonger le site et la galerie<em>Au-delà de l’année comprise</em>",
+    "a9.price": "₪150 / an",
+    a10: "Livraison en urgence<em>À moins de 30 jours du mariage</em>",
+
+    termsTitle: "Conditions",
+    t1: "<strong>Paiement.</strong> 50 % à la commande, le solde avant la mise en ligne.",
+    t2: "<strong>Modifications.</strong> Deux séries comprises ; la suivante, <span class=\"num\">₪200</span>. Illimitées sur le forfait sur mesure.",
+    t3: "<strong>Délai.</strong> 10 jours ouvrés une fois les contenus reçus.",
+    t4: "<strong>Urgence.</strong> À moins de 30 jours du mariage, 30 % en plus.",
+    t5: "<strong>Le jour J.</strong> Pas d’assistance au téléphone pendant le mariage : tout est testé et validé avant.",
+    t6: "<strong>Il manque quelque chose ?</strong> Le site est développé sur mesure, donc presque tout peut s’ajouter. Dites-moi ce qu’il vous faut, je vous donne le prix.",
+
+    ctaNote: "",
+    ctaTitle: "On en parle ?",
+    ctaText: "Envoyez-moi la date de votre mariage sur WhatsApp, je vous réponds avec mes disponibilités et le calendrier.",
+    ctaBtn: "Écrire sur WhatsApp",
+    waText: "Bonjour ! J’ai vu vos tarifs, ça me convient. Je voudrais le forfait site + galerie. On peut commencer quand ?",
+
+    foot1: "Dudaim · Les détails avant, les souvenirs après",
+    foot2: "Tarifs valables 30 jours"
+  };
+
+  T.it = {
+    title: "Listino matrimoni 2026",
+    langsLabel: "Lingua",
+    jump: "Ne parliamo?",
+    brand: "Dudaim",
+    eyebrow: "Listino 2026",
+    h1: "Il vostro matrimonio, dal primo invito all’ultima foto",
+    packagesLabel: "Pacchetti",
+
+    "p1.name": "Il sito",
+    "p1.note": "Prezzo unico, senza canone mensile",
+    "p1.lead": "Tutto quello che serve perché gli invitati sappiano quando, dove e come — e perché voi sappiate esattamente quanti saranno.",
+    "p1.f1": "Un sito su misura, pensato prima di tutto per il telefono",
+    "p1.f2": "Fino a <b>3 lingue</b>: ebraico, inglese e quella che volete",
+    "p1.f3": "Le conferme arrivano da sole nel vostro foglio Google",
+    "p1.f4": "Chi ha confermato, chi non ha ancora risposto, quanti coperti",
+    "p1.f5": "Posizione e navigazione con Waze, programma della serata, dress code, dati per il regalo",
+    "p1.f6": "<b>Un monogramma vostro</b>: sul sito, sul QR e sui segnatavolo",
+    "p1.f8": "Il sito resta online per un anno dopo il matrimonio",
+
+    "p2.tag": "Il più richiesto",
+    "p2.name": "Sito + galleria",
+    "p2.note": "₪500 in più rispetto al pacchetto sito",
+    "p2.lead": "Il sito completo, più tutte le foto degli invitati in un unico posto — invece che sparse su 300 telefoni.",
+    "p2.f1": "<b>Tutto il pacchetto sito</b>",
+    "p2.f2": "Galleria foto <b>e video</b>, con un <b>QR personalizzato</b>, creato da una vostra foto",
+    "p2.f3": "Gli invitati inquadrano e caricano. Senza app e senza registrarsi.",
+    "p2.f4": "Fino a 1.000 file, in qualità originale",
+    "p2.f5": "Ognuno vede la galleria e lascia un augurio",
+    "p2.f6": "Alla fine si scarica tutto in un file solo",
+    "p2.f7": "La galleria resta online per un anno dopo il matrimonio",
+    "p2.f8": "Un pannello di gestione tutto vostro: aggiungere, togliere o riordinare quello che arriva nella galleria",
+    "p2.stack": "Separatamente: sito <span class=\"num\">₪1,600</span> · conferme <span class=\"num\">₪700</span> · galleria <span class=\"num\">₪900</span> · QR <span class=\"num\">₪300</span> — <b>totale <span class=\"num\">₪3,500</span></b>",
+
+    "p3.name": "Su misura",
+    "p3.note": "Prezzo di partenza, in base al lavoro di grafica",
+    "p3.lead": "Per chi vuole un sito identico alla propria partecipazione, non un modello ricolorato.",
+    "p3.f1": "<b>Tutto il pacchetto sito + galleria</b>",
+    "p3.f2": "Grafica creata da zero, dalla partecipazione o dal vostro stile",
+    "p3.f3": "Dominio vostro, primo anno incluso",
+    "p3.f4": "Fino a 5 lingue, quelle che volete",
+    "p3.f5": "Priorità in agenda",
+    "p3.f6": "Modifiche illimitate",
+    "p3.f7": "Foto e video <b>senza limiti</b>, per un anno intero",
+
+    addonsTitle: "Extra",
+    addonsNote: "Si aggiungono a qualsiasi pacchetto, anche a sito già online.",
+    a1: "Una lingua in più<em>Quella che volete, oltre a quelle del pacchetto</em>",
+    a2: "Riepilogo di allergie e menù speciali<em>Pronto da mandare al catering</em>",
+    a3: "Segnatavolo da stampare<em>File pronto: QR e numero per ogni tavolo</em>",
+    a4: "Stampa e spedizione dei segnatavolo<em>Fino a 25 biglietti, stampati e spediti a casa</em>",
+    a5: "Dominio vostro<em>Primo anno incluso</em>",
+    a6: "«Trova il tuo tavolo»<em>L’invitato scrive il nome all’ingresso e gli esce il numero del tavolo</em>",
+    a7: "Regali digitali<em>Fino a 3 metodi a scelta — Bit, Paybox, PayPal, Wise, Revolut — e l’elenco di chi ha mandato, pronto per i ringraziamenti</em>",
+    a8: "Un metodo di pagamento in più<em>Per gli invitati dall’estero, oltre ai tre inclusi</em>",
+    a9: "Prolungare sito e galleria<em>Oltre l’anno incluso</em>",
+    "a9.price": "₪150 / anno",
+    a10: "Consegna urgente<em>A meno di 30 giorni dal matrimonio</em>",
+
+    termsTitle: "Condizioni",
+    t1: "<strong>Pagamento.</strong> 50% all’ordine, il resto prima della pubblicazione.",
+    t2: "<strong>Modifiche.</strong> Due giri inclusi; ogni giro in più <span class=\"num\">₪200</span>. Nel pacchetto su misura, illimitate.",
+    t3: "<strong>Consegna.</strong> 10 giorni lavorativi da quando arrivano i contenuti.",
+    t4: "<strong>Urgenze.</strong> A meno di 30 giorni dal matrimonio, 30% in più sul totale.",
+    t5: "<strong>Il giorno del matrimonio.</strong> Niente assistenza telefonica durante la festa: è tutto provato e approvato prima.",
+    t6: "<strong>Manca qualcosa?</strong> Il sito nasce da zero, quindi quasi tutto si può aggiungere. Ditemi cosa vi serve e vi faccio il preventivo.",
+
+    ctaNote: "",
+    ctaTitle: "Ne parliamo?",
+    ctaText: "Scrivetemi su WhatsApp con la data del matrimonio: vi rispondo con disponibilità e tempi.",
+    ctaBtn: "Scrivimi su WhatsApp",
+    waText: "Ciao! Ho visto il listino e mi interessa. Vorrei il pacchetto sito + galleria. Quando possiamo iniziare?",
+
+    foot1: "Dudaim · I dettagli prima, i ricordi dopo",
+    foot2: "Listino valido 30 giorni"
+  };
+
+  T.ru = {
+    title: "Свадебный сайт — цены 2026",
+    langsLabel: "Язык",
+    jump: "Поговорим?",
+    brand: "Dudaim",
+    eyebrow: "Цены 2026",
+    h1: "Ваша свадьба — от первого приглашения до последней фотографии",
+    packagesLabel: "Пакеты",
+
+    "p1.name": "Сайт",
+    "p1.note": "Оплата один раз, никаких ежемесячных платежей",
+    "p1.lead": "Всё, чтобы гости знали, когда, куда и как ехать, — а вы точно знали, сколько человек придёт.",
+    "p1.f1": "Свадебный сайт под вас, сделанный в первую очередь под телефон",
+    "p1.f2": "До <b>3 языков</b>: иврит, английский и любой третий",
+    "p1.f3": "Ответы гостей сразу попадают в вашу гугл-таблицу",
+    "p1.f4": "Видно, кто подтвердил, кто молчит и сколько порций заказывать",
+    "p1.f5": "Место и маршрут в Waze, расписание, дресс-код, реквизиты для подарка",
+    "p1.f6": "<b>Ваша монограмма</b> — на сайте, на QR-коде и на карточках столов",
+    "p1.f8": "Сайт работает ещё год после свадьбы",
+
+    "p2.tag": "Берут чаще всего",
+    "p2.name": "Сайт + галерея",
+    "p2.note": "На ₪500 дороже пакета «Сайт»",
+    "p2.lead": "Тот же сайт, плюс все гостевые фотографии в одном месте — а не в трёхстах телефонах.",
+    "p2.f1": "<b>Всё из пакета «Сайт»</b>",
+    "p2.f2": "Галерея фото <b>и видео</b> с <b>именным QR-кодом</b> — из вашей же фотографии",
+    "p2.f3": "Гости наводят камеру и загружают. Без приложения и без регистрации.",
+    "p2.f4": "До 1 000 файлов в исходном качестве",
+    "p2.f5": "Каждый видит галерею и оставляет пожелание",
+    "p2.f6": "В конце всё скачивается одним архивом",
+    "p2.f7": "Галерея работает ещё год после свадьбы",
+    "p2.f8": "Своя панель управления: добавить, убрать или переставить всё, что попало в галерею",
+    "p2.stack": "По отдельности: сайт <span class=\"num\">₪1,600</span> · подтверждения <span class=\"num\">₪700</span> · галерея <span class=\"num\">₪900</span> · QR <span class=\"num\">₪300</span> — <b>итого <span class=\"num\">₪3,500</span></b>",
+
+    "p3.name": "Индивидуально",
+    "p3.note": "Цена от, зависит от объёма дизайна",
+    "p3.lead": "Для тех, кому нужен сайт точь-в-точь как приглашение, а не перекрашенный шаблон.",
+    "p3.f1": "<b>Всё из пакета «Сайт + галерея»</b>",
+    "p3.f2": "Дизайн с нуля — по вашему приглашению или по вашей идее",
+    "p3.f3": "Свой домен, первый год включён",
+    "p3.f4": "До 5 языков — любых",
+    "p3.f5": "Приоритет в очереди",
+    "p3.f6": "Правки без ограничений",
+    "p3.f7": "Фото и видео <b>без ограничений</b>, целый год",
+
+    addonsTitle: "Дополнения",
+    addonsNote: "Можно добавить к любому пакету — хоть когда сайт уже работает.",
+    a1: "Ещё один язык<em>Любой, сверх тех, что входят в пакет</em>",
+    a2: "Список аллергий и особых блюд<em>Готов к отправке кейтерингу</em>",
+    a3: "Карточки столов для печати<em>Готовый файл: QR-код и номер для каждого стола</em>",
+    a4: "Печать и доставка карточек<em>До 25 штук — напечатаем и привезём</em>",
+    a5: "Свой домен<em>Первый год включён</em>",
+    a6: "«Найди свой стол»<em>Гость вводит имя на входе и видит номер стола</em>",
+    a7: "Подарки онлайн<em>До 3 способов на выбор — Bit, Paybox, PayPal, Wise, Revolut — и список тех, кто отправил: пригодится для благодарностей</em>",
+    a8: "Ещё один способ оплаты<em>Для гостей из-за границы, сверх трёх включённых</em>",
+    a9: "Продлить сайт и галерею<em>Дальше включённого года</em>",
+    "a9.price": "₪150 / год",
+    a10: "Срочно<em>Меньше 30 дней до свадьбы</em>",
+
+    termsTitle: "Условия",
+    t1: "<strong>Оплата.</strong> 50% при заказе, остальное — перед публикацией сайта.",
+    t2: "<strong>Правки.</strong> Два круга включены, каждый следующий — <span class=\"num\">₪200</span>. В индивидуальном пакете — без ограничений.",
+    t3: "<strong>Сроки.</strong> 10 рабочих дней с того момента, как получены материалы.",
+    t4: "<strong>Срочно.</strong> Меньше 30 дней до свадьбы — плюс 30% к сумме.",
+    t5: "<strong>В день свадьбы.</strong> По телефону в этот день я не на связи: всё проверено и утверждено заранее.",
+    t6: "<strong>Не нашли нужного?</strong> Сайт делается с нуля, поэтому добавить можно почти что угодно. Напишите, чего не хватает, — назову цену.",
+
+    ctaNote: "Сайт будет полностью на русском. Переписка — на иврите или английском: по-русски я не говорю.",
+    ctaTitle: "Поговорим?",
+    ctaText: "Напишите в WhatsApp дату свадьбы — отвечу, свободна ли она, и назову сроки.",
+    ctaBtn: "Написать в WhatsApp",
+    waText: "Здравствуйте! Посмотрел цены — подходит. Хочу пакет «Сайт + галерея». Когда можем начать?",
+
+    foot1: "Dudaim · Детали до, воспоминания после",
+    foot2: "Цены действительны 30 дней"
+  };
+
+  function meta(code) {
+    for (var i = 0; i < LANGS.length; i++) {
+      if (LANGS[i].code === code) return LANGS[i];
+    }
+    return LANGS[0];
+  }
+
+  function pick() {
+    var q = null;
+    try {
+      q = new URLSearchParams(window.location.search).get("lang");
+    } catch (e) { /* older browsers */ }
+    if (q && T[q]) return q;
+
+    try {
+      var saved = window.localStorage.getItem(STORE_KEY);
+      if (saved && T[saved]) return saved;
+    } catch (e) { /* storage blocked */ }
+
+    if (AUTO_DETECT) {
+      var pref = navigator.languages || [navigator.language || ""];
+      for (var i = 0; i < pref.length; i++) {
+        var code = String(pref[i]).toLowerCase().split("-")[0];
+        if (code === "iw") code = "he";
+        if (T[code]) return code;
+      }
+    }
+    return "en";
+  }
+
+  function apply(code) {
+    var t = T[code] || T.en;
+    var info = meta(code);
+
+    document.documentElement.setAttribute("lang", code);
+    document.documentElement.setAttribute("dir", info.dir);
+    document.title = t.title;
+
+    var nodes = document.querySelectorAll("[data-i18n]");
+    for (var i = 0; i < nodes.length; i++) {
+      var value = t[nodes[i].getAttribute("data-i18n")];
+      if (value == null) continue;
+      if (value === "") {
+        nodes[i].hidden = true;
+      } else {
+        nodes[i].innerHTML = value;
+        nodes[i].hidden = false;
+      }
+    }
+
+    var labelled = document.querySelectorAll("[data-i18n-label]");
+    for (var j = 0; j < labelled.length; j++) {
+      var label = t[labelled[j].getAttribute("data-i18n-label")];
+      if (label != null) labelled[j].setAttribute("aria-label", label);
+    }
+
+    var waLinks = document.querySelectorAll("[data-wa]");
+    for (var w = 0; w < waLinks.length; w++) {
+      waLinks[w].href = WA_BASE + encodeURIComponent(t.waText);
+    }
+
+    var buttons = document.querySelectorAll(".langs__btn");
+    for (var k = 0; k < buttons.length; k++) {
+      var on = buttons[k].getAttribute("data-lang") === code;
+      buttons[k].setAttribute("aria-current", on ? "true" : "false");
+      buttons[k].disabled = on;
+    }
+
+    try { window.localStorage.setItem(STORE_KEY, code); } catch (e) { /* storage blocked */ }
+  }
+
+  /* Fade the body out, swap the language, fade it back in, so a change of
+     reading direction reads as one move instead of the page snapping over. */
+  function switchTo(code) {
+    var swap = document.getElementById("swap");
+    var still = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    if (!swap || still) {
+      apply(code);
+      return;
+    }
+
+    swap.classList.add("is-swapping");
+    window.setTimeout(function () {
+      apply(code);
+      window.requestAnimationFrame(function () {
+        swap.classList.remove("is-swapping");
+      });
+    }, 200);
+  }
+
+  function build() {
+    var nav = document.getElementById("langs");
+    if (!nav) return;
+
+    LANGS.forEach(function (lang, index) {
+      if (index > 0) {
+        var sep = document.createElement("span");
+        sep.className = "langs__sep";
+        sep.setAttribute("aria-hidden", "true");
+        sep.textContent = "·";
+        nav.appendChild(sep);
+      }
+
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "langs__btn";
+      btn.setAttribute("data-lang", lang.code);
+      btn.setAttribute("lang", lang.code);
+      btn.setAttribute("dir", lang.dir);
+      btn.textContent = lang.name;
+      btn.addEventListener("click", function () { switchTo(lang.code); });
+      nav.appendChild(btn);
+    });
+  }
+
+  build();
+  apply(pick());
+})();
+</script>
+</body>
+</html>
