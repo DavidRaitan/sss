@@ -112,6 +112,16 @@
   }
   .langs__btn:focus-visible { outline: 2px solid var(--brass); outline-offset: 3px; }
   .langs__sep { color: var(--rule); font-size: .8rem; user-select: none; }
+
+  .jump {
+    font-size: .84rem; line-height: 1.4; letter-spacing: .02em;
+    color: var(--brass); text-decoration: none; white-space: nowrap;
+    border-bottom: 1px solid var(--brass-soft); padding-bottom: .1rem;
+    transition: color .15s ease, border-color .15s ease;
+  }
+  .jump:hover { color: var(--ink); border-bottom-color: var(--ink); }
+  .jump:focus-visible { outline: 2px solid var(--brass); outline-offset: 3px; }
+  @media (prefers-reduced-motion: reduce) { .jump { transition: none; } }
   @media (prefers-reduced-motion: reduce) { .langs__btn { transition: none; } }
 
   /* ---- masthead ---- */
@@ -262,7 +272,9 @@
     display: flex; flex-wrap: wrap; gap: .4rem 1.5rem; justify-content: space-between;
   }
   .num { direction: ltr; unicode-bidi: isolate; }
-  html { color-scheme: light dark; }
+  html { color-scheme: light dark; scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  .cta { scroll-margin-block: 1.5rem; }
   body { margin: 0; }
   img { max-width: 100%; }
   [hidden] { display: none !important; }
@@ -274,13 +286,14 @@
   <div class="brand">
     <span class="brand__mark" data-i18n="brand">Dudaim</span>
     <nav class="langs" id="langs" data-i18n-label="langsLabel" aria-label="Language"></nav>
+    <a class="jump" href="#contact" data-i18n="jump">Let&rsquo;s talk &darr;</a>
   </div>
 
   <div class="swap" id="swap">
 
     <header class="masthead">
       <span class="eyebrow" data-i18n="eyebrow">Price list 2026</span>
-      <h1 data-i18n="h1">A wedding website, RSVPs and a guest gallery</h1>
+      <h1 data-i18n="h1">Your wedding, from the first invitation to the last photo</h1>
       <div class="rule"></div>
     </header>
 
@@ -297,7 +310,6 @@
           <li data-i18n="p1.f4">Full tracking: who confirmed, who has not replied yet, how many meals</li>
           <li data-i18n="p1.f5">Location and Waze navigation, schedule, dress code, gift details</li>
           <li data-i18n="p1.f6"><b>A personal monogram</b> &mdash; on the site, on the QR code and on the table cards</li>
-          <li data-i18n="p1.f7">Your own address for the event<span class="sub num" dir="ltr">noa-yoav.weddings.co.il</span></li>
           <li data-i18n="p1.f8">The site stays online for a full year after the wedding</li>
         </ul>
       </article>
@@ -425,7 +437,7 @@
       </div>
     </section>
 
-    <section class="cta">
+    <section class="cta" id="contact">
       <div class="cta__text">
         <h2 data-i18n="ctaTitle">Shall we talk?</h2>
         <p data-i18n="ctaText">Send a WhatsApp message with the date of your event, and I will get back to you with availability and a schedule.</p>
@@ -438,7 +450,7 @@
     </section>
 
     <footer>
-      <span data-i18n="foot1">Dudaim &middot; Wedding websites, RSVPs and digital galleries</span>
+      <span data-i18n="foot1">Dudaim &middot; The details before, the memories after</span>
       <span data-i18n="foot2">This price list is valid for 30 days from the date it was sent</span>
     </footer>
 
@@ -470,9 +482,10 @@
   T.en = {
     title: "Wedding Pricing 2026",
     langsLabel: "Language",
+    jump: "Let’s talk ↓",
     brand: "Dudaim",
     eyebrow: "Price list 2026",
-    h1: "A wedding website, RSVPs and a guest gallery",
+    h1: "Your wedding, from the first invitation to the last photo",
     packagesLabel: "Packages",
 
     "p1.name": "The Website",
@@ -484,7 +497,6 @@
     "p1.f4": "Full tracking: who confirmed, who has not replied yet, how many meals",
     "p1.f5": "Location and Waze navigation, schedule, dress code, gift details",
     "p1.f6": "<b>A personal monogram</b> — on the site, on the QR code and on the table cards",
-    "p1.f7": "Your own address for the event<span class=\"sub num\" dir=\"ltr\">noa-yoav.weddings.co.il</span>",
     "p1.f8": "The site stays online for a full year after the wedding",
 
     "p2.tag": "Most chosen",
@@ -540,16 +552,17 @@
     ctaBtn: "Message me on WhatsApp",
     waText: "Hi! I saw the price list and I am in. I would like the most chosen package — Website + Gallery. When do we start?",
 
-    foot1: "Dudaim · Wedding websites, RSVPs and digital galleries",
+    foot1: "Dudaim · The details before, the memories after",
     foot2: "This price list is valid for 30 days from the date it was sent"
   };
 
   T.he = {
     title: "מחירון חתונות 2026",
     langsLabel: "שפה",
+    jump: "נדבר? ↓",
     brand: "דודאים",
     eyebrow: "מחירון 2026",
-    h1: "אתר חתונה, אישורי הגעה וגלריית אורחים",
+    h1: "החתונה שלכם, מההזמנה הראשונה ועד התמונה האחרונה",
     packagesLabel: "חבילות",
 
     "p1.name": "האתר",
@@ -561,7 +574,6 @@
     "p1.f4": "מעקב מלא: מי אישר, מי טרם ענה, כמה מנות",
     "p1.f5": "מיקום וניווט בוויז, לוח זמנים, קוד לבוש, פרטי מתנה",
     "p1.f6": "<b>מונוגרם אישי</b> — על האתר, על קוד ה־QR ועל כרטיסי השולחן",
-    "p1.f7": "כתובת אישית לאירוע<span class=\"sub num\" dir=\"ltr\">noa-yoav.weddings.co.il</span>",
     "p1.f8": "האתר באוויר שנה מלאה אחרי החתונה",
 
     "p2.tag": "הכי נבחר",
@@ -617,16 +629,17 @@
     ctaBtn: "שליחת הודעה בוואטסאפ",
     waText: "היי! ראיתי את המחירון ואני בפנים. אני רוצה את החבילה הכי נבחרת — האתר + הגלריה. מתי מתחילים?",
 
-    foot1: "דודאים · אתרי חתונה, אישורי הגעה וגלריות דיגיטליות",
+    foot1: "דודאים · כל הפרטים לפני, כל הזיכרונות אחרי",
     foot2: "המחירון תקף 30 יום מיום המסירה"
   };
 
   T.es = {
     title: "Precios de boda 2026",
     langsLabel: "Idioma",
+    jump: "¿Hablamos? ↓",
     brand: "Dudaim",
     eyebrow: "Precios 2026",
-    h1: "La web de la boda, las confirmaciones y la galería de invitados",
+    h1: "Tu boda, desde la primera invitación hasta la última foto",
     packagesLabel: "Paquetes",
 
     "p1.name": "La web",
@@ -638,7 +651,6 @@
     "p1.f4": "Quién ha confirmado, quién falta por responder y cuántos menús salen",
     "p1.f5": "Ubicación con Waze, horario, código de vestimenta y datos para el regalo",
     "p1.f6": "<b>Monograma propio</b> en la web, en el QR y en las tarjetas de mesa",
-    "p1.f7": "Dirección propia para el evento<span class=\"sub num\" dir=\"ltr\">noa-yoav.weddings.co.il</span>",
     "p1.f8": "La web sigue online un año entero después de la boda",
 
     "p2.tag": "El más elegido",
@@ -694,16 +706,17 @@
     ctaBtn: "Escribir por WhatsApp",
     waText: "¡Hola! He visto los precios y me encaja. Quiero el paquete de web + galería. ¿Cuándo podemos empezar?",
 
-    foot1: "Dudaim · Webs de boda, confirmaciones y galerías de fotos",
+    foot1: "Dudaim · Los detalles antes, los recuerdos después",
     foot2: "Precios válidos durante 30 días desde el envío"
   };
 
   T.fr = {
     title: "Tarifs mariage 2026",
     langsLabel: "Langue",
+    jump: "On en parle ? ↓",
     brand: "Dudaim",
     eyebrow: "Tarifs 2026",
-    h1: "Le site du mariage, les réponses des invités et la galerie partagée",
+    h1: "Votre mariage, de la première invitation à la dernière photo",
     packagesLabel: "Forfaits",
 
     "p1.name": "Le site",
@@ -715,7 +728,6 @@
     "p1.f4": "Qui a répondu, qui n’a rien dit, combien de couverts",
     "p1.f5": "Le lieu et l’itinéraire Waze, le déroulé, le dress code, les infos pour le cadeau",
     "p1.f6": "<b>Un monogramme à vous</b> : sur le site, sur le QR code et sur les cartons de table",
-    "p1.f7": "Une adresse rien que pour votre mariage<span class=\"sub num\" dir=\"ltr\">noa-yoav.weddings.co.il</span>",
     "p1.f8": "Le site reste en ligne un an après le mariage",
 
     "p2.tag": "Le plus demandé",
@@ -771,16 +783,17 @@
     ctaBtn: "Écrire sur WhatsApp",
     waText: "Bonjour ! J’ai vu vos tarifs, ça me convient. Je voudrais le forfait site + galerie. On peut commencer quand ?",
 
-    foot1: "Dudaim · Sites de mariage, réponses des invités et galeries photo",
+    foot1: "Dudaim · Les détails avant, les souvenirs après",
     foot2: "Tarifs valables 30 jours"
   };
 
   T.it = {
     title: "Listino matrimoni 2026",
     langsLabel: "Lingua",
+    jump: "Ne parliamo? ↓",
     brand: "Dudaim",
     eyebrow: "Listino 2026",
-    h1: "Il sito del matrimonio, le conferme degli invitati e la galleria condivisa",
+    h1: "Il vostro matrimonio, dal primo invito all’ultima foto",
     packagesLabel: "Pacchetti",
 
     "p1.name": "Il sito",
@@ -792,7 +805,6 @@
     "p1.f4": "Chi ha confermato, chi non ha ancora risposto, quanti coperti",
     "p1.f5": "Posizione e navigazione con Waze, programma della serata, dress code, dati per il regalo",
     "p1.f6": "<b>Un monogramma vostro</b>: sul sito, sul QR e sui segnatavolo",
-    "p1.f7": "Un indirizzo solo per il vostro matrimonio<span class=\"sub num\" dir=\"ltr\">noa-yoav.weddings.co.il</span>",
     "p1.f8": "Il sito resta online per un anno dopo il matrimonio",
 
     "p2.tag": "Il più richiesto",
@@ -848,16 +860,17 @@
     ctaBtn: "Scrivimi su WhatsApp",
     waText: "Ciao! Ho visto il listino e mi interessa. Vorrei il pacchetto sito + galleria. Quando possiamo iniziare?",
 
-    foot1: "Dudaim · Siti di matrimonio, conferme degli invitati e gallerie digitali",
+    foot1: "Dudaim · I dettagli prima, i ricordi dopo",
     foot2: "Listino valido 30 giorni"
   };
 
   T.ru = {
     title: "Свадебный сайт — цены 2026",
     langsLabel: "Язык",
+    jump: "Поговорим? ↓",
     brand: "Dudaim",
     eyebrow: "Цены 2026",
-    h1: "Свадебный сайт, подтверждения гостей и общая галерея",
+    h1: "Ваша свадьба — от первого приглашения до последней фотографии",
     packagesLabel: "Пакеты",
 
     "p1.name": "Сайт",
@@ -869,7 +882,6 @@
     "p1.f4": "Видно, кто подтвердил, кто молчит и сколько порций заказывать",
     "p1.f5": "Место и маршрут в Waze, расписание, дресс-код, реквизиты для подарка",
     "p1.f6": "<b>Ваша монограмма</b> — на сайте, на QR-коде и на карточках столов",
-    "p1.f7": "Отдельный адрес для вашей свадьбы<span class=\"sub num\" dir=\"ltr\">noa-yoav.weddings.co.il</span>",
     "p1.f8": "Сайт работает ещё год после свадьбы",
 
     "p2.tag": "Берут чаще всего",
@@ -925,7 +937,7 @@
     ctaBtn: "Написать в WhatsApp",
     waText: "Здравствуйте! Посмотрел цены — подходит. Хочу пакет «Сайт + галерея». Когда можем начать?",
 
-    foot1: "Dudaim · Свадебные сайты, подтверждения гостей и общие галереи",
+    foot1: "Dudaim · Детали до, воспоминания после",
     foot2: "Цены действительны 30 дней"
   };
 
