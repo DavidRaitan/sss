@@ -1,0 +1,7 @@
+name = "gutenberg-mcp"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+
+# MCP_TOKEN is the secret path segment and is set with
+#   npx wrangler secret put MCP_TOKEN
+# never here — this file is committed.

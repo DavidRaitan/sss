@@ -10,3 +10,6 @@ service-account*.json
 
 # Claude Desktop config backups, if ever copied here.
 claude_desktop_config.json*
+
+# Secret path segments for the deployed MCP Workers.
+.workers-secrets

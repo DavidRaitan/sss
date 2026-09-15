@@ -40,6 +40,8 @@ bundled MCP server to reach either account —
 | `mcp/gws_mcp_server.py` | Zero-dependency MCP server exposing both accounts to Claude Desktop |
 | `scripts/mcp-add.py` | Registers the extra MCP servers with Claude Desktop, merging rather than replacing |
 | `mcp/servers.json` | Catalogue of those servers (no secrets) |
+| `scripts/deploy-workers.sh` | Deploys the Workers and prints the connector URLs |
+| `workers/` | The same servers as Cloudflare Workers, for Claude on the web |
 
 ## Extra MCP servers
 
@@ -52,7 +54,15 @@ python3 ./scripts/mcp-add.py        # Claude Desktop; then quit it with Cmd-Q
 ```
 
 Claude Code picks them up from the repo's `.mcp.json` with nothing to run.
-Claude on the web cannot use them at all — it accepts only remote HTTPS
-servers, and these are local processes.
 
 **[docs/mcp-servers.md](docs/mcp-servers.md)**
+
+Claude on the web cannot start a local process — it only talks to servers
+already running at an HTTPS address. So `gutenberg` and `fetch` are also
+written as Cloudflare Workers and added there as custom connectors:
+
+```bash
+./scripts/deploy-workers.sh     # prints a URL per server
+```
+
+**[docs/mcp-web.md](docs/mcp-web.md)**
