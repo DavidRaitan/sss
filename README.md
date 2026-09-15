@@ -43,11 +43,11 @@ bundled MCP server to reach either account —
 
 ## Extra MCP servers
 
-`gutenberg` (public-domain books), `youtube-transcript`, and `firecrawl` (web
-scraping). All three are stdio servers, so they run on this machine.
+`gutenberg` (public-domain books), `youtube-transcript`, and `fetch` (any web
+page as markdown). All three are stdio servers, so they run on this machine,
+and none of them needs an API key.
 
 ```bash
-export FIRECRAWL_API_KEY=fc-...     # only needed for firecrawl
 python3 ./scripts/mcp-add.py        # Claude Desktop; then quit it with Cmd-Q
 ```
 

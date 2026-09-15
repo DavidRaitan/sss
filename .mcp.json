@@ -3,7 +3,10 @@
     "gutenberg": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@cyanheads/gutenberg-mcp-server@latest"]
+      "args": [
+        "-y",
+        "@cyanheads/gutenberg-mcp-server@latest"
+      ]
     },
     "youtube-transcript": {
       "type": "stdio",
@@ -14,11 +17,12 @@
         "mcp-youtube-transcript"
       ]
     },
-    "firecrawl": {
+    "fetch": {
       "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "firecrawl-mcp"],
-      "env": { "FIRECRAWL_API_KEY": "${FIRECRAWL_API_KEY}" }
+      "command": "uvx",
+      "args": [
+        "mcp-server-fetch"
+      ]
     }
   }
 }

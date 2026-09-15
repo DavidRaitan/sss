@@ -4,7 +4,10 @@
     "gutenberg": {
       "description": "Project Gutenberg - search and read public-domain books",
       "launcher": "npx",
-      "args": ["-y", "@cyanheads/gutenberg-mcp-server@latest"]
+      "args": [
+        "-y",
+        "@cyanheads/gutenberg-mcp-server@latest"
+      ]
     },
     "youtube-transcript": {
       "description": "Fetch transcripts for YouTube videos",
@@ -15,11 +18,12 @@
         "mcp-youtube-transcript"
       ]
     },
-    "firecrawl": {
-      "description": "Scrape and crawl web pages into clean markdown",
-      "launcher": "npx",
-      "args": ["-y", "firecrawl-mcp"],
-      "requires_env": ["FIRECRAWL_API_KEY"]
+    "fetch": {
+      "description": "Fetch a web page and convert it to markdown - no API key",
+      "launcher": "uvx",
+      "args": [
+        "mcp-server-fetch"
+      ]
     }
   }
 }

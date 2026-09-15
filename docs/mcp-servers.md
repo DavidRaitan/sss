@@ -1,12 +1,13 @@
 # Extra MCP servers
 
-Three general-purpose servers, kept alongside the `google-workspace` one:
+Three general-purpose servers, kept alongside the `google-workspace` one. None
+of them needs an API key or an account:
 
 | Server | Gives Claude | Needs |
 |---|---|---|
 | `gutenberg` | Search and read public-domain books from Project Gutenberg | `npx` |
 | `youtube-transcript` | Transcripts for YouTube videos | `uvx` |
-| `firecrawl` | Scrapes and crawls web pages into clean markdown | `npx` + an API key |
+| `fetch` | Any web page, converted to markdown | `uvx` |
 
 All three are **stdio** servers: Claude starts them as processes on this
 machine and talks to them over stdin/stdout. That decides where they can go.
@@ -22,11 +23,9 @@ only *remote* servers — ones reachable at an HTTPS URL, added under
 **Settings → Connectors → Add custom connector**. A stdio config cannot be
 converted into one; it would need the server hosted somewhere public first.
 
-## Claude Desktop
+## Install
 
 ```bash
-export FIRECRAWL_API_KEY=fc-...        # from firecrawl.dev; skip if you
-                                        # are not adding firecrawl
 python3 ~/sss/scripts/mcp-add.py
 ```
 
@@ -38,7 +37,7 @@ Useful flags and arguments:
 ```bash
 ./scripts/mcp-add.py --list                 # what is on offer
 ./scripts/mcp-add.py --dry-run              # print the merged config, write nothing
-./scripts/mcp-add.py gutenberg firecrawl    # only these two
+./scripts/mcp-add.py gutenberg fetch        # only these two
 ```
 
 The script merges into `mcpServers` rather than replacing it, so
@@ -50,27 +49,34 @@ makes the difference between working and failing silently: Claude Desktop is a
 GUI app and does not inherit your shell's PATH, so a bare `"command": "npx"`
 often cannot be found and the server just never appears.
 
-### The firecrawl key
+For Claude Code there is nothing to run — the `.mcp.json` at the repo root
+covers sessions started in this directory. Claude Code asks for approval the
+first time it sees the file. Confirm with `claude mcp list`.
 
-`FIRECRAWL_API_KEY` is read from your shell at the moment you run the script.
-It is never stored in this repo — `mcp/servers.json` only records *that*
-firecrawl needs a key. Re-running without the variable set keeps whatever key
-is already in the Desktop config, so you will not clobber a working setup.
+## On `fetch`, and why not firecrawl
 
-If it is missing entirely the script still writes the entry, with
-`YOUR_KEY_HERE` in place, and warns. Note that the Desktop config file holds
-the key in plaintext; it lives outside this repo, so do not copy it in.
+`fetch` is the reference server from the Model Context Protocol project
+itself. It takes a URL, strips the page to readable text and hands back
+markdown, with `start_index` for paging through something long. No key, no
+account, no quota, and it is the same lineage as the protocol, so it does not
+go stale.
 
-## Claude Code
+What it does **not** do is crawl. It is one page per call: give it a URL and
+it reads that URL. It will not walk a site, follow links, or render
+JavaScript, so a page that builds its content client-side comes back thin or
+empty.
 
-The `.mcp.json` at the repo root covers Claude Code sessions started in this
-directory — no script to run. Claude Code asks for approval the first time it
-sees the file, and expands `${FIRECRAWL_API_KEY}` from your environment, so
-export the key in your shell profile rather than writing it into the file.
+Firecrawl covers those cases, and was in this repo briefly, but it needs an
+account and an API key: 1,000 credits a month free, then $19/mo. Since nothing
+else here needs a key, it was dropped rather than make the whole setup depend
+on one. `scripts/mcp-add.py` still understands `requires_env`, so adding it
+back is an entry in `mcp/servers.json` and `export FIRECRAWL_API_KEY=...`
+before running the script.
 
-```bash
-claude mcp list     # confirm all three are connected
-```
+For JavaScript-heavy pages the free route is Playwright MCP
+(`npx -y @playwright/mcp@latest`), which drives a real browser. It is a much
+heavier dependency — it downloads browser binaries on first run — so it is
+deliberately not in the catalogue. Add it the same way if you need it.
 
 ## Adding another server
 
@@ -86,10 +92,15 @@ Add an entry to `mcp/servers.json`:
 ```
 
 `launcher` must be `npx` or `uvx` — those are the two runners `mcp-add.py`
-knows how to locate. Drop `requires_env` when the server needs no secret.
-Adding it to `.mcp.json` as well is a separate, manual edit; the two files are
-deliberately not generated from each other, since Claude Code can expand
-`${VARS}` and Claude Desktop cannot.
+knows how to locate. Drop `requires_env` when the server needs no secret; when
+it is present, the value is read from your shell at the moment you run the
+script and falls back to whatever key is already in the Desktop config, so a
+re-run without it exported will not clobber a working setup. Keys are never
+written to this repo, and the Desktop config that holds them lives outside it.
+
+Adding the server to `.mcp.json` as well is a separate, manual edit; the two
+files are deliberately not generated from each other, since Claude Code can
+expand `${VARS}` in a config and Claude Desktop cannot.
 
 ## Troubleshooting
 
@@ -103,9 +114,8 @@ python3 -m json.tool < ~/Library/Application\ Support/Claude/claude_desktop_conf
 **`npx`/`uvx` not found.** `brew install node` or `brew install uv`, then
 re-run the script so it picks up the new path.
 
-**First launch is slow.** `npx -y` and `uvx --from git+...` download the
-package on first run. `youtube-transcript` builds from a git checkout, so give
-it the longest.
+**First launch is slow.** `npx -y` and `uvx` download the package on first run.
+`youtube-transcript` builds from a git checkout, so give it the longest.
 
-**firecrawl returns auth errors.** The key is wrong or still the placeholder —
-`grep FIRECRAWL ~/Library/Application\ Support/Claude/claude_desktop_config.json`.
+**`fetch` returns almost nothing for a page.** That page renders in the
+browser. See the Playwright note above.
