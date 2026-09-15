@@ -38,3 +38,21 @@ bundled MCP server to reach either account —
 | `skills/gws-accounts/` | Claude Code skill teaching Claude to target a named account |
 | `skills/gws-my-accounts/` | Which account a task belongs to (YouTube/Descript vs. default) |
 | `mcp/gws_mcp_server.py` | Zero-dependency MCP server exposing both accounts to Claude Desktop |
+| `scripts/mcp-add.py` | Registers the extra MCP servers with Claude Desktop, merging rather than replacing |
+| `mcp/servers.json` | Catalogue of those servers (no secrets) |
+
+## Extra MCP servers
+
+`gutenberg` (public-domain books), `youtube-transcript`, and `firecrawl` (web
+scraping). All three are stdio servers, so they run on this machine.
+
+```bash
+export FIRECRAWL_API_KEY=fc-...     # only needed for firecrawl
+python3 ./scripts/mcp-add.py        # Claude Desktop; then quit it with Cmd-Q
+```
+
+Claude Code picks them up from the repo's `.mcp.json` with nothing to run.
+Claude on the web cannot use them at all — it accepts only remote HTTPS
+servers, and these are local processes.
+
+**[docs/mcp-servers.md](docs/mcp-servers.md)**

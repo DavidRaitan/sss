@@ -1,0 +1,24 @@
+{
+  "mcpServers": {
+    "gutenberg": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@cyanheads/gutenberg-mcp-server@latest"]
+    },
+    "youtube-transcript": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/jkawamoto/mcp-youtube-transcript",
+        "mcp-youtube-transcript"
+      ]
+    },
+    "firecrawl": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "firecrawl-mcp"],
+      "env": { "FIRECRAWL_API_KEY": "${FIRECRAWL_API_KEY}" }
+    }
+  }
+}

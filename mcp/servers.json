@@ -1,0 +1,25 @@
+{
+  "_comment": "Catalogue of stdio MCP servers registered by scripts/mcp-add.py. 'launcher' names the runner whose absolute path must be resolved, because Claude Desktop does not inherit a shell PATH. 'requires_env' lists secrets that are never stored here.",
+  "servers": {
+    "gutenberg": {
+      "description": "Project Gutenberg - search and read public-domain books",
+      "launcher": "npx",
+      "args": ["-y", "@cyanheads/gutenberg-mcp-server@latest"]
+    },
+    "youtube-transcript": {
+      "description": "Fetch transcripts for YouTube videos",
+      "launcher": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/jkawamoto/mcp-youtube-transcript",
+        "mcp-youtube-transcript"
+      ]
+    },
+    "firecrawl": {
+      "description": "Scrape and crawl web pages into clean markdown",
+      "launcher": "npx",
+      "args": ["-y", "firecrawl-mcp"],
+      "requires_env": ["FIRECRAWL_API_KEY"]
+    }
+  }
+}
