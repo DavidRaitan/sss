@@ -15,7 +15,7 @@
  */
 
 var SHEET_NAME = 'RSVPs';
-var HEADERS = ['Received', 'Name', 'Phone', 'Attending', 'Guests', 'Language'];
+var HEADERS = ['Received', 'Name', 'Attending', 'Guests', 'Dietary', 'Language'];
 
 function doPost(e) {
   var lock = LockService.getScriptLock();       // two guests can reply at once
@@ -26,9 +26,9 @@ function doPost(e) {
     sheet.appendRow([
       data.timestamp ? new Date(data.timestamp) : new Date(),
       data.name || '',
-      data.phone || '',
       data.attending || '',
       data.guests || '',
+      data.diet || '',
       data.language || ''
     ]);
     return json_({ ok: true });

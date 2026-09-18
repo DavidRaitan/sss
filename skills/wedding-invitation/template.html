@@ -124,9 +124,9 @@
   .attend label.yes.on{border-color:var(--sage-deep);background:rgba(127,138,95,.16);color:var(--sage-deep);font-weight:600}
   .attend label.no.on{border-color:#c99a77;background:rgba(201,154,119,.15);color:#96684a;font-weight:600}
 
-  .guests-wrap{transition:.3s;overflow:hidden}
-  .guests-wrap.hide{max-height:0;opacity:0;margin:0}
-  .guests-wrap.show{max-height:120px;opacity:1}
+  .reveal{transition:.3s;overflow:hidden}
+  .reveal.hide{max-height:0;opacity:0;margin:0}
+  .reveal.show{max-height:340px;opacity:1}
 
   .submit{
     width:100%;font-family:"Cormorant Garamond",serif;font-size:1.3rem;letter-spacing:.03em;
@@ -149,6 +149,15 @@
   .thanks button:hover{border-color:var(--sage);color:var(--sage-deep)}
 
   .foot{text-align:center;color:var(--sage);font-style:italic;font-size:1rem;margin-top:30px}
+
+  .credit{text-align:center;margin-top:26px}
+  .credit a{
+    display:inline-block;color:var(--ink-soft);opacity:.72;text-decoration:none;
+    font-size:.78rem;letter-spacing:.11em;text-transform:uppercase;
+    padding-bottom:3px;border-bottom:1px solid var(--line);transition:.25s;
+  }
+  .credit a:hover{opacity:1;color:var(--sage-deep);border-bottom-color:var(--sage)}
+  .credit:not(.on){display:none}
 
   [hidden]{display:none!important}
 
@@ -345,11 +354,6 @@
         </div>
 
         <div class="field">
-          <label data-t="phone_l"></label>
-          <input type="tel" id="phone" autocomplete="tel" data-ph="phone_ph">
-        </div>
-
-        <div class="field">
           <label data-t="attend_l"></label>
           <div class="attend" id="attend">
             <label class="yes" data-attend="yes"><input type="radio" name="attend" value="yes"><span data-t="attend_yes"></span></label>
@@ -357,7 +361,8 @@
           </div>
         </div>
 
-        <div class="field guests-wrap hide" id="guestsWrap">
+        <div class="reveal hide" id="comingWrap">
+        <div class="field">
           <label data-t="guests_l"></label>
           <select id="guests">
             <option value="1">1</option><option value="2">2</option><option value="3">3</option>
@@ -365,6 +370,18 @@
             <option value="7">7</option><option value="8">8</option><option value="9">9</option>
             <option value="10">10</option><option value="11">11</option><option value="12">12</option>
           </select>
+        </div>
+
+        <div class="field">
+          <label data-t="diet_l"></label>
+          <select id="diet">
+            <option value="none" data-t="diet_none"></option>
+            <option value="vegetarian" data-t="diet_vegetarian"></option>
+            <option value="vegan" data-t="diet_vegan"></option>
+            <option value="gluten-free" data-t="diet_gf"></option>
+            <option value="other" data-t="diet_other"></option>
+          </select>
+        </div>
         </div>
 
         <button class="submit" id="submitBtn" data-t="submit"></button>
@@ -379,6 +396,7 @@
       </div>
 
       <p class="foot" data-t="foot"></p>
+      <p class="credit"><a id="creditLink" target="_blank" rel="noopener" data-t="credit"></a></p>
       </div><!-- /card-body -->
     </div>
   </div>
@@ -406,6 +424,10 @@ const WEDDING = {
   calDetails: "Wedding of First & Second. Kabbalat Panim 00:00, Chuppah 00:00."
 };
 
+/* the quiet line at the foot of the page. Set url to "" to leave it off. */
+const CREDIT = { url: "https://wa.me/972547699701?text=" +
+                      encodeURIComponent("Hi Dudaim — I'd like an invitation site like this one") };
+
 const DEFAULT_LANG = "en";
 const AUTO_DETECT  = true;   // open in the visitor's own language when we have it
 
@@ -426,13 +448,16 @@ const T = {
     cal_google:"Add to Google Calendar", cal_apple:"Add to Apple Calendar",
     rsvp_h:"Will you join us?", rsvp_sub:"Kindly reply below",
     name_l:"Full name", name_ph:"Your full name",
-    phone_l:"Phone", phone_ph:"So we can reach you",
     attend_l:"Will you attend?", attend_yes:"Joyfully yes", attend_no:"Sadly no",
     guests_l:"How many guests (including you)?",
+    diet_l:"Anything we should know about food? (optional)",
+    diet_none:"No restrictions", diet_vegetarian:"Vegetarian", diet_vegan:"Vegan",
+    diet_gf:"Gluten free", diet_other:"Something else — we'll be in touch",
     submit:"Send RSVP",
     thanks_h:"Thank you!", thanks_p:"Your reply has been received. We can't wait to celebrate with you.",
     again:"Send another reply",
     foot:"We can't wait to celebrate with you",
+    credit:"Invitation site by Dudaim — make yours",
     err_name:"Please enter your name.",
     err_attend:"Please let us know if you'll attend.",
     sending:"Sending…", fail:"Something went wrong. Please try again."
@@ -450,13 +475,16 @@ const T = {
     cal_google:"הוספה ליומן Google", cal_apple:"הוספה ליומן Apple",
     rsvp_h:"תבואו לחגוג איתנו?", rsvp_sub:"נודה לכם על אישור ההגעה",
     name_l:"שם מלא", name_ph:"השם המלא שלכם",
-    phone_l:"טלפון", phone_ph:"כדי שנוכל להשיג אתכם",
     attend_l:"האם תגיעו?", attend_yes:"בשמחה, מגיעים", attend_no:"לצערנו לא",
     guests_l:"כמה אורחים (כולל אתכם)?",
+    diet_l:"משהו שכדאי לדעת לגבי האוכל? (לא חובה)",
+    diet_none:"ללא הגבלות", diet_vegetarian:"צמחוני", diet_vegan:"טבעוני",
+    diet_gf:"ללא גלוטן", diet_other:"משהו אחר — ניצור קשר",
     submit:"שליחת אישור",
     thanks_h:"תודה רבה!", thanks_p:"אישור ההגעה התקבל. מחכים לחגוג איתכם!",
     again:"שליחת אישור נוסף",
     foot:"מחכים לחגוג איתכם",
+    credit:"אתר ההזמנה — דודאים · גם לכם",
     err_name:"נא להזין שם.",
     err_attend:"נא לציין אם תגיעו.",
     sending:"שולח…", fail:"משהו השתבש. נסו שוב בבקשה."
@@ -508,6 +536,13 @@ function paintLang(l){
   document.querySelectorAll(".langbar button").forEach(b=>b.classList.toggle("on", b.dataset.lang === l));
   try { localStorage.setItem("rsvp-lang", l); } catch(e){}
 }
+
+(function setupCredit(){
+  const a = document.getElementById("creditLink");
+  if (!a || !CREDIT.url) return;
+  a.href = CREDIT.url;
+  a.parentElement.classList.add("on");
+})();
 
 /* the switcher builds itself from T, and hides when there is only one language */
 (function buildLangbar(){
@@ -576,7 +611,7 @@ document.querySelectorAll("#attend label").forEach(l=>{
   l.addEventListener("click", ()=>{
     attend = l.dataset.attend;
     document.querySelectorAll("#attend label").forEach(x=>x.classList.toggle("on", x === l));
-    const w = document.getElementById("guestsWrap");
+    const w = document.getElementById("comingWrap");
     if (attend === "yes"){ w.classList.remove("hide"); w.classList.add("show"); }
     else { w.classList.remove("show"); w.classList.add("hide"); }
   });
@@ -588,16 +623,15 @@ const btn = document.getElementById("submitBtn");
 btn.addEventListener("click", async ()=>{
   const t = T[lang];
   const name = document.getElementById("fullname").value.trim();
-  const phone = document.getElementById("phone").value.trim();
   msg.className = "msg";
   if (!name){ msg.textContent = t.err_name; msg.classList.add("err"); return; }
   if (!attend){ msg.textContent = t.err_attend; msg.classList.add("err"); return; }
 
   const payload = {
     name,
-    phone,
     attending: attend === "yes" ? "Yes" : "No",
     guests: attend === "yes" ? document.getElementById("guests").value : "0",
+    diet: attend === "yes" ? document.getElementById("diet").value : "",
     language: lang,
     timestamp: new Date().toISOString()
   };
@@ -636,10 +670,11 @@ document.getElementById("againBtn").addEventListener("click", ()=>{
   document.getElementById("thanks").classList.remove("show");
   document.getElementById("formArea").hidden = false;
   document.getElementById("fullname").value = "";
-  document.getElementById("phone").value = "";
   attend = null;
   document.querySelectorAll("#attend label").forEach(x=>x.classList.remove("on"));
-  const w = document.getElementById("guestsWrap"); w.classList.remove("show"); w.classList.add("hide");
+  const w = document.getElementById("comingWrap"); w.classList.remove("show"); w.classList.add("hide");
+  document.getElementById("guests").value = "1";
+  document.getElementById("diet").value = "none";
   document.querySelectorAll('input[name="attend"]').forEach(i=>i.checked = false);
 });
 

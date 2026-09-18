@@ -14,6 +14,11 @@ Down the page: an opening monogram, the invitation itself (a different
 picture per language), the date and venue, Add-to-calendar buttons, a map
 with a Waze link, and the RSVP form.
 
+The form asks for a name, yes or no, and — only once they say yes — how
+many are coming and whether anything about the food matters. The dietary
+dropdown opens on "No restrictions", so a guest with nothing to say can
+ignore it and send. No phone number: the couple knows who they invited.
+
 ## Building one
 
 `template.html`, `embed-images.py`, `apps-script/` and
@@ -60,6 +65,8 @@ digits read the same in every language.
 
 ## Where the replies go
 
+One row per reply: Received, Name, Attending, Guests, Dietary, Language.
+
 `$SKILL/apps-script/Code.gs` is the spreadsheet side: a Google Sheet per couple,
 Apps Script behind it, deployed as a web app. The file's own header has the
 five steps. Paste the resulting `/exec` URL into `ENDPOINT`.
@@ -75,6 +82,13 @@ The form posts `mode:"no-cors"`, which Apps Script needs; the browser
 cannot read the response, so a reply that fails to save still shows the
 thank-you. Test with a real submission and look at the sheet before
 sending the link out.
+
+## The credit line
+
+A quiet line under the footer — "Invitation site by Dudaim — make yours" —
+linking to the studio's WhatsApp. It lives in `CREDIT` at the top of the
+script, and its wording is the `credit` key in each language. Set
+`CREDIT.url` to `""` and the line disappears.
 
 ## If a language has no artwork
 
