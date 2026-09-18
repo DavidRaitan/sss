@@ -8,19 +8,21 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=Frank+Ruhl+Libre:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
+  /* Taken from the invitation itself: its paper, its ink, the olive of the
+     leaves and the peach of the chuppah drape. */
   :root{
-    --ink:#2f3a2c;
-    --ink-soft:#54634d;
-    --sage:#7c8a63;
-    --sage-deep:#4f6138;
-    --gold:#a68b4c;
-    --paper:#f7f5ec;
-    --line:#cfd3bd;
-    --white:#fdfcf6;
-    --shadow:0 18px 50px -22px rgba(59,70,48,.45);
+    --ink:#332f22;
+    --ink-soft:#5c5745;
+    --sage:#7f8a5f;
+    --sage-deep:#55603c;
+    --gold:#c9a077;
+    --paper:#f6f1e6;
+    --line:#e2dbc8;
+    --white:#fdfaf3;
+    --shadow:0 18px 50px -22px rgba(74,64,42,.35);
   }
   *{box-sizing:border-box;margin:0;padding:0}
-  html{scroll-behavior:smooth}
+  html{scroll-behavior:smooth;scrollbar-gutter:stable}
   body{
     background:var(--paper);
     color:var(--ink);
@@ -60,14 +62,18 @@
   @media(max-width:640px){.card-body{padding:0 22px}}
 
   /* ---- the invitation itself ---- */
-  .invite-img{margin:0;line-height:0;background:var(--white)}
-  .invite-img img{width:100%;height:auto;display:block}
+  .invite-img{margin:0;line-height:0;background:var(--white);aspect-ratio:var(--invite-ratio,2/3)}
+  .invite-img img{width:100%;height:100%;object-fit:contain;display:block}
+
+  /* the language swap: one quiet crossfade, no jump */
+  .invite-img img,.card-body{transition:opacity .22s ease}
+  .card.swapping .invite-img img,.card.swapping .card-body{opacity:0}
 
   /* seam that blends the printed invitation into the interactive part */
   .fade-seam{position:relative;text-align:center;margin:0 0 22px}
   .fade-seam::before{
     content:"";position:absolute;left:0;right:0;top:-70px;height:70px;
-    background:linear-gradient(to bottom, rgba(253,252,246,0), var(--white));
+    background:linear-gradient(to bottom, rgba(253,250,243,0), var(--white));
     pointer-events:none;
   }
   .fade-seam span{
@@ -96,7 +102,7 @@
 
   /* ---- map ---- */
   .mapblock{margin-top:8px}
-  .mapframe{border:1px solid var(--line);border-radius:3px;overflow:hidden;box-shadow:0 8px 24px -16px rgba(59,70,48,.5)}
+  .mapframe{border:1px solid var(--line);border-radius:3px;overflow:hidden;box-shadow:0 8px 24px -16px rgba(74,64,42,.45)}
   .mapframe iframe{display:block;width:100%;height:260px;border:0;filter:saturate(.92)}
   .maplink{display:inline-flex;align-items:center;gap:7px;margin-top:12px;color:var(--sage-deep);font-size:1rem;text-decoration:none;border-bottom:1px solid transparent;transition:.2s}
   .maplink:hover{border-bottom-color:var(--sage-deep)}
@@ -110,13 +116,13 @@
     width:100%;font-family:"EB Garamond",serif;font-size:1.05rem;color:var(--ink);
     background:var(--paper);border:1px solid var(--line);border-radius:3px;padding:12px 14px;transition:.2s;
   }
-  .field input:focus,.field select:focus{outline:none;border-color:var(--sage);background:var(--white);box-shadow:0 0 0 3px rgba(124,138,99,.15)}
+  .field input:focus,.field select:focus{outline:none;border-color:var(--sage);background:var(--white);box-shadow:0 0 0 3px rgba(127,138,95,.18)}
 
   .attend{display:flex;gap:12px}
   .attend label{flex:1;cursor:pointer;text-align:center;border:1px solid var(--line);border-radius:3px;padding:14px 8px;transition:.2s;background:var(--paper);font-size:1.05rem;color:var(--ink)}
   .attend input{position:absolute;opacity:0;pointer-events:none}
-  .attend label.yes.on{border-color:var(--sage-deep);background:rgba(124,138,99,.14);color:var(--sage-deep);font-weight:600}
-  .attend label.no.on{border-color:#b08a6a;background:rgba(176,138,106,.13);color:#8a6242;font-weight:600}
+  .attend label.yes.on{border-color:var(--sage-deep);background:rgba(127,138,95,.16);color:var(--sage-deep);font-weight:600}
+  .attend label.no.on{border-color:#c99a77;background:rgba(201,154,119,.15);color:#96684a;font-weight:600}
 
   .guests-wrap{transition:.3s;overflow:hidden}
   .guests-wrap.hide{max-height:0;opacity:0;margin:0}
@@ -127,12 +133,12 @@
     background:var(--sage-deep);color:var(--white);border:none;border-radius:3px;padding:15px;cursor:pointer;transition:.25s;margin-top:6px;
   }
   body.rtl .submit{font-size:1.1rem}
-  .submit:hover{background:#3e4d2c}
+  .submit:hover{background:#454f2e}
   .submit:disabled{opacity:.6;cursor:wait}
 
   .msg{text-align:center;margin-top:16px;font-size:1.02rem;min-height:1.2em}
   .msg.ok{color:var(--sage-deep)}
-  .msg.err{color:#a5563b}
+  .msg.err{color:#a05a3c}
 
   .thanks{text-align:center;padding:20px 0 6px;display:none}
   .thanks.show{display:block}
@@ -199,10 +205,10 @@
   .calendar-btn{
     display:inline-flex;align-items:center;justify-content:center;gap:8px;
     min-width:176px;padding:10px 14px;border:1px solid var(--line);border-radius:999px;
-    color:var(--sage-deep);background:rgba(253,252,246,.78);text-decoration:none;
+    color:var(--sage-deep);background:rgba(253,250,243,.78);text-decoration:none;
     font-size:.98rem;transition:.2s;backdrop-filter:blur(3px)
   }
-  .calendar-btn:hover{border-color:var(--sage);background:rgba(124,138,99,.10);transform:translateY(-1px)}
+  .calendar-btn:hover{border-color:var(--sage);background:rgba(127,138,95,.12);transform:translateY(-1px)}
   .calendar-btn svg{width:16px;height:16px;flex:none}
   @media(max-width:640px){
     .calendar-btn{min-width:150px;flex:1 1 150px}
@@ -471,7 +477,17 @@ const INVITE_IMG = {
    ============================================================ */
 let lang = DEFAULT_LANG, attend = null;
 
-function applyLang(l){
+function applyLang(l, animate){
+  if (animate){
+    const card = document.querySelector(".card");
+    card.classList.add("swapping");
+    setTimeout(()=>{ paintLang(l); card.classList.remove("swapping"); }, 220);
+    return;
+  }
+  paintLang(l);
+}
+
+function paintLang(l){
   lang = l;
   const t = T[l];
   document.documentElement.lang = l;
@@ -501,7 +517,7 @@ function applyLang(l){
     b.type = "button";
     b.dataset.lang = code;
     b.textContent = T[code].name;
-    b.addEventListener("click", ()=>applyLang(code));
+    b.addEventListener("click", ()=>applyLang(code, true));
     bar.appendChild(b);
   });
 })();
@@ -521,6 +537,22 @@ function chooseLang(){
   }
   return codes.includes(DEFAULT_LANG) ? DEFAULT_LANG : codes[0];
 }
+
+/* every invitation is decoded up front, so a swap has nothing to wait for,
+   and the first one to arrive fixes the frame's proportions */
+(function prepareInvitations(){
+  const figure = document.querySelector(".invite-img");
+  let measured = false;
+  Object.values(INVITE_IMG).forEach(src=>{
+    const probe = new Image();
+    probe.onload = function(){
+      if (measured || !probe.naturalWidth) return;
+      measured = true;
+      figure.style.setProperty("--invite-ratio", probe.naturalWidth + " / " + probe.naturalHeight);
+    };
+    probe.src = src;
+  });
+})();
 
 /* the opening monogram: hold ~1.5s, then fade into the invitation */
 (function splash(){
