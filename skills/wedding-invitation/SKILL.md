@@ -16,11 +16,15 @@ with a Waze link, and the RSVP form.
 
 ## Building one
 
-1. `cp template.html sites/invitations/<couple-slug>/index.html` — the slug
-   is the two family names, e.g. `katsof-yativ`.
+`template.html`, `embed-images.py`, `apps-script/` and
+`invitation-typeset.html` sit next to this SKILL.md; below, `$SKILL` means
+that directory.
+
+1. `cp $SKILL/template.html sites/invitations/<couple-slug>/index.html` —
+   the slug is the two family names, e.g. `katsof-yativ`.
 2. Put the couple's invitation pictures in, one per language:
    ```
-   python3 embed-images.py sites/invitations/<slug>/index.html \
+   python3 $SKILL/embed-images.py sites/invitations/<slug>/index.html \
        en=invite-en.jpg he=invite-he.jpg
    ```
    Re-running it later swaps a picture out. A language with no picture of
@@ -56,7 +60,7 @@ digits read the same in every language.
 
 ## Where the replies go
 
-`apps-script/Code.gs` is the spreadsheet side: a Google Sheet per couple,
+`$SKILL/apps-script/Code.gs` is the spreadsheet side: a Google Sheet per couple,
 Apps Script behind it, deployed as a web app. The file's own header has the
 five steps. Paste the resulting `/exec` URL into `ENDPOINT`.
 
@@ -74,7 +78,7 @@ sending the link out.
 
 ## If a language has no artwork
 
-`invitation-typeset.html` is the same invitation with the wording as real
+`$SKILL/invitation-typeset.html` is the same invitation with the wording as real
 HTML over the watercolour bands instead of a picture — branches across the
 top, the chuppah scene at the bottom, cream paper between. Any language can
 be set in it. Use it to produce the missing picture, or as the invitation

@@ -38,3 +38,22 @@ bundled MCP server to reach either account —
 | `skills/gws-accounts/` | Claude Code skill teaching Claude to target a named account |
 | `skills/gws-my-accounts/` | Which account a task belongs to (YouTube/Descript vs. default) |
 | `mcp/gws_mcp_server.py` | Zero-dependency MCP server exposing both accounts to Claude Desktop |
+
+## Wedding invitations
+
+A couple's invitation site in one HTML file — their printed invitation, the
+date and venue, calendar buttons, a map, and an RSVP form that writes to
+their own Google Sheet, in as many languages as they want.
+
+```bash
+./scripts/install-skills.sh wedding-invitation   # then restart Claude Code
+```
+
+From Claude Code, hand it the couple's details and their invitation
+pictures and ask for the site. Built ones live in
+**[sites/invitations/](sites/invitations/)**.
+
+| Script | Purpose |
+|---|---|
+| `scripts/install-skills.sh` | Installs this repo's skills into `~/.claude/skills` (`--list` to see what is there) |
+| `skills/wedding-invitation/` | Claude Code skill: the site template, the image embedder, and the RSVP spreadsheet |
