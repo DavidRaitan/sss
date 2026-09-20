@@ -150,24 +150,33 @@
 
   .foot{text-align:center;color:var(--sage);font-style:italic;font-size:1rem;margin-top:30px}
 
-  .credit{
-    text-align:center;margin-top:30px;
-    font-family:"EB Garamond",Georgia,serif;font-size:.86rem;letter-spacing:.06em;
-    color:var(--ink-soft);
+  .credit{text-align:center;margin-top:42px}
+  .credit-mark{display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:16px}
+  .credit-mark i{display:block;width:54px;height:1px;background:var(--line)}
+  .credit-mark span{
+    display:block;width:6px;height:6px;background:var(--gold);
+    opacity:.8;transform:rotate(45deg);
   }
   .credit a{
-    display:inline-flex;align-items:center;gap:.34em;
-    color:inherit;font:inherit;letter-spacing:inherit;text-decoration:none;
-    padding:2px 3px;border-bottom:1px solid transparent;transition:.2s;
+    display:inline-flex;flex-direction:column;align-items:center;gap:6px;
+    text-decoration:none;padding:4px 8px;transition:.25s;
   }
-  .credit .sep{display:inline-block;margin:0 .5em;opacity:.45}
-  .credit .chat svg{width:.95em;height:.95em;flex:none;opacity:.8}
-  .credit a:hover{border-bottom-color:var(--line)}
-  .credit a:hover svg{opacity:1}
+  .credit .lead{
+    font-family:"EB Garamond",Georgia,serif;
+    font-size:.74rem;letter-spacing:.22em;text-transform:uppercase;
+    color:var(--ink-soft);transition:.25s;
+  }
+  .credit .brand{
+    font-family:"Cormorant Garamond",serif;font-size:1.72rem;font-weight:500;
+    letter-spacing:.16em;color:var(--sage-deep);
+    padding-bottom:4px;border-bottom:1px solid transparent;transition:.25s;
+  }
+  .credit a:hover .brand{border-bottom-color:var(--gold)}
   .credit a:focus-visible{
-    outline:2px solid var(--sage-deep);outline-offset:3px;border-radius:2px;
+    outline:2px solid var(--sage-deep);outline-offset:4px;border-radius:3px;
   }
-  body.rtl .credit{font-family:"Frank Ruhl Libre",serif;letter-spacing:0}
+  body.rtl .credit .lead{letter-spacing:.08em}
+  body.rtl .credit .brand{font-family:"Frank Ruhl Libre",serif;letter-spacing:.05em;font-size:1.5rem}
   .credit:not(.on){display:none}
 
   [hidden]{display:none!important}
@@ -461,14 +470,13 @@
       </div>
 
       <p class="foot" data-t="foot"></p>
-      <p class="credit">
-        <a id="creditLink" target="_blank" rel="noopener" data-t="credit_line"></a><span class="sep" aria-hidden="true">·</span><a id="creditChat" target="_blank" rel="noopener" class="chat">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
-               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M21 11.6a8.4 8.4 0 0 1-12.3 7.5L3.5 20.5l1.4-5.1A8.4 8.4 0 1 1 21 11.6Z"/>
-          </svg><span class="chat-label" data-t="credit_chat"></span>
+      <div class="credit">
+        <div class="credit-mark" aria-hidden="true"><i></i><span></span><i></i></div>
+        <a id="creditLink" target="_blank" rel="noopener">
+          <span class="lead" data-t="credit_lead"></span>
+          <span class="brand" data-t="credit_brand"></span>
         </a>
-      </p>
+      </div>
       </div><!-- /card-body -->
     </div>
   </div>
@@ -503,8 +511,7 @@ const CREDIT = {
   // ?ref=<the couple's first names> is how the studio counts this wedding's
   // clicks. Keep the query string exactly as it is.
   url: "https://dudaim.netlify.app/?ref=sara-natan",
-  // the same wedding, named in the opening line of the chat instead
-  whatsapp: "972547699701"
+  whatsapp: ""          // a number instead, when there is no site to send them to
 };
 
 const DEFAULT_LANG = "en";
@@ -538,7 +545,7 @@ const T = {
     thanks_h:"Thank you!", thanks_p:"Your reply has been received. We can't wait to celebrate with you.",
     again:"Send another reply",
     foot:"We can't wait to celebrate with you",
-    credit_line:"Invitation by Dudaim", credit_chat:"WhatsApp",
+    credit_lead:"Invitation site by", credit_brand:"Dudaim",
     credit_msg:"Hi Dudaim — I saw Sara & Natan's invitation site and I'd like one for our wedding",
     err_name:"Please enter your name.",
     err_attend:"Please let us know if you'll attend.",
@@ -568,7 +575,7 @@ const T = {
     thanks_h:"תודה רבה!", thanks_p:"אישור ההגעה התקבל. מחכים לחגוג איתכם!",
     again:"שליחת אישור נוסף",
     foot:"מחכים לחגוג איתכם",
-    credit_line:"עוצב על ידי דודאים", credit_chat:"וואטסאפ",
+    credit_lead:"עוצב על ידי", credit_brand:"דודאים",
     credit_msg:"היי דודאים — ראיתי את אתר ההזמנה של שרה ונתן ואשמח לאחד לחתונה שלנו",
     err_name:"נא להזין שם.",
     err_attend:"נא לציין אם תגיעו.",
@@ -616,16 +623,10 @@ function paintLang(l){
     el.placeholder = t[el.getAttribute("data-ph")] || "";
   });
   const credit = document.getElementById("creditLink");
-  const chat = document.getElementById("creditChat");
-  if (credit && chat){
-    const chatUrl = chatHref(t);
-    credit.href = CREDIT.url;
-    credit.hidden = !CREDIT.url;
-    chat.href = chatUrl;
-    chat.hidden = !chatUrl;
-    chat.setAttribute("aria-label", t.credit_chat || "WhatsApp");
-    credit.parentElement.querySelector(".sep").hidden = !(CREDIT.url && chatUrl);
-    credit.parentElement.classList.toggle("on", !!(CREDIT.url || chatUrl));
+  if (credit){
+    const href = CREDIT.url || chatHref(t);
+    credit.href = href;
+    credit.closest(".credit").classList.toggle("on", !!href);
   }
   document.querySelectorAll(".langbar button").forEach(b=>b.classList.toggle("on", b.dataset.lang === l));
   try { localStorage.setItem("rsvp-lang", l); } catch(e){}

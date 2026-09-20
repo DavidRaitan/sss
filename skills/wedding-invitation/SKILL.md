@@ -121,20 +121,18 @@ One quiet line at the very foot of the page — "Invitation by Dudaim" /
 ink. No button, no box, no logo: it is a maker's mark on someone else's
 invitation, not a shopfront.
 
-Two destinations, side by side: the studio's name opens the site, and a
-small speech bubble after a thin dot opens WhatsApp. Someone deciding opens
-the site; someone already decided opens the chat. Neither is a button.
+A hairline rule with a gold lozenge, then "Invitation site by" in small
+caps over the studio's name in the display serif. One destination: the
+site.
 
-`CREDIT.url` carries the site with **`?ref=<the couple's first names>`** on
+`CREDIT.url` carries it with **`?ref=<the couple's first names>`** on
 the end — `?ref=sara-natan`, `?ref=dor-maya`. That query string is how the
 studio counts which wedding a visit came from, so it must survive every
-copy; nothing on this page does the counting. `CREDIT.whatsapp` is the
-number, and `credit_msg` in each language is the line already typed when
-the chat opens — name the couple in it, so a WhatsApp enquiry says which
-wedding it came from the way `?ref=` does for the site.
+copy; nothing on this page does the counting.
 
-Leave either empty and that half disappears, the dot with it; empty both
-and so does the line.
+`CREDIT.whatsapp` is the fallback, used only when `url` is empty: it opens
+a chat with `credit_msg` already typed in the guest's language. Empty both
+and the line disappears.
 
 The link opens in a new tab (`rel="noopener"`), sits last in the tab order
 with a visible focus ring, and its colour clears AA against the card. Do
