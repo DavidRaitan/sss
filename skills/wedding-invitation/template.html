@@ -150,17 +150,24 @@
 
   .foot{text-align:center;color:var(--sage);font-style:italic;font-size:1rem;margin-top:30px}
 
-  .credit{text-align:center;margin-top:30px}
-  .credit a{
+  .credit{
+    text-align:center;margin-top:30px;
     font-family:"EB Garamond",Georgia,serif;font-size:.86rem;letter-spacing:.06em;
-    color:var(--ink-soft);text-decoration:none;
-    padding:2px 4px;border-bottom:1px solid transparent;transition:.2s;
+    color:var(--ink-soft);
   }
+  .credit a{
+    display:inline-flex;align-items:center;gap:.34em;
+    color:inherit;font:inherit;letter-spacing:inherit;text-decoration:none;
+    padding:2px 3px;border-bottom:1px solid transparent;transition:.2s;
+  }
+  .credit .sep{display:inline-block;margin:0 .5em;opacity:.45}
+  .credit .chat svg{width:.95em;height:.95em;flex:none;opacity:.8}
   .credit a:hover{border-bottom-color:var(--line)}
+  .credit a:hover svg{opacity:1}
   .credit a:focus-visible{
     outline:2px solid var(--sage-deep);outline-offset:3px;border-radius:2px;
   }
-  body.rtl .credit a{font-family:"Frank Ruhl Libre",serif;letter-spacing:0}
+  body.rtl .credit{font-family:"Frank Ruhl Libre",serif;letter-spacing:0}
   .credit:not(.on){display:none}
 
   [hidden]{display:none!important}
@@ -454,7 +461,14 @@
       </div>
 
       <p class="foot" data-t="foot"></p>
-      <p class="credit"><a id="creditLink" target="_blank" rel="noopener" data-t="credit_line"></a></p>
+      <p class="credit">
+        <a id="creditLink" target="_blank" rel="noopener" data-t="credit_line"></a><span class="sep" aria-hidden="true">·</span><a id="creditChat" target="_blank" rel="noopener" class="chat">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 11.6a8.4 8.4 0 0 1-12.3 7.5L3.5 20.5l1.4-5.1A8.4 8.4 0 1 1 21 11.6Z"/>
+          </svg><span class="chat-label" data-t="credit_chat"></span>
+        </a>
+      </p>
       </div><!-- /card-body -->
     </div>
   </div>
@@ -489,7 +503,8 @@ const CREDIT = {
   // ?ref=<the couple's first names> is how the studio counts this wedding's
   // clicks. Keep the query string exactly as it is.
   url: "https://dudaim.netlify.app/?ref=first-second",
-  whatsapp: ""          // a number instead, when there is no site to send them to
+  // the same wedding, named in the opening line of the chat instead
+  whatsapp: "972547699701"
 };
 
 const DEFAULT_LANG = "en";
@@ -523,7 +538,7 @@ const T = {
     thanks_h:"Thank you!", thanks_p:"Your reply has been received. We can't wait to celebrate with you.",
     again:"Send another reply",
     foot:"We can't wait to celebrate with you",
-    credit_line:"Invitation by Dudaim",
+    credit_line:"Invitation by Dudaim", credit_chat:"WhatsApp",
     credit_msg:"Hi Dudaim — I saw an invitation site of yours and I'd like one for our wedding",
     err_name:"Please enter your name.",
     err_attend:"Please let us know if you'll attend.",
@@ -553,7 +568,7 @@ const T = {
     thanks_h:"תודה רבה!", thanks_p:"אישור ההגעה התקבל. מחכים לחגוג איתכם!",
     again:"שליחת אישור נוסף",
     foot:"מחכים לחגוג איתכם",
-    credit_line:"עוצב על ידי דודאים",
+    credit_line:"עוצב על ידי דודאים", credit_chat:"וואטסאפ",
     credit_msg:"היי דודאים — ראיתי אתר הזמנה שלכם ואשמח לאחד לחתונה שלנו",
     err_name:"נא להזין שם.",
     err_attend:"נא לציין אם תגיעו.",
@@ -604,17 +619,22 @@ function paintLang(l){
     el.placeholder = t[el.getAttribute("data-ph")] || "";
   });
   const credit = document.getElementById("creditLink");
-  if (credit){
-    const href = creditHref(t);
-    credit.href = href;
-    credit.closest(".credit").classList.toggle("on", !!href);
+  const chat = document.getElementById("creditChat");
+  if (credit && chat){
+    const chatUrl = chatHref(t);
+    credit.href = CREDIT.url;
+    credit.hidden = !CREDIT.url;
+    chat.href = chatUrl;
+    chat.hidden = !chatUrl;
+    chat.setAttribute("aria-label", t.credit_chat || "WhatsApp");
+    credit.parentElement.querySelector(".sep").hidden = !(CREDIT.url && chatUrl);
+    credit.parentElement.classList.toggle("on", !!(CREDIT.url || chatUrl));
   }
   document.querySelectorAll(".langbar button").forEach(b=>b.classList.toggle("on", b.dataset.lang === l));
   try { localStorage.setItem("rsvp-lang", l); } catch(e){}
 }
 
-function creditHref(t){
-  if (CREDIT.url) return CREDIT.url;
+function chatHref(t){
   if (!CREDIT.whatsapp) return "";
   return "https://wa.me/" + CREDIT.whatsapp + "?text=" + encodeURIComponent(t.credit_msg || "");
 }
