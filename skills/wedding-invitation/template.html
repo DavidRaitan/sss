@@ -150,30 +150,17 @@
 
   .foot{text-align:center;color:var(--sage);font-style:italic;font-size:1rem;margin-top:30px}
 
-  .credit{text-align:center;margin-top:38px}
-  .credit-mark{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:12px}
-  .credit-mark i{display:block;width:46px;height:1px;background:var(--line)}
-  .credit-mark span{
-    display:block;width:5px;height:5px;background:var(--gold);
-    opacity:.75;transform:rotate(45deg);
-  }
+  .credit{text-align:center;margin-top:30px}
   .credit a{
-    display:inline-flex;flex-direction:column;align-items:center;gap:3px;
-    text-decoration:none;transition:.25s;
+    font-family:"EB Garamond",Georgia,serif;font-size:.86rem;letter-spacing:.06em;
+    color:var(--ink-soft);text-decoration:none;
+    padding:2px 4px;border-bottom:1px solid transparent;transition:.2s;
   }
-  .credit .lead{
-    font-size:.64rem;letter-spacing:.2em;text-transform:uppercase;
-    color:var(--ink-soft);opacity:.55;transition:.25s;
+  .credit a:hover{border-bottom-color:var(--line)}
+  .credit a:focus-visible{
+    outline:2px solid var(--sage-deep);outline-offset:3px;border-radius:2px;
   }
-  .credit .brand{
-    font-family:"Cormorant Garamond",serif;font-size:1.22rem;letter-spacing:.14em;
-    color:var(--sage-deep);opacity:.85;
-    padding-bottom:2px;border-bottom:1px solid transparent;transition:.25s;
-  }
-  .credit a:hover .brand{opacity:1;border-bottom-color:var(--gold)}
-  .credit a:hover .lead{opacity:.8}
-  body.rtl .credit .lead{letter-spacing:.06em}
-  body.rtl .credit .brand{font-family:"Frank Ruhl Libre",serif;letter-spacing:.04em}
+  body.rtl .credit a{font-family:"Frank Ruhl Libre",serif;letter-spacing:0}
   .credit:not(.on){display:none}
 
   [hidden]{display:none!important}
@@ -467,13 +454,7 @@
       </div>
 
       <p class="foot" data-t="foot"></p>
-      <div class="credit">
-        <div class="credit-mark" aria-hidden="true"><i></i><span></span><i></i></div>
-        <a id="creditLink" target="_blank" rel="noopener">
-          <span class="lead" data-t="credit_lead"></span>
-          <span class="brand" data-t="credit_brand"></span>
-        </a>
-      </div>
+      <p class="credit"><a id="creditLink" target="_blank" rel="noopener" data-t="credit_line"></a></p>
       </div><!-- /card-body -->
     </div>
   </div>
@@ -505,8 +486,10 @@ const WEDDING = {
    A WhatsApp number opens a chat with the first line already written, in
    the language the guest was reading; url, when set, wins over it. */
 const CREDIT = {
-  whatsapp: "972547699701",
-  url: ""
+  // ?ref=<the couple's first names> is how the studio counts this wedding's
+  // clicks. Keep the query string exactly as it is.
+  url: "https://dudaim.netlify.app/?ref=first-second",
+  whatsapp: ""          // a number instead, when there is no site to send them to
 };
 
 const DEFAULT_LANG = "en";
@@ -540,7 +523,7 @@ const T = {
     thanks_h:"Thank you!", thanks_p:"Your reply has been received. We can't wait to celebrate with you.",
     again:"Send another reply",
     foot:"We can't wait to celebrate with you",
-    credit_lead:"Invitation site by", credit_brand:"Dudaim",
+    credit_line:"Invitation by Dudaim",
     credit_msg:"Hi Dudaim — I saw an invitation site of yours and I'd like one for our wedding",
     err_name:"Please enter your name.",
     err_attend:"Please let us know if you'll attend.",
@@ -570,7 +553,7 @@ const T = {
     thanks_h:"תודה רבה!", thanks_p:"אישור ההגעה התקבל. מחכים לחגוג איתכם!",
     again:"שליחת אישור נוסף",
     foot:"מחכים לחגוג איתכם",
-    credit_lead:"אתר ההזמנה נבנה על ידי", credit_brand:"דודאים",
+    credit_line:"עוצב על ידי דודאים",
     credit_msg:"היי דודאים — ראיתי אתר הזמנה שלכם ואשמח לאחד לחתונה שלנו",
     err_name:"נא להזין שם.",
     err_attend:"נא לציין אם תגיעו.",

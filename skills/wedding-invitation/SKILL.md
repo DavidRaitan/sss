@@ -116,14 +116,23 @@ line the venue.
 
 ## The credit line
 
-A quiet line under the footer: a hairline rule with a gold lozenge, then
-"Invitation site by" in small caps over the studio's name.
+One quiet line at the very foot of the page — "Invitation by Dudaim" /
+"עוצב על ידי דודאים" — in the body face, a size down, in the body's own soft
+ink. No button, no box, no logo: it is a maker's mark on someone else's
+invitation, not a shopfront.
 
-`CREDIT` at the top of the script holds a `whatsapp` number, which opens a
-chat with the first line already written in whichever language the guest
-was reading (`credit_msg` in each block), and a `url`, which wins when set
-— use it once there is a site worth sending people to. Empty both and the
-line disappears, for a couple who would rather not carry it.
+`CREDIT.url` carries the studio's site with **`?ref=<the couple's first
+names>`** on the end — `?ref=sara-natan`, `?ref=dor-maya`. That query string
+is how the studio counts which wedding a visit came from, so it must
+survive every copy; nothing on this page does the counting. `CREDIT`
+also takes a `whatsapp` number as an alternative, used only when `url` is
+empty, which opens a chat with a first line already written in the guest's
+language (`credit_msg`). Empty both and the line disappears.
+
+The link opens in a new tab (`rel="noopener"`), sits last in the tab order
+with a visible focus ring, and its colour clears AA against the card. Do
+not add analytics, a tracking pixel, or any third-party script to an
+invitation site — the counting belongs on the destination.
 
 ## If a language has no artwork
 
