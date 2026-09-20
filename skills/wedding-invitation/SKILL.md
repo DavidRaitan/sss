@@ -116,10 +116,14 @@ line the venue.
 
 ## The credit line
 
-A quiet line under the footer — "Invitation site by Dudaim — make yours" —
-linking to the studio's WhatsApp. It lives in `CREDIT` at the top of the
-script, and its wording is the `credit` key in each language. Set
-`CREDIT.url` to `""` and the line disappears.
+A quiet line under the footer: a hairline rule with a gold lozenge, then
+"Invitation site by" in small caps over the studio's name.
+
+`CREDIT` at the top of the script holds a `whatsapp` number, which opens a
+chat with the first line already written in whichever language the guest
+was reading (`credit_msg` in each block), and a `url`, which wins when set
+— use it once there is a site worth sending people to. Empty both and the
+line disappears, for a couple who would rather not carry it.
 
 ## If a language has no artwork
 

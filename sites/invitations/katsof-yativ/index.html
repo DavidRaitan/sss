@@ -150,13 +150,30 @@
 
   .foot{text-align:center;color:var(--sage);font-style:italic;font-size:1rem;margin-top:30px}
 
-  .credit{text-align:center;margin-top:26px}
-  .credit a{
-    display:inline-block;color:var(--ink-soft);opacity:.72;text-decoration:none;
-    font-size:.78rem;letter-spacing:.11em;text-transform:uppercase;
-    padding-bottom:3px;border-bottom:1px solid var(--line);transition:.25s;
+  .credit{text-align:center;margin-top:38px}
+  .credit-mark{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:12px}
+  .credit-mark i{display:block;width:46px;height:1px;background:var(--line)}
+  .credit-mark span{
+    display:block;width:5px;height:5px;background:var(--gold);
+    opacity:.75;transform:rotate(45deg);
   }
-  .credit a:hover{opacity:1;color:var(--sage-deep);border-bottom-color:var(--sage)}
+  .credit a{
+    display:inline-flex;flex-direction:column;align-items:center;gap:3px;
+    text-decoration:none;transition:.25s;
+  }
+  .credit .lead{
+    font-size:.64rem;letter-spacing:.2em;text-transform:uppercase;
+    color:var(--ink-soft);opacity:.55;transition:.25s;
+  }
+  .credit .brand{
+    font-family:"Cormorant Garamond",serif;font-size:1.22rem;letter-spacing:.14em;
+    color:var(--sage-deep);opacity:.85;
+    padding-bottom:2px;border-bottom:1px solid transparent;transition:.25s;
+  }
+  .credit a:hover .brand{opacity:1;border-bottom-color:var(--gold)}
+  .credit a:hover .lead{opacity:.8}
+  body.rtl .credit .lead{letter-spacing:.06em}
+  body.rtl .credit .brand{font-family:"Frank Ruhl Libre",serif;letter-spacing:.04em}
   .credit:not(.on){display:none}
 
   [hidden]{display:none!important}
@@ -450,7 +467,13 @@
       </div>
 
       <p class="foot" data-t="foot"></p>
-      <p class="credit"><a id="creditLink" target="_blank" rel="noopener" data-t="credit"></a></p>
+      <div class="credit">
+        <div class="credit-mark" aria-hidden="true"><i></i><span></span><i></i></div>
+        <a id="creditLink" target="_blank" rel="noopener">
+          <span class="lead" data-t="credit_lead"></span>
+          <span class="brand" data-t="credit_brand"></span>
+        </a>
+      </div>
       </div><!-- /card-body -->
     </div>
   </div>
@@ -478,9 +501,13 @@ const WEDDING = {
   calDetails: "Kabbalat Panim 18:00, Chuppah 18:45."
 };
 
-/* the quiet line at the foot of the page. Set url to "" to leave it off. */
-const CREDIT = { url: "https://wa.me/972547699701?text=" +
-                      encodeURIComponent("Hi Dudaim — I'd like an invitation site like this one") };
+/* The quiet line at the foot of the page. Leave both empty to drop it.
+   A WhatsApp number opens a chat with the first line already written, in
+   the language the guest was reading; url, when set, wins over it. */
+const CREDIT = {
+  whatsapp: "972547699701",
+  url: ""
+};
 
 const DEFAULT_LANG = "en";
 const AUTO_DETECT  = true;   // open in the visitor's own language when we have it
@@ -513,7 +540,8 @@ const T = {
     thanks_h:"Thank you!", thanks_p:"Your reply has been received. We can't wait to celebrate with you.",
     again:"Send another reply",
     foot:"We can't wait to celebrate with you",
-    credit:"Invitation site by Dudaim — make yours",
+    credit_lead:"Invitation site by", credit_brand:"Dudaim",
+    credit_msg:"Hi Dudaim — I saw an invitation site of yours and I'd like one for our wedding",
     err_name:"Please enter your name.",
     err_attend:"Please let us know if you'll attend.",
     sending:"Sending…", fail:"Something went wrong. Please try again."
@@ -542,7 +570,8 @@ const T = {
     thanks_h:"תודה רבה!", thanks_p:"אישור ההגעה התקבל. מחכים לחגוג איתכם!",
     again:"שליחת אישור נוסף",
     foot:"מחכים לחגוג איתכם",
-    credit:"אתר ההזמנה — דודאים · גם לכם",
+    credit_lead:"אתר ההזמנה נבנה על ידי", credit_brand:"דודאים",
+    credit_msg:"היי דודאים — ראיתי אתר הזמנה שלכם ואשמח לאחד לחתונה שלנו",
     err_name:"נא להזין שם.",
     err_attend:"נא לציין אם תגיעו.",
     sending:"שולח…", fail:"משהו השתבש. נסו שוב בבקשה."
@@ -588,16 +617,21 @@ function paintLang(l){
   document.querySelectorAll("[data-ph]").forEach(el=>{
     el.placeholder = t[el.getAttribute("data-ph")] || "";
   });
+  const credit = document.getElementById("creditLink");
+  if (credit){
+    const href = creditHref(t);
+    credit.href = href;
+    credit.closest(".credit").classList.toggle("on", !!href);
+  }
   document.querySelectorAll(".langbar button").forEach(b=>b.classList.toggle("on", b.dataset.lang === l));
   try { localStorage.setItem("rsvp-lang", l); } catch(e){}
 }
 
-(function setupCredit(){
-  const a = document.getElementById("creditLink");
-  if (!a || !CREDIT.url) return;
-  a.href = CREDIT.url;
-  a.parentElement.classList.add("on");
-})();
+function creditHref(t){
+  if (CREDIT.url) return CREDIT.url;
+  if (!CREDIT.whatsapp) return "";
+  return "https://wa.me/" + CREDIT.whatsapp + "?text=" + encodeURIComponent(t.credit_msg || "");
+}
 
 /* the switcher builds itself from T, and hides when there is only one language */
 (function buildLangbar(){
