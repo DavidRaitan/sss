@@ -508,10 +508,11 @@ const WEDDING = {
    A WhatsApp number opens a chat with the first line already written, in
    the language the guest was reading; url, when set, wins over it. */
 const CREDIT = {
-  // ?ref=<the couple's first names> is how the studio counts this wedding's
-  // clicks. Keep the query string exactly as it is.
-  url: "https://dudaim.netlify.app/?ref=sara-natan",
-  whatsapp: ""          // a number instead, when there is no site to send them to
+  // The mark opens WhatsApp. The chat's first line names the couple, which
+  // is what ?ref= does for the site — an enquiry still says which wedding
+  // it came from. Put the site back in url and it wins over the number.
+  url: "",
+  whatsapp: "972547699701"
 };
 
 const DEFAULT_LANG = "en";
