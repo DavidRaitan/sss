@@ -94,8 +94,18 @@ Hebrew (`["ש", "נ"]`), set right to left with a small gold lozenge between.
 The names under the wreath are the `couple` key in each language, so they
 appear in whichever one the guest is reading.
 
-A couple who has a logo of their own can have it instead: drop an `<img>`
-in place of the `<svg class="wreath">`.
+A couple who has a monogram of their own uses that instead — it replaces
+the wreath and the letters both:
+
+```
+python3 $SKILL/embed-images.py sites/invitations/<slug>/index.html \
+    logo=monogram.png
+```
+
+Cut it out of its background first (a circular monogram on a white square
+shows its corners against the cream). A transparent PNG or WebP keeps its
+transparency through the embedder. `WEDDING.logo` set to `""` goes back to
+the drawn wreath.
 
 ## The calendar entry
 

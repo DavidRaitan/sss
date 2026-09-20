@@ -170,8 +170,12 @@
   #splash.gone{opacity:0;pointer-events:none}
   .monogram{text-align:center;animation:mono-in 1s ease both}
   .monogram .ring{
-    width:230px;height:230px;margin:0 auto;position:relative;
+    width:252px;height:252px;margin:0 auto;position:relative;
     display:flex;align-items:center;justify-content:center;
+  }
+  .monogram .mono-img{
+    position:absolute;inset:0;width:100%;height:100%;object-fit:contain;
+    animation:wreath-in 1.5s ease .1s both;
   }
   .monogram .wreath{
     position:absolute;inset:0;width:100%;height:100%;
@@ -237,6 +241,7 @@
   <div id="splash" aria-hidden="true">
     <div class="monogram">
       <div class="ring">
+        <img class="mono-img" id="monoImg" alt="" hidden>
         <svg class="wreath" viewBox="0 0 220 220" fill="none" aria-hidden="true">
                 <circle cx="110" cy="110" r="101" fill="none" stroke="#c9a077" stroke-width=".7" opacity=".5"/>
                 <path d="M152.0 37.3 L157.1 40.5 L162.0 44.0 L166.6 47.9 L170.9 52.2 L174.9 56.7 L178.6 61.5 L181.9 66.6 L184.8 71.9 L187.4 77.3 L189.5 83.0 L191.3 88.8 L192.6 94.7 L193.5 100.7 L193.9 106.7 L194.0 112.7 L193.5 118.8 L192.7 124.8 L191.4 130.7 L189.7 136.5 L187.6 142.1 L185.1 147.6 L182.2 152.9 L178.9 158.0 L175.3 162.9 L171.3 167.4 L167.0 171.7 L162.4 175.6 L157.6 179.2 L152.5 182.5 L147.2 185.3 L141.6 187.8 L136.0 189.9" stroke="#8a9464" stroke-width="1" fill="none" opacity=".7" stroke-linecap="round"/>
@@ -463,6 +468,7 @@ const ENDPOINT = "";
    2) THE WEDDING
    ============================================================ */
 const WEDDING = {
+  logo: "PASTE_DATA_URI_LOGO",          // the couple's own monogram; "" draws the wreath instead
   monogram: ["א", "ב"],                 // the two letters inside the wreath
   icsName: "first-second-wedding",   // the .ics filename
   start: "20260101T180000",             // first event of the evening, Asia/Jerusalem
@@ -647,8 +653,17 @@ function chooseLang(){
 /* the opening monogram: hold ~1.5s, then fade into the invitation */
 (function splash(){
   const SHOW_MS = 1500;
-  document.getElementById("monoA").textContent = WEDDING.monogram[0];
-  document.getElementById("monoB").textContent = WEDDING.monogram[1];
+  /* a monogram of their own replaces the drawn wreath and its letters */
+  if (WEDDING.logo && WEDDING.logo.indexOf("PASTE_") !== 0){
+    const img = document.getElementById("monoImg");
+    img.src = WEDDING.logo;
+    img.hidden = false;
+    document.querySelector(".monogram .wreath").remove();
+    document.querySelector(".monogram .letters").remove();
+  } else {
+    document.getElementById("monoA").textContent = WEDDING.monogram[0];
+    document.getElementById("monoB").textContent = WEDDING.monogram[1];
+  }
   window.addEventListener("load", function(){
     setTimeout(function(){
       const s = document.getElementById("splash");

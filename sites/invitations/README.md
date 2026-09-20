@@ -10,4 +10,4 @@ See `skills/wedding-invitation/SKILL.md` for how to make a new one.
 
 | Couple | Date | Venue | Languages | Replies to |
 |---|---|---|---|---|
-| [Sara Nava & Natan Yehuda](katsof-yativ/) | Thursday 29 October 2026 | Psagot Winery | English, Hebrew | its own Apps Script sheet |
+| [Sara Nava & Natan Yehuda](katsof-yativ/) | Thursday 29 October 2026 | Psagot Winery | English, Hebrew | its own Apps Script sheet, tested |

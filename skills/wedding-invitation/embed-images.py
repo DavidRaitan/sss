@@ -2,10 +2,13 @@
 """Write the invitation pictures into the page as data URIs.
 
     python3 embed-images.py index.html en=invite-en.jpg he=invite-he.jpg
+    python3 embed-images.py index.html logo=monogram.png
 
-Each image replaces the PASTE_DATA_URI_<CODE> placeholder for that language,
-or the data URI already sitting there, so the same command also swaps a
-picture out later. The file is edited in place.
+Each image replaces the PASTE_DATA_URI_<CODE> placeholder of that name — a
+language code for an invitation, or "logo" for the couple's monogram — or
+the data URI already sitting there, so the same command also swaps a
+picture out later. The file is edited in place. A picture with a
+transparent background keeps it.
 """
 import base64
 import io
@@ -27,8 +30,11 @@ def encode(path):
     im = Image.open(io.BytesIO(raw))
     if im.width > MAX_WIDTH:
         im = im.resize((MAX_WIDTH, round(im.height * MAX_WIDTH / im.width)), Image.LANCZOS)
-    if kind == "image/png" and im.mode in ("RGBA", "LA", "P"):
-        buf = io.BytesIO(); im.save(buf, "PNG", optimize=True)
+    has_alpha = im.mode in ("RGBA", "LA") or (im.mode == "P" and "transparency" in im.info)
+    if has_alpha:
+        # a monogram cut out of its background stays cut out
+        kind = "image/webp"
+        buf = io.BytesIO(); im.convert("RGBA").save(buf, "WEBP", quality=90, method=6)
     else:
         kind = "image/jpeg"
         buf = io.BytesIO(); im.convert("RGB").save(buf, "JPEG", quality=JPEG_QUALITY,
