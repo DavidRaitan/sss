@@ -17,7 +17,8 @@ with a Waze link, and the RSVP form.
 The form asks for a name, yes or no, and — only once they say yes — how
 many are coming and whether anything about the food matters. The dietary
 dropdown opens on "No restrictions", so a guest with nothing to say can
-ignore it and send. No phone number: the couple knows who they invited.
+ignore it and send; choosing "Something else" opens a line to write in. No
+phone number: the couple knows who they invited.
 
 ## Building one
 
@@ -65,7 +66,8 @@ digits read the same in every language.
 
 ## Where the replies go
 
-One row per reply: Received, Name, Attending, Guests, Dietary, Language.
+One row per reply: Received, Name, Attending, Guests, Dietary, Details,
+Language. "Details" is what a guest typed under "Something else".
 
 `$SKILL/apps-script/Code.gs` is the spreadsheet side: a Google Sheet per couple,
 Apps Script behind it, deployed as a web app. The file's own header has the
@@ -82,6 +84,14 @@ The form posts `mode:"no-cors"`, which Apps Script needs; the browser
 cannot read the response, so a reply that fails to save still shows the
 thank-you. Test with a real submission and look at the sheet before
 sending the link out.
+
+## The opening monogram
+
+An olive wreath drawn in SVG — no logo file to commission — with the two
+initials inside it and the couple's names underneath. `WEDDING.monogram`
+holds the initials and `WEDDING.monogramSub` the names. A couple who has a
+logo of their own can have it instead: drop an `<img>` in place of the
+`<svg class="wreath">`.
 
 ## The credit line
 

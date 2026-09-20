@@ -6,7 +6,7 @@
 <title>COUPLE — RSVP</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=Frank+Ruhl+Libre:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Great+Vibes&family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=Frank+Ruhl+Libre:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   /* Taken from the invitation itself: its paper, its ink, the olive of the
      leaves and the peach of the chuppah drape. */
@@ -126,7 +126,7 @@
 
   .reveal{transition:.3s;overflow:hidden}
   .reveal.hide{max-height:0;opacity:0;margin:0}
-  .reveal.show{max-height:340px;opacity:1}
+  .reveal.show{max-height:420px;opacity:1}
 
   .submit{
     width:100%;font-family:"Cormorant Garamond",serif;font-size:1.3rem;letter-spacing:.03em;
@@ -170,16 +170,24 @@
   #splash.gone{opacity:0;pointer-events:none}
   .monogram{text-align:center;animation:mono-in 1s ease both}
   .monogram .ring{
-    width:190px;height:190px;border-radius:50%;border:1px solid var(--gold);
-    display:flex;align-items:center;justify-content:center;margin:0 auto;position:relative;
+    width:230px;height:230px;margin:0 auto;position:relative;
+    display:flex;align-items:center;justify-content:center;
   }
-  .monogram .ring::before{content:"";position:absolute;inset:8px;border-radius:50%;border:1px solid rgba(124,138,99,.4)}
+  .monogram .wreath{
+    position:absolute;inset:0;width:100%;height:100%;
+    animation:wreath-in 1.5s ease .1s both;
+  }
   .monogram .letters{
-    font-family:"Cormorant Garamond",serif;color:var(--sage-deep);
-    font-size:3.1rem;font-weight:500;letter-spacing:.02em;line-height:1;
-    display:flex;align-items:center;gap:8px;direction:ltr;
+    position:relative;
+    font-family:"Great Vibes","Cormorant Garamond",cursive;color:var(--sage-deep);
+    font-size:3.4rem;font-weight:400;line-height:1;
+    display:flex;align-items:baseline;gap:6px;direction:ltr;
   }
-  .monogram .letters .amp{font-style:italic;color:var(--gold);font-size:2rem}
+  .monogram .letters .amp{
+    font-family:"Cormorant Garamond",serif;font-style:italic;color:var(--gold);
+    font-size:1.7rem;transform:translateY(-.35em);
+  }
+  @keyframes wreath-in{from{opacity:0;transform:rotate(-6deg) scale(.94)}to{opacity:1;transform:none}}
   .monogram .sub{
     margin-top:18px;font-family:"Cormorant Garamond",serif;font-style:italic;
     color:var(--sage);font-size:1.15rem;letter-spacing:.08em;
@@ -229,6 +237,43 @@
   <div id="splash" aria-hidden="true">
     <div class="monogram">
       <div class="ring">
+        <svg class="wreath" viewBox="0 0 220 220" fill="none" aria-hidden="true">
+                <circle cx="110" cy="110" r="101" fill="none" stroke="#c9a077" stroke-width=".7" opacity=".5"/>
+                <path d="M152.0 37.3 L157.1 40.5 L162.0 44.0 L166.6 47.9 L170.9 52.2 L174.9 56.7 L178.6 61.5 L181.9 66.6 L184.8 71.9 L187.4 77.3 L189.5 83.0 L191.3 88.8 L192.6 94.7 L193.5 100.7 L193.9 106.7 L194.0 112.7 L193.5 118.8 L192.7 124.8 L191.4 130.7 L189.7 136.5 L187.6 142.1 L185.1 147.6 L182.2 152.9 L178.9 158.0 L175.3 162.9 L171.3 167.4 L167.0 171.7 L162.4 175.6 L157.6 179.2 L152.5 182.5 L147.2 185.3 L141.6 187.8 L136.0 189.9" stroke="#8a9464" stroke-width="1" fill="none" opacity=".7" stroke-linecap="round"/>
+                <path d="M0 0 C4.2 -3.4 10.5 -3.6 15 0 C10.5 3.6 4.2 3.4 0 0Z" fill="#8d9a66" opacity="0.95" transform="translate(160.0 40.6) rotate(149.8) scale(0.69 0.69)"/>
+                <path d="M0 0 C4.2 -3.4 10.5 -3.6 15 0 C10.5 3.6 4.2 3.4 0 0Z" fill="#6d7a52" opacity="0.88" transform="translate(158.2 43.1) rotate(101.8) scale(0.64 -0.64)"/>
+                <path d="M0 0 C4.2 -3.4 10.5 -3.6 15 0 C10.5 3.6 4.2 3.4 0 0Z" fill="#8d9a66" opacity="0.95" transform="translate(177.6 57.7) rotate(166.3) scale(0.83 0.83)"/>
+                <path d="M0 0 C4.2 -3.4 10.5 -3.6 15 0 C10.5 3.6 4.2 3.4 0 0Z" fill="#6d7a52" opacity="0.88" transform="translate(175.3 59.5) rotate(118.3) scale(0.76 -0.76)"/>
+                <path d="M0 0 C4.2 -3.4 10.5 -3.6 15 0 C10.5 3.6 4.2 3.4 0 0Z" fill="#8d9a66" opacity="0.95" transform="translate(189.7 79.0) rotate(182.8) scale(0.94 0.94)"/>
+                <path d="M0 0 C4.2 -3.4 10.5 -3.6 15 0 C10.5 3.6 4.2 3.4 0 0Z" fill="#6d7a52" opacity="0.88" transform="translate(186.9 80.1) rotate(134.8) scale(0.86 -0.86)"/>
+                <path d="M0 0 C4.2 -3.4 10.5 -3.6 15 0 C10.5 3.6 4.2 3.4 0 0Z" fill="#8d9a66" opacity="0.95" transform="translate(195.2 103.0) rotate(199.3) scale(0.99 0.99)"/>
+                <path d="M0 0 C4.2 -3.4 10.5 -3.6 15 0 C10.5 3.6 4.2 3.4 0 0Z" fill="#6d7a52" opacity="0.88" transform="translate(192.2 103.2) rotate(151.3) scale(0.91 -0.91)"/>
+                <path d="M0 0 C4.2 -3.4 10.5 -3.6 15 0 C10.5 3.6 4.2 3.4 0 0Z" fill="#8d9a66" opacity="0.95" transform="translate(193.7 127.4) rotate(215.8) scale(0.99 0.99)"/>
+                <path d="M0 0 C4.2 -3.4 10.5 -3.6 15 0 C10.5 3.6 4.2 3.4 0 0Z" fill="#6d7a52" opacity="0.88" transform="translate(190.8 126.8) rotate(167.8) scale(0.91 -0.91)"/>
+                <path d="M0 0 C4.2 -3.4 10.5 -3.6 15 0 C10.5 3.6 4.2 3.4 0 0Z" fill="#8d9a66" opacity="0.95" transform="translate(185.3 150.5) rotate(232.3) scale(0.94 0.94)"/>
+                <path d="M0 0 C4.2 -3.4 10.5 -3.6 15 0 C10.5 3.6 4.2 3.4 0 0Z" fill="#6d7a52" opacity="0.88" transform="translate(182.7 149.1) rotate(184.3) scale(0.86 -0.86)"/>
+                <path d="M0 0 C4.2 -3.4 10.5 -3.6 15 0 C10.5 3.6 4.2 3.4 0 0Z" fill="#8d9a66" opacity="0.95" transform="translate(170.7 170.2) rotate(248.8) scale(0.83 0.83)"/>
+                <path d="M0 0 C4.2 -3.4 10.5 -3.6 15 0 C10.5 3.6 4.2 3.4 0 0Z" fill="#6d7a52" opacity="0.88" transform="translate(168.6 168.1) rotate(200.8) scale(0.76 -0.76)"/>
+                <path d="M0 0 C4.2 -3.4 10.5 -3.6 15 0 C10.5 3.6 4.2 3.4 0 0Z" fill="#8d9a66" opacity="0.95" transform="translate(151.1 185.0) rotate(265.3) scale(0.69 0.69)"/>
+                <path d="M0 0 C4.2 -3.4 10.5 -3.6 15 0 C10.5 3.6 4.2 3.4 0 0Z" fill="#6d7a52" opacity="0.88" transform="translate(149.7 182.3) rotate(217.3) scale(0.64 -0.64)"/>
+                <path d="M68.0 37.3 L62.9 40.5 L58.0 44.0 L53.4 47.9 L49.1 52.2 L45.1 56.7 L41.4 61.5 L38.1 66.6 L35.2 71.9 L32.6 77.3 L30.5 83.0 L28.7 88.8 L27.4 94.7 L26.5 100.7 L26.1 106.7 L26.0 112.7 L26.5 118.8 L27.3 124.8 L28.6 130.7 L30.3 136.5 L32.4 142.1 L34.9 147.6 L37.8 152.9 L41.1 158.0 L44.7 162.9 L48.7 167.4 L53.0 171.7 L57.6 175.6 L62.4 179.2 L67.5 182.5 L72.8 185.3 L78.4 187.8 L84.0 189.9" stroke="#8a9464" stroke-width="1" fill="none" opacity=".7" stroke-linecap="round"/>
+                <path d="M0 0 C4.2 -3.4 10.5 -3.6 15 0 C10.5 3.6 4.2 3.4 0 0Z" fill="#8d9a66" opacity="0.95" transform="translate(60.0 40.6) rotate(78.2) scale(0.69 0.69)"/>
+                <path d="M0 0 C4.2 -3.4 10.5 -3.6 15 0 C10.5 3.6 4.2 3.4 0 0Z" fill="#6d7a52" opacity="0.88" transform="translate(61.8 43.1) rotate(30.2) scale(0.64 -0.64)"/>
+                <path d="M0 0 C4.2 -3.4 10.5 -3.6 15 0 C10.5 3.6 4.2 3.4 0 0Z" fill="#8d9a66" opacity="0.95" transform="translate(42.4 57.7) rotate(61.7) scale(0.83 0.83)"/>
+                <path d="M0 0 C4.2 -3.4 10.5 -3.6 15 0 C10.5 3.6 4.2 3.4 0 0Z" fill="#6d7a52" opacity="0.88" transform="translate(44.7 59.5) rotate(13.7) scale(0.76 -0.76)"/>
+                <path d="M0 0 C4.2 -3.4 10.5 -3.6 15 0 C10.5 3.6 4.2 3.4 0 0Z" fill="#8d9a66" opacity="0.95" transform="translate(30.3 79.0) rotate(45.2) scale(0.94 0.94)"/>
+                <path d="M0 0 C4.2 -3.4 10.5 -3.6 15 0 C10.5 3.6 4.2 3.4 0 0Z" fill="#6d7a52" opacity="0.88" transform="translate(33.1 80.1) rotate(-2.8) scale(0.86 -0.86)"/>
+                <path d="M0 0 C4.2 -3.4 10.5 -3.6 15 0 C10.5 3.6 4.2 3.4 0 0Z" fill="#8d9a66" opacity="0.95" transform="translate(24.8 103.0) rotate(28.7) scale(0.99 0.99)"/>
+                <path d="M0 0 C4.2 -3.4 10.5 -3.6 15 0 C10.5 3.6 4.2 3.4 0 0Z" fill="#6d7a52" opacity="0.88" transform="translate(27.8 103.2) rotate(-19.3) scale(0.91 -0.91)"/>
+                <path d="M0 0 C4.2 -3.4 10.5 -3.6 15 0 C10.5 3.6 4.2 3.4 0 0Z" fill="#8d9a66" opacity="0.95" transform="translate(26.3 127.4) rotate(12.2) scale(0.99 0.99)"/>
+                <path d="M0 0 C4.2 -3.4 10.5 -3.6 15 0 C10.5 3.6 4.2 3.4 0 0Z" fill="#6d7a52" opacity="0.88" transform="translate(29.2 126.8) rotate(-35.8) scale(0.91 -0.91)"/>
+                <path d="M0 0 C4.2 -3.4 10.5 -3.6 15 0 C10.5 3.6 4.2 3.4 0 0Z" fill="#8d9a66" opacity="0.95" transform="translate(34.7 150.5) rotate(-4.3) scale(0.94 0.94)"/>
+                <path d="M0 0 C4.2 -3.4 10.5 -3.6 15 0 C10.5 3.6 4.2 3.4 0 0Z" fill="#6d7a52" opacity="0.88" transform="translate(37.3 149.1) rotate(-52.3) scale(0.86 -0.86)"/>
+                <path d="M0 0 C4.2 -3.4 10.5 -3.6 15 0 C10.5 3.6 4.2 3.4 0 0Z" fill="#8d9a66" opacity="0.95" transform="translate(49.3 170.2) rotate(-20.8) scale(0.83 0.83)"/>
+                <path d="M0 0 C4.2 -3.4 10.5 -3.6 15 0 C10.5 3.6 4.2 3.4 0 0Z" fill="#6d7a52" opacity="0.88" transform="translate(51.4 168.1) rotate(-68.8) scale(0.76 -0.76)"/>
+                <path d="M0 0 C4.2 -3.4 10.5 -3.6 15 0 C10.5 3.6 4.2 3.4 0 0Z" fill="#8d9a66" opacity="0.95" transform="translate(68.9 185.0) rotate(-37.3) scale(0.69 0.69)"/>
+                <path d="M0 0 C4.2 -3.4 10.5 -3.6 15 0 C10.5 3.6 4.2 3.4 0 0Z" fill="#6d7a52" opacity="0.88" transform="translate(70.3 182.3) rotate(-85.3) scale(0.64 -0.64)"/>
+              </svg>
         <div class="letters"><span id="monoA">S</span><span class="amp">&amp;</span><span id="monoB">N</span></div>
       </div>
       <div class="sub" id="monoSub">Sara Nava &amp; Natan Yehuda</div>
@@ -382,6 +427,10 @@
             <option value="other" data-t="diet_other"></option>
           </select>
         </div>
+
+        <div class="field reveal hide" id="dietNoteWrap">
+          <input type="text" id="dietNote" maxlength="140" data-ph="diet_note_ph">
+        </div>
         </div>
 
         <button class="submit" id="submitBtn" data-t="submit"></button>
@@ -452,7 +501,8 @@ const T = {
     guests_l:"How many guests (including you)?",
     diet_l:"Anything we should know about food? (optional)",
     diet_none:"No restrictions", diet_vegetarian:"Vegetarian", diet_vegan:"Vegan",
-    diet_gf:"Gluten free", diet_other:"Something else — we'll be in touch",
+    diet_gf:"Gluten free", diet_other:"Something else",
+    diet_note_ph:"Tell us what to avoid",
     submit:"Send RSVP",
     thanks_h:"Thank you!", thanks_p:"Your reply has been received. We can't wait to celebrate with you.",
     again:"Send another reply",
@@ -479,7 +529,8 @@ const T = {
     guests_l:"כמה אורחים (כולל אתכם)?",
     diet_l:"משהו שכדאי לדעת לגבי האוכל? (לא חובה)",
     diet_none:"ללא הגבלות", diet_vegetarian:"צמחוני", diet_vegan:"טבעוני",
-    diet_gf:"ללא גלוטן", diet_other:"משהו אחר — ניצור קשר",
+    diet_gf:"ללא גלוטן", diet_other:"משהו אחר",
+    diet_note_ph:"ספרו לנו ממה להימנע",
     submit:"שליחת אישור",
     thanks_h:"תודה רבה!", thanks_p:"אישור ההגעה התקבל. מחכים לחגוג איתכם!",
     again:"שליחת אישור נוסף",
@@ -613,8 +664,24 @@ document.querySelectorAll("#attend label").forEach(l=>{
     document.querySelectorAll("#attend label").forEach(x=>x.classList.toggle("on", x === l));
     const w = document.getElementById("comingWrap");
     if (attend === "yes"){ w.classList.remove("hide"); w.classList.add("show"); }
-    else { w.classList.remove("show"); w.classList.add("hide"); }
+    else {
+      w.classList.remove("show"); w.classList.add("hide");
+      const dn = document.getElementById("dietNoteWrap");
+      dn.classList.remove("show"); dn.classList.add("hide");
+      document.getElementById("diet").value = "none";
+      document.getElementById("dietNote").value = "";
+    }
   });
+});
+
+/* "something else" opens a line to write in */
+document.getElementById("diet").addEventListener("change", function(){
+  const w = document.getElementById("dietNoteWrap");
+  const wanted = this.value === "other";
+  w.classList.toggle("show", wanted);
+  w.classList.toggle("hide", !wanted);
+  if (wanted) document.getElementById("dietNote").focus();
+  else document.getElementById("dietNote").value = "";
 });
 
 const msg = document.getElementById("msg");
@@ -632,6 +699,7 @@ btn.addEventListener("click", async ()=>{
     attending: attend === "yes" ? "Yes" : "No",
     guests: attend === "yes" ? document.getElementById("guests").value : "0",
     diet: attend === "yes" ? document.getElementById("diet").value : "",
+    dietNote: attend === "yes" ? document.getElementById("dietNote").value.trim() : "",
     language: lang,
     timestamp: new Date().toISOString()
   };
@@ -675,6 +743,8 @@ document.getElementById("againBtn").addEventListener("click", ()=>{
   const w = document.getElementById("comingWrap"); w.classList.remove("show"); w.classList.add("hide");
   document.getElementById("guests").value = "1";
   document.getElementById("diet").value = "none";
+  document.getElementById("dietNote").value = "";
+  const dn = document.getElementById("dietNoteWrap"); dn.classList.remove("show"); dn.classList.add("hide");
   document.querySelectorAll('input[name="attend"]').forEach(i=>i.checked = false);
 });
 

@@ -15,7 +15,7 @@
  */
 
 var SHEET_NAME = 'RSVPs';
-var HEADERS = ['Received', 'Name', 'Attending', 'Guests', 'Dietary', 'Language'];
+var HEADERS = ['Received', 'Name', 'Attending', 'Guests', 'Dietary', 'Details', 'Language'];
 
 function doPost(e) {
   var lock = LockService.getScriptLock();       // two guests can reply at once
@@ -29,6 +29,7 @@ function doPost(e) {
       data.attending || '',
       data.guests || '',
       data.diet || '',
+      data.dietNote || '',
       data.language || ''
     ]);
     return json_({ ok: true });
