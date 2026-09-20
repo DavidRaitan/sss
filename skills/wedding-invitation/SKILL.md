@@ -87,11 +87,22 @@ sending the link out.
 
 ## The opening monogram
 
-An olive wreath drawn in SVG — no logo file to commission — with the two
-initials inside it and the couple's names underneath. `WEDDING.monogram`
-holds the initials and `WEDDING.monogramSub` the names. A couple who has a
-logo of their own can have it instead: drop an `<img>` in place of the
-`<svg class="wreath">`.
+An olive wreath drawn in SVG — no logo file to commission — with the
+couple's two initials inside it and their names underneath.
+`WEDDING.monogram` holds the two letters; for an Israeli couple they are
+Hebrew (`["ש", "נ"]`), set right to left with a small gold lozenge between.
+The names under the wreath are the `couple` key in each language, so they
+appear in whichever one the guest is reading.
+
+A couple who has a logo of their own can have it instead: drop an `<img>`
+in place of the `<svg class="wreath">`.
+
+## The calendar entry
+
+`WEDDING.calTitle` is what lands in a guest's calendar — first names and
+the word Wedding, the way a guest would write it themselves, not the formal
+names from the invitation. The details line carries the times, the location
+line the venue.
 
 ## The credit line
 

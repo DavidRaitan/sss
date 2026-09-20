@@ -6,7 +6,7 @@
 <title>Sara Nava &amp; Natan Yehuda — RSVP</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Great+Vibes&family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=Frank+Ruhl+Libre:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Great+Vibes&family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=David+Libre:wght@400;500&family=Frank+Ruhl+Libre:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
   /* Taken from the invitation itself: its paper, its ink, the olive of the
      leaves and the peach of the chuppah drape. */
@@ -178,14 +178,14 @@
     animation:wreath-in 1.5s ease .1s both;
   }
   .monogram .letters{
-    position:relative;
-    font-family:"Great Vibes","Cormorant Garamond",cursive;color:var(--sage-deep);
-    font-size:3.4rem;font-weight:400;line-height:1;
-    display:flex;align-items:baseline;gap:6px;direction:ltr;
+    position:relative;direction:rtl;
+    font-family:"David Libre","Frank Ruhl Libre",serif;color:var(--sage-deep);
+    font-size:3.6rem;font-weight:400;line-height:1;
+    display:flex;align-items:center;gap:.34em;
   }
-  .monogram .letters .amp{
-    font-family:"Cormorant Garamond",serif;font-style:italic;color:var(--gold);
-    font-size:1.7rem;transform:translateY(-.35em);
+  .monogram .letters .gem{
+    width:8px;height:8px;background:var(--gold);opacity:.85;
+    transform:rotate(45deg);flex:none;
   }
   @keyframes wreath-in{from{opacity:0;transform:rotate(-6deg) scale(.94)}to{opacity:1;transform:none}}
   .monogram .sub{
@@ -274,9 +274,9 @@
                 <path d="M0 0 C4.2 -3.4 10.5 -3.6 15 0 C10.5 3.6 4.2 3.4 0 0Z" fill="#8d9a66" opacity="0.95" transform="translate(68.9 185.0) rotate(-37.3) scale(0.69 0.69)"/>
                 <path d="M0 0 C4.2 -3.4 10.5 -3.6 15 0 C10.5 3.6 4.2 3.4 0 0Z" fill="#6d7a52" opacity="0.88" transform="translate(70.3 182.3) rotate(-85.3) scale(0.64 -0.64)"/>
               </svg>
-        <div class="letters"><span id="monoA">S</span><span class="amp">&amp;</span><span id="monoB">N</span></div>
+        <div class="letters"><span id="monoA"></span><span class="gem" aria-hidden="true"></span><span id="monoB"></span></div>
       </div>
-      <div class="sub" id="monoSub">Sara Nava &amp; Natan Yehuda</div>
+      <div class="sub" id="monoSub" data-t="couple"></div>
     </div>
   </div>
 
@@ -358,7 +358,7 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>
           <span data-t="cal_google"></span>
         </a>
-        <a class="calendar-btn" id="appleCalendar" download="sara-nava-natan-yehuda-wedding.ics">
+        <a class="calendar-btn" id="appleCalendar" download="sara-natan-wedding.ics">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>
           <span data-t="cal_apple"></span>
         </a>
@@ -463,14 +463,13 @@ const ENDPOINT = "https://script.google.com/macros/s/AKfycbzn-WAQLb9sfMfsgmsa2on
    2) THE WEDDING
    ============================================================ */
 const WEDDING = {
-  monogram: ["S", "N"],                 // the two initials on the opening ring
-  monogramSub: "Sara Nava & Natan Yehuda",
-  icsName: "sara-nava-natan-yehuda-wedding",
+  monogram: ["ש", "נ"],                 // the two letters inside the wreath
+  icsName: "sara-natan-wedding",
   start: "20261029T180000",             // Kabbalat Panim, Asia/Jerusalem
   end:   "20261029T235900",
-  calTitle: "Sara Nava & Natan Yehuda — Wedding",
+  calTitle: "Sara & Natan Wedding",
   calLocation: "Psagot Winery, Psagot, Israel",
-  calDetails: "Wedding of Sara Nava & Natan Yehuda. Kabbalat Panim 18:00, Chuppah 18:45."
+  calDetails: "Kabbalat Panim 18:00, Chuppah 18:45."
 };
 
 /* the quiet line at the foot of the page. Set url to "" to leave it off. */
@@ -491,6 +490,7 @@ const T = {
     hebdate:"18 Cheshvan 5787",
     venue:"Psagot Winery",
     kabbalat_l:"Kabbalat Panim", chuppah_l:"Chuppah",
+    couple:"Sara Nava & Natan Yehuda",
     seam:"With love, we ask you to reply",
     map_h:"Getting there", map_sub:"Psagot Winery, Psagot",
     directions:"Open directions in Waze",
@@ -519,6 +519,7 @@ const T = {
     hebdate:"י״ח בְּחֶשְׁוָן תשפ״ז",
     venue:"יקב פסגות",
     kabbalat_l:"קבלת פנים", chuppah_l:"חופה",
+    couple:"שרה נאוה ונתן יהודה",
     seam:"נשמח לאישור הגעתכם",
     map_h:"איך מגיעים", map_sub:"יקב פסגות, פסגות",
     directions:"פתחו ניווט ב-Waze",
@@ -645,7 +646,6 @@ function chooseLang(){
   const SHOW_MS = 1500;
   document.getElementById("monoA").textContent = WEDDING.monogram[0];
   document.getElementById("monoB").textContent = WEDDING.monogram[1];
-  document.getElementById("monoSub").textContent = WEDDING.monogramSub;
   window.addEventListener("load", function(){
     setTimeout(function(){
       const s = document.getElementById("splash");
