@@ -1,0 +1,505 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sefaria to Text</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700&family=Assistant:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root {
+  --paper: #f5f7f6;
+  --surface: #ffffff;
+  --ink: #15212a;
+  --muted: #5a6770;
+  --faint: #8a969d;
+  --rule: #d7dedb;
+  --accent: #0e5a53;
+  --accent-ink: #ffffff;
+  --accent-soft: #e0eeeb;
+  --done: #2f7a4b;
+  --warn: #9a5b12;
+  --warn-soft: #f7ecdc;
+  --error: #a3322b;
+  --error-soft: #f8e4e2;
+  --display: "Frank Ruhl Libre", "Times New Roman", serif;
+  --body: "Assistant", -apple-system, "Segoe UI", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0f1517;
+    --surface: #161e21;
+    --ink: #e4ebe9;
+    --muted: #9aa8a5;
+    --faint: #6d7b78;
+    --rule: #28343a;
+    --accent: #5db5a9;
+    --accent-ink: #08201d;
+    --accent-soft: #173330;
+    --done: #6cc28d;
+    --warn: #e0a55c;
+    --warn-soft: #33281a;
+    --error: #ef8b83;
+    --error-soft: #3a1f1d;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0f1517;
+  --surface: #161e21;
+  --ink: #e4ebe9;
+  --muted: #9aa8a5;
+  --faint: #6d7b78;
+  --rule: #28343a;
+  --accent: #5db5a9;
+  --accent-ink: #08201d;
+  --accent-soft: #173330;
+  --done: #6cc28d;
+  --warn: #e0a55c;
+  --warn-soft: #33281a;
+  --error: #ef8b83;
+  --error-soft: #3a1f1d;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; }
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font: 400 16px/1.5 var(--body);
+  padding: 0 20px;
+}
+.wrap { max-width: 1080px; margin: 0 auto; padding-block: 40px 64px; display: grid; gap: 28px; }
+
+header { display: grid; gap: 6px; }
+.eyebrow { font: 600 12px/1 var(--body); letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+h1 { font: 700 clamp(30px, 5vw, 42px)/1.1 var(--display); margin: 0; text-wrap: balance; }
+.lede { color: var(--muted); margin: 0; max-width: 60ch; }
+
+/* The link box */
+.find { display: flex; gap: 10px; flex-wrap: wrap; }
+.find input {
+  flex: 1 1 320px; min-width: 0;
+  font: 400 15px/1.4 var(--mono); color: var(--ink);
+  background: var(--surface); border: 1px solid var(--rule); border-radius: 8px;
+  padding: 14px 16px;
+}
+.find input::placeholder { color: var(--faint); }
+
+button { font: 600 15px/1 var(--body); cursor: pointer; border-radius: 8px; }
+button:disabled { cursor: not-allowed; opacity: .55; }
+.btn-primary { background: var(--accent); color: var(--accent-ink); border: 1px solid var(--accent); padding: 14px 22px; }
+.btn-primary:hover:not(:disabled) { filter: brightness(1.08); }
+.btn-quiet { background: transparent; color: var(--ink); border: 1px solid var(--rule); padding: 13px 18px; }
+.btn-quiet:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.btn-small { padding: 7px 11px; font-size: 13px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.grid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 28px; align-items: start; }
+@media (max-width: 820px) { .grid { grid-template-columns: 1fr; } }
+
+/* The book */
+.book { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; overflow: hidden; }
+.book-head { padding: 24px 24px 18px; display: grid; gap: 6px; border-bottom: 1px solid var(--rule); }
+.book-he { font: 700 26px/1.25 var(--display); margin: 0; text-wrap: balance; }
+.book-en { font: 500 17px/1.35 var(--display); color: var(--muted); margin: 0; text-wrap: balance; }
+.crumbs { font-size: 13px; color: var(--faint); }
+.meter { height: 4px; background: var(--rule); }
+.meter span { display: block; height: 100%; width: 0; background: var(--accent); transition: width .3s ease; }
+.status { padding: 12px 24px; font-size: 14px; color: var(--muted); display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; border-bottom: 1px solid var(--rule); font-variant-numeric: tabular-nums; }
+
+.toc { list-style: none; margin: 0; padding: 8px 0 12px; max-height: 560px; overflow-y: auto; }
+.toc li { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 10px; padding: 7px 24px; align-items: start; }
+.toc .part { padding-top: 16px; }
+.toc .part .label { font: 600 12px/1.3 var(--body); letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
+.toc .nested { padding-inline-start: 40px; }
+.label { display: grid; gap: 1px; }
+.label .en { font-size: 15px; }
+.label .he { font: 500 14px/1.35 var(--display); color: var(--muted); direction: rtl; text-align: left; unicode-bidi: plaintext; }
+.mark { width: 18px; height: 18px; margin-top: 2px; border-radius: 50%; border: 1.5px solid var(--rule); display: grid; place-items: center; font-size: 11px; line-height: 1; }
+li[data-state="done"] .mark { background: var(--done); border-color: var(--done); color: var(--surface); }
+li[data-state="skipped"] .mark { border-color: var(--warn); color: var(--warn); }
+li[data-state="active"] .mark { border-color: var(--accent); border-top-color: transparent; animation: spin .8s linear infinite; }
+li[data-state="pending"] .en, li[data-state="pending"] .he { opacity: .8; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { li[data-state="active"] .mark { animation: none; border-top-color: var(--accent); } .meter span { transition: none; } }
+
+.empty { padding: 32px 24px; color: var(--muted); }
+.example { opacity: .9; }
+.example-tag { display: inline-block; font: 600 11px/1 var(--body); letter-spacing: .08em; text-transform: uppercase; color: var(--warn); background: var(--warn-soft); padding: 4px 7px; border-radius: 4px; justify-self: start; }
+
+/* Options */
+.options { display: grid; gap: 22px; }
+fieldset { border: 0; margin: 0; padding: 0; display: grid; gap: 10px; min-width: 0; }
+legend { font: 600 12px/1 var(--body); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); padding: 0; margin-bottom: 10px; }
+.hint { font-size: 13px; color: var(--faint); margin: 0; }
+
+.formats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.chip { position: relative; }
+.chip input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.chip span { display: grid; gap: 2px; padding: 12px; border: 1px solid var(--rule); border-radius: 8px; background: var(--surface); height: 100%; }
+.chip b { font: 500 15px/1 var(--mono); }
+.chip small { color: var(--muted); font-size: 12.5px; line-height: 1.3; }
+.chip input:checked + span { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
+.chip input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.seg { display: flex; flex-wrap: wrap; border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; background: var(--surface); }
+.seg label { flex: 1 1 0; position: relative; min-width: 90px; }
+.seg input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.seg span { display: block; text-align: center; padding: 10px 8px; font-size: 14px; }
+.seg label + label span { border-inline-start: 1px solid var(--rule); }
+.seg input:checked + span { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.seg input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: -3px; }
+
+.toggle { display: flex; gap: 10px; align-items: center; cursor: pointer; font-size: 15px; }
+.toggle input { width: 18px; height: 18px; accent-color: var(--accent); }
+
+.folder { font: 400 14px/1.4 var(--mono); color: var(--ink); background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 11px 12px; width: 100%; }
+
+.go { display: grid; gap: 10px; }
+.go .btn-primary { padding: 16px 22px; font-size: 16px; width: 100%; }
+
+.alert { border-radius: 8px; padding: 12px 14px; font-size: 14px; }
+.alert.error { background: var(--error-soft); color: var(--error); }
+.alert.warn { background: var(--warn-soft); color: var(--warn); }
+
+/* Results */
+.saved { display: grid; gap: 10px; }
+.saved h2 { font: 700 20px/1.2 var(--display); margin: 0; }
+.saved .summary { color: var(--muted); font-size: 14px; margin: 0; }
+.file { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 12px; align-items: center; padding: 12px 14px; border: 1px solid var(--rule); border-radius: 8px; background: var(--surface); }
+.file .name { font: 500 14px/1.3 var(--mono); overflow-wrap: anywhere; }
+.file .where { font: 400 12px/1.3 var(--mono); color: var(--faint); overflow-wrap: anywhere; grid-column: 1; }
+.file .actions { display: flex; gap: 6px; grid-row: 1 / span 2; grid-column: 2; }
+@media (max-width: 460px) { .file { grid-template-columns: 1fr; } .file .actions { grid-row: auto; grid-column: 1; } }
+
+.recent { display: grid; gap: 6px; }
+.recent button { text-align: start; background: none; border: 0; padding: 4px 0; color: var(--accent); font: 400 14px/1.35 var(--body); }
+.recent button:hover { text-decoration: underline; }
+
+footer { color: var(--faint); font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Sefaria → your computer</div>
+    <h1>Sefaria to Text</h1>
+    <p class="lede">Paste the link to any book on Sefaria. It downloads every chapter in order and saves the whole book as one clean file.</p>
+  </header>
+
+  <form class="find" id="find">
+    <label for="book" hidden>Sefaria link or book title</label>
+    <input id="book" name="book" autocomplete="off" spellcheck="false"
+           placeholder="https://www.sefaria.org/…  or a title, like Mesillat Yesharim">
+    <button class="btn-quiet" type="submit" id="lookup">Show chapters</button>
+  </form>
+
+  <div class="grid">
+    <section class="book" aria-live="polite">
+      <div class="book-head" id="book-head">
+        <span class="example-tag" id="example-tag">Example</span>
+        <p class="book-he" id="he-title" dir="rtl">השותפות הגדולה; הדת, המדע והחיפוש אחר משמעות</p>
+        <p class="book-en" id="en-title">The Great Partnership; God, Science, and the Search for Meaning</p>
+        <div class="crumbs" id="crumbs">Jewish Thought · Modern · Rabbi Lord Jonathan Sacks</div>
+      </div>
+      <div class="meter" aria-hidden="true"><span id="meter"></span></div>
+      <div class="status"><span id="status-left">19 chapters</span><span id="status-right">Not downloaded yet</span></div>
+      <ol class="toc" id="toc"></ol>
+    </section>
+
+    <section class="options">
+      <fieldset>
+        <legend>Save as</legend>
+        <div class="formats">
+          <label class="chip"><input type="checkbox" id="fmt-txt" value="txt" checked><span><b>.txt</b><small>Plain text</small></span></label>
+          <label class="chip"><input type="checkbox" id="fmt-md" value="md" checked><span><b>.md</b><small>Markdown headings</small></span></label>
+          <label class="chip"><input type="checkbox" id="fmt-html" value="html"><span><b>.html</b><small>Opens in a browser</small></span></label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Language</legend>
+        <div class="seg" role="radiogroup">
+          <label><input type="radio" name="lang" id="lang-english" value="english" checked><span>English</span></label>
+          <label><input type="radio" name="lang" id="lang-hebrew" value="hebrew"><span>Hebrew</span></label>
+          <label><input type="radio" name="lang" id="lang-source" value="source"><span>Original</span></label>
+        </div>
+        <p class="hint">If a chapter isn't on Sefaria in that language, you get the original text instead.</p>
+      </fieldset>
+
+      <fieldset>
+        <legend>Footnotes</legend>
+        <label class="toggle"><input type="checkbox" id="footnotes"> Keep footnotes as notes at the end of each chapter</label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Save to folder</legend>
+        <input class="folder" id="out" spellcheck="false" value="~/Books">
+      </fieldset>
+
+      <div class="go">
+        <button class="btn-primary" id="download" type="button">Download book</button>
+        <div class="alert error" id="error" hidden></div>
+      </div>
+
+      <div class="saved" id="saved" hidden>
+        <h2>Saved</h2>
+        <p class="summary" id="saved-summary"></p>
+        <div id="files" class="saved"></div>
+      </div>
+
+      <fieldset id="recent-wrap" hidden>
+        <legend>Recent books</legend>
+        <div class="recent" id="recent"></div>
+      </fieldset>
+    </section>
+  </div>
+
+  <footer>Runs on this computer. Keep the Terminal window that opened it running while you use this page.</footer>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const EXAMPLE = {
+  title: "The Great Partnership; God, Science, and the Search for Meaning",
+  he_title: "השותפות הגדולה; הדת, המדע והחיפוש אחר משמעות",
+  categories: ["Jewish Thought", "Modern", "Rabbi Lord Jonathan Sacks"],
+  entries: [
+    ["Acknowledgements", "דברי תודה"], ["Introduction", "הקדמה"],
+    ["I; God and the Search for Meaning", "חלק ראשון; אלוהים והחיפוש אחר משמעות", true],
+    ["1; The Meaning Seeking Animal", "פרק א; החיה מחפשת המשמעות", 1], ["2; In Two Minds", "פרק ב; בשתי תודעות", 1],
+    ["3; Diverging Paths", "פרק ג; שבילים מתפצלים", 1], ["4; Finding God", "פרק ד; למצוא את אלוהים", 1],
+    ["II; Why It Matters", "חלק שני; מדוע זה חשוב?", true],
+    ["5; What We Stand to Lose", "פרק ה; מה אנו עלולים לאבד?", 1], ["6; Human Dignity", "פרק ו; כבוד האדם", 1],
+    ["7; The Politics of Freedom", "פרק ז; הפוליטיקה של החופש", 1], ["8; Morality", "פרק ח; מוסר", 1],
+    ["9; Relationships", "פרק ט; מערכות יחסים", 1], ["10; A Meaningful Life", "פרק י; חיים בעלי משמעות", 1],
+    ["III; Faith and Its Challenges", "חלק שלישי; האמונה ואתגריה", true],
+    ["11; Darwin", "פרק יא; דרווין", 1], ["12; The Problem of Evil", "פרק יב; בעיית הרע", 1],
+    ["13; When Religion Goes Wrong", "פרק יג; כשהדת משרכת דרכיה", 1], ["14; Why God?", "פרק יד; למה אלוהים?", 1],
+    ["Epilogue; Letter to a Scientific Atheist", "אחרית דבר; מכתב למדען אתיאיסט"],
+    ["Appendix; Jewish Sources on Creation, the Age of the Universe and Evolution", "נספח; מקורות יהודיים על בריאה, גיל העולם ואבולוציה"],
+    ["For Further Reading", "לקריאה נוספת"],
+  ].map(([en, he, x]) => ({ en, he, level: x === 1 ? 1 : 0, ref: x === true ? null : en })),
+};
+const EXAMPLE_LINK = "https://www.sefaria.org/The_Great_Partnership;_God,_Science,_and_the_Search_for_Meaning?tab=contents";
+
+let platform = "darwin";
+let home = "";
+let shown = null;        // the book whose contents are on screen
+let leafRows = [];       // <li> per downloadable section, in download order
+let polling = null;
+
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+
+function showError(msg) { $("error").textContent = msg; $("error").hidden = !msg; }
+
+function renderContents(c, isExample) {
+  shown = c;
+  $("example-tag").hidden = !isExample;
+  $("he-title").textContent = c.he_title || "";
+  $("he-title").hidden = !c.he_title || c.he_title === c.title;
+  $("en-title").textContent = c.title;
+  $("crumbs").textContent = (c.categories || []).join(" · ");
+  const toc = $("toc");
+  toc.replaceChildren();
+  leafRows = [];
+  for (const e of c.entries) {
+    if (!e.en && !e.he && e.ref) continue;
+    const li = document.createElement("li");
+    if (!e.ref) li.className = "part";
+    else if (e.level > 0) li.className = "nested";
+    const mark = document.createElement("span");
+    mark.className = "mark";
+    if (!e.ref) mark.style.visibility = "hidden";
+    const label = document.createElement("span");
+    label.className = "label";
+    const en = document.createElement("span"); en.className = "en"; en.textContent = e.en || e.he;
+    label.append(en);
+    if (e.he && e.he !== e.en) { const he = document.createElement("span"); he.className = "he"; he.textContent = e.he; label.append(he); }
+    li.append(mark, label);
+    if (e.ref) { li.dataset.state = "pending"; leafRows.push(li); }
+    toc.append(li);
+  }
+  if (!c.entries.some(e => e.ref)) {
+    const li = document.createElement("li"); li.className = "empty"; li.textContent = "This book is a single text with no chapters listed."; toc.append(li);
+  }
+  $("status-left").textContent = `${leafRows.length || 1} ${leafRows.length === 1 ? "section" : "sections"}`;
+  $("status-right").textContent = isExample ? "Example — paste a link above" : "Not downloaded yet";
+  $("meter").style.width = "0";
+}
+
+async function lookup(book) {
+  showError("");
+  $("lookup").disabled = true;
+  $("status-right").textContent = "Looking up…";
+  try {
+    const r = await fetch("/api/contents?book=" + encodeURIComponent(book));
+    const body = await r.json();
+    if (!r.ok) throw new Error(body.error || "Couldn't look that up.");
+    renderContents(body, false);
+    return body;
+  } catch (e) {
+    showError(e.message);
+    $("status-right").textContent = "";
+    return null;
+  } finally {
+    $("lookup").disabled = false;
+  }
+}
+
+function selectedFormats() {
+  return ["txt", "md", "html"].filter(f => $("fmt-" + f).checked);
+}
+
+function savePrefs() {
+  store.set("prefs", {
+    formats: selectedFormats(),
+    lang: document.querySelector('input[name="lang"]:checked').value,
+    footnotes: $("footnotes").checked,
+    out: $("out").value,
+  });
+}
+
+function loadPrefs() {
+  const p = store.get("prefs", null);
+  if (!p) return;
+  for (const f of ["txt", "md", "html"]) $("fmt-" + f).checked = (p.formats || []).includes(f);
+  const lang = $("lang-" + p.lang); if (lang) lang.checked = true;
+  $("footnotes").checked = !!p.footnotes;
+  if (p.out) $("out").value = p.out;
+}
+
+function paintProgress(job) {
+  const total = job.total || leafRows.length || 1;
+  $("meter").style.width = `${Math.round((job.done / total) * 100)}%`;
+  $("status-left").textContent = `${job.done} of ${job.total || leafRows.length} sections`;
+  leafRows.forEach((li, i) => {
+    const n = i + 1;
+    li.dataset.state = job.skipped.includes(n) ? "skipped"
+      : n <= job.done ? "done"
+      : (n === job.done + 1 && job.state === "running") ? "active" : "pending";
+    li.querySelector(".mark").textContent = li.dataset.state === "done" ? "✓" : li.dataset.state === "skipped" ? "–" : "";
+    li.title = li.dataset.state === "skipped" ? "Sefaria has no text for this section" : "";
+  });
+  const active = leafRows[job.done];
+  if (active && job.state === "running") active.scrollIntoView({ block: "nearest", behavior: "smooth" });
+}
+
+function fileLabel() { return platform === "darwin" ? "Show in Finder" : platform.startsWith("win") ? "Show in Explorer" : "Show folder"; }
+
+function renderSaved(job) {
+  $("saved").hidden = false;
+  const skipped = job.skipped.length ? ` ${job.skipped.length} empty ${job.skipped.length === 1 ? "section was" : "sections were"} skipped.` : "";
+  $("saved-summary").textContent = `About ${job.words.toLocaleString()} words${job.source ? ` from “${job.source}”` : ""}.${skipped}`;
+  const files = $("files");
+  files.replaceChildren();
+  for (const f of job.files) {
+    const row = document.createElement("div"); row.className = "file";
+    const name = document.createElement("div"); name.className = "name"; name.textContent = f.name;
+    const where = document.createElement("div"); where.className = "where"; const dir = f.path.slice(0, -f.name.length);
+    where.textContent = (home && dir.startsWith(home + "/") ? "~" + dir.slice(home.length) : dir) + ` · ${Math.max(1, Math.round(f.size / 1024)).toLocaleString()} KB`;
+    const actions = document.createElement("div"); actions.className = "actions";
+    for (const [text, open] of [["Open", true], [fileLabel(), false]]) {
+      const b = document.createElement("button"); b.className = "btn-quiet btn-small"; b.type = "button"; b.textContent = text;
+      b.onclick = () => post("/api/reveal", { path: f.path, open }).catch(e => showError(e.message));
+      actions.append(b);
+    }
+    row.append(name, where, actions);
+    files.append(row);
+  }
+}
+
+async function post(url, body) {
+  const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || "Something went wrong.");
+  return data;
+}
+
+function remember(book, title) {
+  const list = store.get("recent", []).filter(r => r.title !== title);
+  list.unshift({ book, title });
+  store.set("recent", list.slice(0, 6));
+  renderRecent();
+}
+
+function renderRecent() {
+  const list = store.get("recent", []);
+  $("recent-wrap").hidden = !list.length;
+  $("recent").replaceChildren(...list.map(r => {
+    const b = document.createElement("button"); b.type = "button"; b.textContent = r.title;
+    b.onclick = () => { $("book").value = r.book; lookup(r.book); };
+    return b;
+  }));
+}
+
+async function download() {
+  showError("");
+  const book = $("book").value.trim();
+  if (!book) { showError("Paste a Sefaria link or type a book title first."); $("book").focus(); return; }
+  const formats = selectedFormats();
+  if (!formats.length) { showError("Pick at least one format to save."); return; }
+  savePrefs();
+  $("download").disabled = true;
+  $("saved").hidden = true;
+  const needLookup = !shown || $("example-tag").hidden === false || shown.__book !== book;
+  if (needLookup) { const c = await lookup(book); if (!c) { $("download").disabled = false; return; } c.__book = book; }
+  try {
+    const { id } = await post("/api/jobs", {
+      book, formats,
+      lang: document.querySelector('input[name="lang"]:checked').value,
+      footnotes: $("footnotes").checked,
+      out: $("out").value,
+    });
+    $("status-right").textContent = "Downloading…";
+    clearInterval(polling);
+    polling = setInterval(async () => {
+      let job;
+      try { job = await (await fetch("/api/jobs/" + id)).json(); }
+      catch { clearInterval(polling); showError("Lost contact with the downloader. Is the Terminal window still open?"); $("download").disabled = false; return; }
+      paintProgress(job);
+      if (job.state === "running") return;
+      clearInterval(polling);
+      $("download").disabled = false;
+      if (job.state === "error") { showError(job.error); $("status-right").textContent = "Stopped"; return; }
+      $("status-right").textContent = "Saved";
+      renderSaved(job);
+      remember(book, shown.title);
+    }, 400);
+  } catch (e) {
+    showError(e.message);
+    $("download").disabled = false;
+  }
+}
+
+$("find").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const book = $("book").value.trim();
+  if (!book) { showError("Paste a Sefaria link or type a book title first."); return; }
+  const c = await lookup(book);
+  if (c) c.__book = book;
+});
+$("book").addEventListener("paste", () => setTimeout(() => $("find").requestSubmit(), 0));
+$("download").addEventListener("click", download);
+for (const el of document.querySelectorAll(".options input")) el.addEventListener("change", savePrefs);
+
+loadPrefs();
+renderContents(EXAMPLE, true);
+$("book").value = EXAMPLE_LINK;
+renderRecent();
+fetch("/api/defaults").then(r => r.json()).then(d => {
+  platform = d.platform;
+  home = d.home;
+}).catch(() => {});
+</script>
+</body>
+</html>

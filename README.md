@@ -5,19 +5,26 @@ Personal tooling.
 ## Sefaria book downloader
 
 Sefaria shows a book one section at a time. This pulls the whole thing through
-Sefaria's API and writes it out as one readable file per format — chapter
-headings kept, markup and footnotes stripped (`--footnotes` keeps them as
-endnotes), right-to-left for Hebrew.
+Sefaria's API and saves it as one readable file, with chapter headings kept and
+markup and footnotes removed (footnotes can be kept as endnotes if you want them).
+Hebrew text reads right to left.
+
+**Point and click:** double-click `scripts/Sefaria to Text.command` in Finder
+(or run `./scripts/sefaria-book.py` with no arguments). A page opens in your
+browser. Paste a Sefaria link, pick `.txt` / `.md` / `.html`, and click
+**Download book**. Files go to `~/Books` unless you choose another folder. Keep
+the Terminal window it opens running while you use the page.
+
+**Terminal:**
 
 ```bash
 ./scripts/sefaria-book.py "https://www.sefaria.org/The_Great_Partnership;_God,_Science,_and_the_Search_for_Meaning?tab=contents" -o ~/Books
-./scripts/sefaria-book.py "Mesillat Yesharim" --lang he --format txt,md,pdf
+./scripts/sefaria-book.py "Mesillat Yesharim" --lang he --format txt,md,html
 ```
 
-Writes `<Title>.txt` and `.md` by default. `--format txt,md,html,pdf` adds a
-print-ready `.html` and a `.pdf` (printed by Chrome/Chromium if installed;
-`CHROME_BIN` to point at it). English is preferred where Sefaria has it,
-falling back to the source text section by section.
+Writes `<Title>.txt` and `.md` by default. `--format` also takes `html` and
+`pdf` (the PDF is printed by Chrome/Chromium if installed; `CHROME_BIN` to point
+at it).
 
 ## Google Workspace CLI
 
@@ -54,5 +61,7 @@ bundled MCP server to reach either account —
 | `scripts/gws-shell.sh` | Shell integration providing the `gws @account ...` prefix |
 | `skills/gws-accounts/` | Claude Code skill teaching Claude to target a named account |
 | `skills/gws-my-accounts/` | Which account a task belongs to (YouTube/Descript vs. default) |
-| `scripts/sefaria-book.py` | Downloads a whole Sefaria book as txt / md / html / pdf |
+| `scripts/sefaria-book.py` | Downloads a whole Sefaria book as txt / md / html / pdf; no arguments opens the page |
+| `scripts/sefaria-book-ui.html` | The point-and-click page `sefaria-book.py` serves |
+| `scripts/Sefaria to Text.command` | Double-click launcher for the page on macOS |
 | `mcp/gws_mcp_server.py` | Zero-dependency MCP server exposing both accounts to Claude Desktop |
