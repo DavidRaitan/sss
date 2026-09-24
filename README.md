@@ -11,12 +11,12 @@ endnotes), right-to-left for Hebrew.
 
 ```bash
 ./scripts/sefaria-book.py "https://www.sefaria.org/The_Great_Partnership;_God,_Science,_and_the_Search_for_Meaning?tab=contents" -o ~/Books
-./scripts/sefaria-book.py "Mesillat Yesharim" --lang he --format txt,pdf
+./scripts/sefaria-book.py "Mesillat Yesharim" --lang he --format txt,md,pdf
 ```
 
-Writes `<Title>.txt`, `.md`, `.html` and `.pdf`. The PDF is printed by
-Chrome/Chromium if one is installed (`CHROME_BIN` to point at it); otherwise
-open the `.html` and print it. English is preferred where Sefaria has it,
+Writes `<Title>.txt` and `.md` by default. `--format txt,md,html,pdf` adds a
+print-ready `.html` and a `.pdf` (printed by Chrome/Chromium if installed;
+`CHROME_BIN` to point at it). English is preferred where Sefaria has it,
 falling back to the source text section by section.
 
 ## Google Workspace CLI

@@ -370,7 +370,7 @@ def main():
     ap.add_argument("-o", "--out", default=".", help="output directory (default: current)")
     ap.add_argument("--lang", default="english", choices=["english", "hebrew", "source", "en", "he"],
                     help="which version to prefer; falls back to the source text (default: english)")
-    ap.add_argument("--format", default="txt,md,html,pdf", help="comma-separated: txt,md,html,pdf")
+    ap.add_argument("--format", default="txt,md", help="comma-separated: txt,md,html,pdf (default: txt,md)")
     ap.add_argument("--footnotes", action="store_true", help="keep footnotes (default: drop them)")
     args = ap.parse_args()
 
