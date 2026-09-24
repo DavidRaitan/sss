@@ -271,20 +271,50 @@ def find_chrome():
     return None
 
 
-def print_pdf(html_path, pdf_path):
+def print_pdf(html_path, pdf_path, timeout=180):
+    """Print the HTML to PDF with headless Chrome.
+
+    On macOS headless Chrome often writes the PDF and then never exits (it can
+    sit waiting on the Keychain), so this watches for the finished file rather
+    than waiting on the process, and kills Chrome once the file stops growing.
+    """
     chrome = find_chrome()
     if not chrome:
-        print("  pdf: skipped - no Chrome/Chromium found (set CHROME_BIN, or print book.html from a browser)",
+        print("  pdf: skipped - no Chrome/Chromium found (set CHROME_BIN, or print the .html from a browser)",
               file=sys.stderr)
         return False
+    if os.path.exists(pdf_path):
+        os.remove(pdf_path)
+    print("  pdf: printing with Chrome...", file=sys.stderr)
     with tempfile.TemporaryDirectory() as profile:
-        subprocess.run(
+        proc = subprocess.Popen(
             [chrome, "--headless", "--disable-gpu", "--no-sandbox", f"--user-data-dir={profile}",
+             "--no-first-run", "--no-default-browser-check", "--disable-extensions",
+             "--use-mock-keychain", "--password-store=basic",
              "--no-pdf-header-footer", f"--print-to-pdf={pdf_path}",
              "file://" + os.path.abspath(html_path)],
-            check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=300,
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         )
-    return os.path.exists(pdf_path)
+        last_size, deadline = -1, time.monotonic() + timeout
+        try:
+            while time.monotonic() < deadline:
+                exited = proc.poll() is not None
+                size = os.path.getsize(pdf_path) if os.path.exists(pdf_path) else -1
+                if size > 0 and (exited or size == last_size):
+                    break
+                if exited:
+                    break
+                last_size = size
+                time.sleep(1)
+        finally:
+            if proc.poll() is None:
+                proc.kill()
+                proc.wait()
+    if os.path.exists(pdf_path) and os.path.getsize(pdf_path) > 0:
+        return True
+    print("  pdf: Chrome did not produce a PDF - open the .html in a browser and print it instead",
+          file=sys.stderr)
+    return False
 
 
 def slugify(title):
