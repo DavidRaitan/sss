@@ -1,22 +1,17 @@
-#!/usr/bin/env python3
-"""Sefaria: fetching a daf and building its pack.
+# -*- coding: utf-8 -*-
+"""Sefaria: fetching an amud and building its pack.
 
-A pack holds everything the chavruta needs about a page, assembled once and
-cached for every user who learns that daf. Nothing here is model-generated:
-every field is retrieved from Sefaria, so any claim the chavruta later makes
-about the page can be traced back to a live reference the learner can open.
+Written against recorded responses from the live API (see tests/), because the
+first version was written from memory and got two things wrong that together
+meant no real page ever loaded: the text endpoint wants `language|versionTitle`,
+not a bare title, and a link's anchor is the segment itself -- trimming its last
+":n" detached every commentary from every line.
 
-The one exception is the sugya map (see build_sugya_map.py), which is written
-by a model and then checked against the text in this pack.
-
-Usage:
-    python3 build_pack.py "Berakhot 2a" -o ../packs/
-    python3 build_pack.py "Berakhot 2a" --segments 1-3 -o ../packs/
-
-Needs outbound access to www.sefaria.org.
+A pack holds everything retrieved about one amud. Nothing in it is generated,
+apart from the argument structure read out of each commentary by sugya.py, and
+that is extracted from the commentary's own words.
 """
 
-import argparse
 import json
 import os
 import re
@@ -27,258 +22,247 @@ import urllib.parse
 import urllib.request
 
 from . import sugya
+from .commentators import WHO
 
-API = "https://www.sefaria.org/api"
+API = os.environ.get("CHAVRUTA_SEFARIA_API", "https://www.sefaria.org/api").rstrip("/")
 
-# The vocalized Davidson text is the one worth aligning against: it carries
-# both nikud and punctuation, and the punctuation is Steinsaltz's reading of
-# where each clause stops. That is exactly the judgement a learner gets wrong.
-VOCALIZED = "William Davidson Edition - Vocalized Aramaic"
+# The vocalized Davidson text carries nikud and punctuation, and the punctuation
+# is Steinsaltz's reading of where each clause stops -- which is the judgement a
+# learner gets wrong. Fall back to the unvocalized edition, then to whatever
+# Sefaria calls the source, rather than fail to open a page.
+VERSIONS = [
+    "hebrew|William Davidson Edition - Vocalized Aramaic",
+    "hebrew|William Davidson Edition - Aramaic",
+    "source",
+]
 
-from .commentators import WHO, backbone_for, wide_for
+# Commentary links carry their text; for everything else the reference is
+# enough. A single cross-reference like "Berakhot 13a-22a" arrives with nine
+# dapim of text attached, and none of it belongs in a pack.
+KEEP_TEXT = {"Commentary"}
 
-# Coverage is a fact and is probed (see available()); who answers what is
-# judgement and lives in commentators.py. Weights come from there too.
-WEIGHT = {name: entry["weight"] for name, entry in WHO.items()}
-
-# Sefaria tags every link with a category -- Commentary, Halakhah, Midrash,
-# Talmud, Responsa, Reference -- and that tagging is what its connections panel
-# is built from. It is the skeleton of "what did X say here / what is the law
-# here", already done for all of shas, so the pack mirrors it rather than
-# inventing a taxonomy of its own.
-PANEL = ["Commentary", "Halakhah", "Talmud", "Tanakh", "Mishnah", "Midrash",
-         "Responsa", "Quoting Commentary", "Reference", "Chasidut", "Musar", "Kabbalah"]
-
-
-# Ein Mishpat routes the sugya to where it lands in halacha. Sefaria types
-# these links separately, which saves us from guessing.
-HALACHA_LINK_TYPE = "ein mishpat / ner mitsvah"
+# Where the learner can go from a line, grouped the way Sefaria's own panel
+# groups it. Capped so a heavily quoted line stays readable.
+RELATED = ["Halakhah", "Talmud", "Tanakh", "Mishnah", "Midrash", "Responsa",
+           "Jewish Thought", "Chasidut", "Musar", "Reference"]
+RELATED_CAP = 30
 
 TAG = re.compile(r"<[^>]+>")
-# <b> and <strong> both mark literal talmud words inside a Steinsaltz gloss.
 LITERAL_TAG = re.compile(r"</?(?:b|strong)\b[^>]*>", re.I)
-# A clause ends at a full stop, question mark, or colon -- the sof pasuk of
-# the printed gemara. Commas are a softer break and are kept inside the clause.
 CLAUSE_END = re.compile(r"[^.?!:]+[.?!:]?")
-# Rashi and Tosafot open with the words they are commenting on, then a dash.
-# Sefaria ships the exact pattern per commentary in its index metadata, so we
-# read it from there and keep these only for indexes that omit it.
-FALLBACK_DIBUR = [r"^<b>(.+?)</b>", r"^(.{2,80}?)\s*[–—-]\s+"]
+NIKUD = re.compile(r"[֑-ׇ]")
+# Rishonim bold their lemma, sometimes after a short marker -- "[מתני']:",
+# "גמרא:", "(דף ב.)", "הכי גריס רש"י ז"ל:" -- so allow a little before it.
+BOLD_OPENING = re.compile(r"^.{0,40}?<b>(.{1,220}?)</b>", re.S)
+DASH_OPENING = re.compile(r"^(.{2,90}?)\s+[–—-]\s+")
 
-
-# Availability and dibur patterns are properties of a text, not of a session,
-# so they are asked once per process rather than once per daf.
 _SEEN = {}
+
+# Bumped whenever the pack's shape or meaning changes. Older packs on disk are
+# rebuilt: version 1 packs had every commentary detached from its line.
+PACK_VERSION = 3
+
+
+class SefariaError(RuntimeError):
+    pass
 
 
 def get(path, soft=False, **params):
-    url = "%s/%s" % (API, urllib.parse.quote(path, safe="/:,-."))
+    url = "%s/%s" % (API, urllib.parse.quote(path, safe="/:,-.|"))
     if params:
-        parts = []
+        pairs = []
         for key, value in params.items():
             for item in value if isinstance(value, list) else [value]:
-                parts.append("%s=%s" % (key, urllib.parse.quote(str(item))))
-        url += "?" + "&".join(parts)
-    # A soft call is a probe -- "does this text exist" -- and most of them are
-    # expected to miss. Retrying those with backoff turned opening one daf into
-    # a minute of waiting, so probes get one quick attempt and real fetches
-    # keep the retries.
-    attempts, timeout = (1, 6) if soft else (4, 30)
+                pairs.append((key, item))
+        url += "?" + urllib.parse.urlencode(pairs)
+    # A soft call is a probe that is allowed to miss; a real fetch retries.
+    attempts, timeout = (1, 8) if soft else (3, 45)
+    last = None
     for attempt in range(attempts):
         try:
-            with urllib.request.urlopen(url, timeout=timeout) as response:
+            request = urllib.request.Request(url, headers={"User-Agent": "chavruta/0.3"})
+            with urllib.request.urlopen(request, timeout=timeout) as response:
                 return json.load(response)
-        except (urllib.error.URLError, TimeoutError) as exc:
+        except urllib.error.HTTPError as exc:
+            last = exc
+            if soft or exc.code in (400, 404):
+                break
+        except (urllib.error.URLError, TimeoutError, OSError, ValueError) as exc:
+            last = exc
             if soft:
-                return None
-            if attempt == attempts - 1:
-                if soft:
-                    return None
-                raise SystemExit("sefaria unreachable: %s (%s)" % (url, exc))
-            time.sleep(2 ** attempt)
+                break
+        if attempt < attempts - 1:
+            time.sleep(1.5 * (attempt + 1))
+    if soft:
+        return None
+    raise SefariaError("could not reach Sefaria for %s (%s)" % (path, last))
 
 
-def plain(html):
-    """Strip markup, leaving the words a person would read aloud."""
-    return re.sub(r"\s+", " ", TAG.sub("", html or "")).strip()
+def plain(value):
+    """Text a person would read, from a string or Sefaria's nested lists."""
+    if value is None:
+        return ""
+    if isinstance(value, list):
+        return " ".join(p for p in (plain(v) for v in value) if p)
+    return re.sub(r"\s+", " ", TAG.sub("", str(value))).strip()
+
+
+def unpointed(text):
+    return NIKUD.sub("", text)
 
 
 def split_gloss(html):
-    """Split a Steinsaltz gloss into literal talmud words and his expansion.
-
-    Steinsaltz bolds the words that are actually on the daf and leaves his own
-    connective explanation unbolded. That markup is a free word-level alignment
-    between the raw Aramaic and its expansion -- the single most useful
-    structure on Sefaria for this product. We keep it rather than flatten it.
-    """
+    """Keep Steinsaltz's split between the words on the daf and his expansion."""
     spans = []
     for index, chunk in enumerate(LITERAL_TAG.split(html or "")):
         text = plain(chunk)
         if text:
-            # split() alternates outside/inside the tag, so odd chunks are bold.
             spans.append({"kind": "text" if index % 2 == 0 else "daf", "text": text})
     return spans
 
 
 def split_clauses(vocalized):
-    """Break a segment at its printed stopping points.
-
-    Where a learner stops is where a learner goes wrong, so these boundaries
-    are ground truth for correcting a misread, not just display sugar.
-    """
+    """Break a line at its printed stopping points."""
     clauses = []
     for match in CLAUSE_END.finditer(vocalized):
         text = match.group(0).strip()
         if text:
-            clauses.append({
-                "i": len(clauses),
-                "he": text,
-                "ends": text[-1] if text[-1] in ".?!:" else None,
-            })
+            clauses.append({"i": len(clauses), "he": text,
+                            "ends": text[-1] if text[-1] in ".?!:" else None})
     return clauses
 
 
-def dibur_patterns(title):
-    """The patterns that split a comment's opening lemma from its body.
-
-    Sefaria records these per commentary -- Rashi and Tosafot mark the lemma
-    with a dash, others bold it -- so reading them beats one guessed regex.
-    """
-    if title not in _SEEN:
-        _SEEN[title] = get("v2/raw_index/%s" % title, soft=True) or {}
-    index = _SEEN[title]
-    schema = index.get("schema", {})
-    if not schema.get("isSegmentLevelDiburHamatchil", True):
-        return []
-    return [re.compile(p) for p in (schema.get("diburHamatchilRegexes") or FALLBACK_DIBUR)]
-
-
-def available(masechta, names):
-    """Which of these commentators Sefaria actually holds on this masechta."""
-    found = []
-    for name in names:
-        key = "%s on %s" % (name, masechta)
-        if key not in _SEEN:
-            _SEEN[key] = get("v2/raw_index/%s" % key, soft=True) or {}
-        if _SEEN[key]:
-            found.append(name)
-    return found
-
-
-def wanted_for(masechta, wide=False):
-    """Who to pull for this masechta: the backbone, or the wider bench too.
-
-    The backbone is what is printed on the page and loads with it. The wide
-    bench is only fetched when a question actually reaches for it, so a page
-    opens fast and a session only pays for what it uses.
-    """
-    asked = backbone_for(masechta) + (wide_for(masechta) if wide else [])
-    return available(masechta, list(dict.fromkeys(asked)))
-
-
 def fetch_daf(ref):
-    """Pull the daf itself in both the vocalized source and the Davidson English."""
-    data = get("v3/texts/%s" % ref, version=[VOCALIZED, "english"])
-    source, english = [], []
-    for version in data.get("versions", []):
-        text = version.get("text") or []
-        text = text if isinstance(text, list) else [text]
-        if version.get("languageFamilyName") == "english":
-            english = text
-        elif version.get("versionTitle") == VOCALIZED:
-            source = text
-    if not source:
-        raise SystemExit("no vocalized text for %s -- check the ref" % ref)
-    return source, english
+    """The amud in the vocalized Davidson text and its English, plus where it sits."""
+    source, english, meta = [], [], {}
+    for version in VERSIONS:
+        data = get("v3/texts/%s" % ref, version=[version, "english"])
+        meta = {k: data.get(k) for k in ("next", "prev", "heRef", "book", "heTitle")}
+        for v in data.get("versions", []):
+            text = v.get("text") or []
+            text = text if isinstance(text, list) else [text]
+            if v.get("languageFamilyName") == "english" or v.get("actualLanguage") == "en":
+                english = english or text
+            elif not source:
+                source, meta["version"] = text, v.get("versionTitle")
+        if source:
+            return source, english, meta
+    raise SefariaError("Sefaria has no Hebrew text for %s" % ref)
 
 
 def fetch_links(ref):
-    """Group every link on the daf by segment, then by commentator."""
-    by_segment = {}
-    for link in get("links/%s" % ref, with_text=1):
-        anchor = link.get("anchorRef") or link.get("ref", "")
-        segment = anchor.rsplit(":", 1)[0] if ":" in anchor else anchor
-        by_segment.setdefault(segment, []).append(link)
-    return by_segment
+    return get("links/%s" % ref, with_text=1) or []
 
 
-def commentator_of(link, wanted):
-    """Match a link to a commentator we asked for, e.g. 'Rashi on Berakhot 2a:1:1'."""
-    index = link.get("index_title") or link.get("collectiveTitle", {}).get("en") or ""
-    for name in wanted:
-        if index == name or index.startswith(name + " on "):
-            return name
-    return None
+def commentator(link):
+    """The name a link's commentary goes by, e.g. "Rashi", "Rif", "Tosafot HaRosh"."""
+    name = (link.get("collectiveTitle") or {}).get("en")
+    if name:
+        return name
+    index = link.get("index_title") or ""
+    return index.split(" on ")[0] if " on " in index else index
 
 
-def build_segment(ref, number, source_html, english_html, links, wanted, patterns):
-    vocalized = plain(source_html)
-    segment = {
-        "ref": "%s:%d" % (ref, number),
-        "n": number,
-        # Vocalized for display and for judging where the learner stopped.
-        "he": vocalized,
-        # Unpointed for fuzzy-matching degraded ASR against a known string.
-        "he_plain": re.sub(r"[֑-ׇ]", "", vocalized),
-        "clauses": split_clauses(vocalized),
-        # Keeps the bold/unbold split rather than flattening it to a string.
-        "en": split_gloss(english_html),
-        "commentaries": {},
-        "halacha": [],
-        "xrefs": [],
-        # Counts per category, so the panel can be drawn before anything loads.
-        "panel": {},
-    }
-    for link in links:
-        category = link.get("category")
-        if category in PANEL:
-            segment["panel"][category] = segment["panel"].get(category, 0) + 1
-        name = commentator_of(link, wanted)
-        body = plain(link.get("he") or link.get("text") or "")
-        if name:
-            opening = next(
-                (m for p in patterns.get(name, []) for m in [p.match(body)] if m), None)
-            segment["commentaries"].setdefault(name, []).append({
-                "ref": link.get("ref"),
-                # The words on the daf this comment hangs off -- our anchor for
-                # "what does the commentary say about the line I just read".
-                "dibur": opening.group(1).rstrip(" .:") if opening else None,
-                "weight": WEIGHT.get(name, 20),
-                "he": body,
-                # The argument the comment states about itself, when it states one.
-                "structure": sugya.structure(link.get("ref"), body),
-                "en": plain(link.get("text") or "") if link.get("he") else None,
-            })
-        elif link.get("type") == HALACHA_LINK_TYPE:
-            segment["halacha"].append(link.get("ref"))
-        elif link.get("category") in ("Talmud", "Tanakh"):
-            segment["xrefs"].append(link.get("ref"))
-    return segment
+def anchors(link, ref):
+    """Which lines of this amud a link hangs off, as integers."""
+    refs = link.get("anchorRefExpanded") or [link.get("anchorRef") or ""]
+    lines = []
+    for r in refs:
+        m = re.match(r"^%s:(\d+)(?:-(\d+))?$" % re.escape(ref), r or "")
+        if m:
+            start = int(m.group(1))
+            lines.extend(range(start, int(m.group(2) or start) + 1))
+    return sorted(set(lines))
 
 
-def build(ref, wanted, only=None):
-    source, english = fetch_daf(ref)
+def opening_words(name, html, body):
+    """The dibur hamatchil: the words on the daf a comment hangs off."""
+    if name == "Steinsaltz":
+        return None  # a running explanation, not a comment on a lemma
+    raw = html if isinstance(html, str) else ""
+    m = BOLD_OPENING.match(raw)
+    if m:
+        return plain(m.group(1)).rstrip(" .:")
+    m = DASH_OPENING.match(body)
+    return m.group(1).rstrip(" .:") if m else None
+
+
+def build(ref):
+    """Everything retrieved about one amud, ready to learn from."""
+    source, english, meta = fetch_daf(ref)
     links = fetch_links(ref)
-    patterns = {n: dibur_patterns("%s on %s" % (n, ref.rsplit(" ", 1)[0])) for n in wanted}
+
     segments = []
-    for index, html in enumerate(source, start=1):
-        if only and index not in only:
+    for n, html in enumerate(source, start=1):
+        vocalized = plain(html)
+        segments.append({
+            "ref": "%s:%d" % (ref, n),
+            "n": n,
+            "he": vocalized,
+            "he_plain": unpointed(vocalized),
+            "clauses": split_clauses(vocalized),
+            "en": split_gloss(english[n - 1] if n <= len(english) else ""),
+            "commentaries": {},
+            "halacha": [],
+            "xrefs": [],
+            "related": {},
+            "panel": {},
+        })
+    by_n = {s["n"]: s for s in segments}
+
+    for link in links:
+        lines = [n for n in anchors(link, ref) if n in by_n]
+        if not lines:
             continue
-        segment_ref = "%s:%d" % (ref, index)
-        segments.append(build_segment(
-            ref, index, html,
-            english[index - 1] if index <= len(english) else "",
-            links.get(segment_ref, []), wanted, patterns,
-        ))
+        category = link.get("category") or ""
+        first = by_n[lines[0]]
+        for n in lines:
+            by_n[n]["panel"][category] = by_n[n]["panel"].get(category, 0) + 1
+
+        if category in KEEP_TEXT:
+            name = commentator(link)
+            body = plain(link.get("he"))
+            if not body:
+                continue
+            english_text = link.get("text")
+            entry = {
+                "ref": link.get("ref"),
+                "dibur": opening_words(name, link.get("he"), body),
+                "weight": WHO.get(name, {}).get("weight", 20),
+                "he": body,
+                "en": plain(english_text) if isinstance(english_text, str) else None,
+                "structure": sugya.structure(link.get("ref"), body),
+            }
+            if len(lines) > 1:
+                entry["span"] = [lines[0], lines[-1]]
+            first["commentaries"].setdefault(name, []).append(entry)
+        elif category == "Halakhah" and link.get("type") == "ein mishpat / ner mitsvah":
+            first["halacha"].append(link.get("ref"))
+        elif category in ("Talmud", "Tanakh", "Mishnah"):
+            first["xrefs"].append(link.get("ref"))
+        if category in RELATED:
+            bucket = first["related"].setdefault(category, [])
+            if len(bucket) < RELATED_CAP and link.get("ref") not in bucket:
+                bucket.append(link.get("ref"))
+
+    for segment in segments:
+        for entries in segment["commentaries"].values():
+            entries.sort(key=lambda e: e["ref"])
+
+    present = sorted({c for s in segments for c in s["commentaries"]},
+                     key=lambda c: -WHO.get(c, {}).get("weight", 20))
     return {
+        "pack_version": PACK_VERSION,
         "ref": ref,
+        "he_ref": meta.get("heRef"),
         "masechta": ref.rsplit(" ", 1)[0],
-        "commentators": wanted,
-        "weights": WEIGHT,
+        "next": meta.get("next"),
+        "prev": meta.get("prev"),
+        "version": meta.get("version"),
+        "commentators": present,
+        "weights": {c: WHO.get(c, {}).get("weight", 20) for c in present},
         "built_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "source": "sefaria.org",
-        # No sugya map yet -- it is written separately and checked against this.
-        "sugyot": [],
         "segments": segments,
     }
 
@@ -296,27 +280,15 @@ def parse_range(text):
     return chosen
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("ref", help='e.g. "Berakhot 2a"')
-    parser.add_argument("-o", "--out", default=".", help="directory to write the pack into")
-    parser.add_argument("--segments", help='limit to segments, e.g. "1-3" or "1,4,7"')
-    args = parser.parse_args()
-
-    masechta = args.ref.rsplit(" ", 1)[0]
-    wanted = wanted_for(masechta)
-    pack = build(args.ref, wanted, parse_range(args.segments))
-
-    os.makedirs(args.out, exist_ok=True)
-    name = args.ref.lower().replace(" ", "_").replace(":", "_") + ".json"
-    path = os.path.join(args.out, name)
-    with open(path, "w", encoding="utf-8") as handle:
-        json.dump(pack, handle, ensure_ascii=False, indent=2)
-
-    covered = sum(1 for s in pack["segments"] if s["commentaries"])
-    print("%s: %d segments, %d with commentary -> %s"
-          % (args.ref, len(pack["segments"]), covered, path), file=sys.stderr)
-
-
-if __name__ == "__main__":
-    main()
+def amudim(masechta):
+    """Every amud of a masechta in order, from commentators.MASECHTOT."""
+    from .commentators import MASECHTOT
+    m = next((x for x in MASECHTOT if x["name"] == masechta), None)
+    if not m:
+        return []
+    out = []
+    for n in range(m["first"], m["last"] + 1):
+        out.append("%s %da" % (masechta, n))
+        if n < m["last"] or m.get("last_amud", "b") == "b":
+            out.append("%s %db" % (masechta, n))
+    return out

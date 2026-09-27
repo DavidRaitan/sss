@@ -1,229 +1,359 @@
 # -*- coding: utf-8 -*-
-"""The local app: type a daf, read it, and talk to it.
+"""The local app: turn to a page, read it aloud, talk about it.
 
-One process, standard library only apart from the model SDK. Packs are built
-from Sefaria the first time a page is opened and cached on disk, so the second
-visit to a daf is instant and free.
+    GET  /api/masechtot          what can be opened
+    GET  /api/daf?ref=           an amud's pack (built from Sefaria, then cached)
+    POST /api/hear?ref=&line=    audio in; what was said, and whether it was reading
+    POST /api/heard              the same for words the browser already recognised
+    POST /api/say                a turn of conversation
+    POST /api/speak              a reply as audio, never the gemara
+    GET  /api/health             what works, and what to fix if it does not
+
+One process, standard library apart from the model SDK. Packs are cached on
+disk and the neighbouring amudim are built in the background, so turning the
+page is instant.
 """
 
 import io
 import json
+import logging
 import os
 import posixpath
 import threading
+import time
 import traceback
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from . import sefaria
-from .llm import LLM, ModelError
+from . import align, retrieve, sefaria
+from .commentators import MASECHTOT
+from .llm import LLM, ModelError, speakable
 from .pack import Pack
-from .partner import Partner
+from .partner import Partner, nudge
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WEB = os.path.join(ROOT, "web")
-PACKS = os.path.join(ROOT, "packs")
+PACKS = os.environ.get("CHAVRUTA_PACKS") or os.path.join(ROOT, "packs")
+LOG_PATH = os.path.join(ROOT, "chavruta.log")
 
-TYPES = {".html": "text/html; charset=utf-8", ".js": "text/javascript",
-         ".css": "text/css", ".json": "application/json; charset=utf-8"}
+TYPES = {".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8",
+         ".css": "text/css; charset=utf-8", ".json": "application/json; charset=utf-8",
+         ".svg": "image/svg+xml", ".png": "image/png", ".ico": "image/x-icon"}
 
-# Conversations, per browser tab. In memory: a session is one sitting.
+log = logging.getLogger("chavruta")
+
 SESSIONS = {}
-LOCK = threading.Lock()
+SESSION_LOCK = threading.Lock()
+BUILDING = {}
+BUILD_LOCK = threading.Lock()
+PAGES = {}   # ref -> align.Page, which is worth keeping between turns
 
+
+# -- packs ---------------------------------------------------------------------
 
 def pack_path(ref):
     return os.path.join(PACKS, ref.lower().replace(" ", "_").replace(":", "_") + ".json")
 
 
-def load_pack(ref, rebuild=False):
-    """From disk if we have the real thing, from Sefaria otherwise.
+def allowed(ref):
+    """Only masechtot we have judged the routing for. See commentators.py."""
+    return any(ref.startswith(m["name"] + " ") for m in MASECHTOT) and \
+        ref in set(sefaria.amudim(ref.rsplit(" ", 1)[0]))
 
-    A fixture on disk is never good enough to serve. It exists so the app runs
-    with no network, and left to satisfy a request it silently shows three
-    hand-typed lines in place of the daf -- which is the exact failure this
-    product cannot have. So a fixture is treated as absent, and only comes back
-    if Sefaria genuinely cannot be reached.
+
+def load_pack(ref, rebuild=False):
+    """From disk if we have the real thing; from Sefaria if we do not.
+
+    A fixture on disk never satisfies a request: it only comes back when
+    Sefaria genuinely cannot be reached, and says so on screen.
     """
     path = pack_path(ref)
     stale = None
     if os.path.exists(path) and not rebuild:
         pack = Pack.load(path)
-        if not pack.is_fixture:
+        current = pack.data.get("pack_version", 0) >= sefaria.PACK_VERSION
+        if current and not pack.is_fixture:
             return pack
-        stale = pack
+        stale = pack  # served only if Sefaria cannot be reached
 
-    masechta = ref.rsplit(" ", 1)[0]
-    # Everything on the daf in one request -- what enters the prompt is decided
-    # later, per turn, by retrieve.py.
-    wanted = sefaria.wanted_for(masechta, wide=True)
-    try:
-        data = sefaria.build(ref, wanted)
-    except SystemExit:
-        if stale is not None:
-            return stale
-        raise
-    os.makedirs(PACKS, exist_ok=True)
-    with open(path, "w", encoding="utf-8") as handle:
-        json.dump(data, handle, ensure_ascii=False, indent=2)
-    return Pack(data)
+    with BUILD_LOCK:
+        gate = BUILDING.setdefault(ref, threading.Lock())
+    with gate:
+        if os.path.exists(path) and not rebuild and stale is None:
+            return Pack.load(path)  # someone else built it while we waited
+        if stale is not None and os.path.exists(path):
+            fresh = Pack.load(path)
+            if fresh.data.get("pack_version", 0) >= sefaria.PACK_VERSION:
+                return fresh
+        try:
+            data = sefaria.build(ref)
+        except sefaria.SefariaError:
+            if stale is not None:
+                return stale
+            raise
+        os.makedirs(PACKS, exist_ok=True)
+        tmp = path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as handle:
+            json.dump(data, handle, ensure_ascii=False)
+        os.replace(tmp, path)
+        PAGES.pop(ref, None)
+        return Pack(data)
 
+
+def prefetch(*refs):
+    """Build the neighbours quietly, so the next turn of the page is instant."""
+    def work():
+        for ref in refs:
+            if ref and allowed(ref) and not os.path.exists(pack_path(ref)):
+                try:
+                    load_pack(ref)
+                except Exception as exc:
+                    log.info("prefetch %s: %s", ref, exc)
+    threading.Thread(target=work, daemon=True).start()
+
+
+def page_of(pack):
+    if pack.ref not in PAGES:
+        PAGES[pack.ref] = align.Page(pack.data)
+    return PAGES[pack.ref]
+
+
+def session(sid):
+    with SESSION_LOCK:
+        return SESSIONS.setdefault(sid or "default", {
+            "history": [], "ref": None, "line": 1, "nudged": set(), "language": "auto"})
+
+
+def hint_for(pack, line):
+    """The words they are about to read, to prime the recogniser."""
+    lines = [s["he_plain"] for s in pack.segments if line - 1 <= s["n"] <= line + 3]
+    return " ".join(lines)[:600]
+
+
+KEYWORDS = ["גמרא", "משנה", "סוגיא", "מחלוקת", "רש\"י", "תוספות", "הרמב\"ם", "רשב\"א",
+            "ריטב\"א", "רי\"ף", "מאירי", "Rashi", "Tosafot", "gemara", "sugya",
+            "machlokes", "mishna", "tanna", "amora", "halacha"]
+
+
+# -- handler ---------------------------------------------------------------------
 
 class Handler(BaseHTTPRequestHandler):
     server_version = "chavruta"
 
     def log_message(self, fmt, *args):
-        if "/api/" in (args[0] if args else ""):
-            print("  %s" % (fmt % args))
-
-    # -- plumbing --------------------------------------------------------------
+        pass
 
     def send_json(self, payload, status=200):
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(body)
 
-    def send_file(self, path):
-        if not os.path.isfile(path):
-            return self.send_json({"error": "not found"}, 404)
-        with open(path, "rb") as handle:
-            body = handle.read()
+    def send_bytes(self, body, mime):
         self.send_response(200)
-        self.send_header("Content-Type",
-                         TYPES.get(os.path.splitext(path)[1], "application/octet-stream"))
+        self.send_header("Content-Type", mime)
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
 
-    # -- routes ----------------------------------------------------------------
+    def fail(self, status, message, exc=None):
+        """A short message for the screen; the whole story goes to the log."""
+        if exc is not None:
+            log.error("%s %s: %s\n%s", self.command, self.path, exc, traceback.format_exc())
+        return self.send_json({"error": message}, status)
+
+    def body_json(self):
+        length = int(self.headers.get("Content-Length") or 0)
+        try:
+            return json.loads(self.rfile.read(length) or b"{}")
+        except ValueError:
+            return {}
+
+    # -- GET -------------------------------------------------------------------
 
     def do_GET(self):
         url = urllib.parse.urlparse(self.path)
-        query = urllib.parse.parse_qs(url.query)
-        if url.path in ("/", "/index.html"):
-            return self.send_file(os.path.join(WEB, "index.html"))
+        q = urllib.parse.parse_qs(url.query)
+        arg = lambda k, d="": (q.get(k) or [d])[0].strip()
+
         if url.path == "/api/health":
-            return self.send_json(self.health())
+            return self.send_json(health())
         if url.path == "/api/masechtot":
-            from .commentators import MASECHTOT
             return self.send_json({"masechtot": MASECHTOT})
-        if url.path == "/api/find":
-            # Sefaria resolves partial and Hebrew names to real refs, so typing
-            # "berachot 2" or "ברכות ב" lands on the daf without knowing how
-            # Sefaria spells it.
-            q = (query.get("q") or [""])[0].strip()
-            if len(q) < 2:
-                return self.send_json({"matches": []})
-            found = sefaria.get("name/%s" % q, soft=True, limit=8) or {}
-            matches = [c for c in (found.get("completions") or []) if c][:8]
-            return self.send_json({"matches": matches, "is_ref": bool(found.get("is_ref"))})
         if url.path == "/api/daf":
-            ref = (query.get("ref") or [""])[0].strip()
-            if not ref:
-                return self.send_json({"error": "no ref"}, 400)
+            ref = arg("ref")
+            if not allowed(ref):
+                return self.fail(400, "not_available")
             try:
-                pack = load_pack(ref, rebuild=bool(query.get("rebuild")))
-            except SystemExit as exc:
-                return self.send_json({"error": str(exc)}, 502)
+                pack = load_pack(ref, rebuild=bool(arg("rebuild")))
+            except sefaria.SefariaError as exc:
+                return self.fail(502, "sefaria_unreachable", exc)
             except Exception as exc:
-                return self.send_json({"error": "%s: %s" % (type(exc).__name__, exc)}, 500)
+                return self.fail(500, "pack_failed", exc)
+            prefetch(pack.data.get("next"), pack.data.get("prev"))
             return self.send_json(pack.data)
-        # Static files, confined to web/.
-        rel = posixpath.normpath(url.path).lstrip("/")
-        target = os.path.normpath(os.path.join(WEB, rel.replace("web/", "", 1)))
-        if not target.startswith(WEB):
-            return self.send_json({"error": "no"}, 403)
-        return self.send_file(target)
+
+        rel = posixpath.normpath(urllib.parse.unquote(url.path)).lstrip("/") or "index.html"
+        target = os.path.normpath(os.path.join(WEB, rel))
+        if not target.startswith(WEB) or not os.path.isfile(target):
+            target = os.path.join(WEB, "index.html") if "." not in rel else None
+        if not target:
+            return self.fail(404, "not_found")
+        with open(target, "rb") as handle:
+            body = handle.read()
+        self.send_bytes(body, TYPES.get(os.path.splitext(target)[1], "application/octet-stream"))
+
+    # -- POST ------------------------------------------------------------------
 
     def do_POST(self):
         route = urllib.parse.urlparse(self.path).path
-        if route == "/api/transcribe":
-            return self.transcribe()
-        if route != "/api/say":
-            return self.send_json({"error": "not found"}, 404)
-        length = int(self.headers.get("Content-Length") or 0)
         try:
-            body = json.loads(self.rfile.read(length) or b"{}")
-        except json.JSONDecodeError:
-            return self.send_json({"error": "bad json"}, 400)
-
-        ref = (body.get("ref") or "").strip()
-        said = (body.get("said") or "").strip()
-        line = int(body.get("line") or 1)
-        level = body.get("level") or "standard"
-        session = body.get("session") or "default"
-        if not ref or not said:
-            return self.send_json({"error": "need ref and said"}, 400)
-
-        try:
-            pack = load_pack(ref)
-            with LOCK:
-                history = SESSIONS.get(session, [])
-            partner = Partner(pack, LLM(), level=level)
-            text, verdict, history, trace = partner.ask(line, history, said)
-            with LOCK:
-                # A sitting is bounded; keep it from growing without limit.
-                SESSIONS[session] = history[-40:]
-            return self.send_json({
-                "text": text, "grounded": verdict.ok,
-                "problem": None if verdict.ok else verdict.complaint(),
-                "trace": trace,
-            })
+            if route == "/api/hear":
+                return self.hear()
+            if route == "/api/heard":
+                return self.heard()
+            if route == "/api/say":
+                return self.say()
+            if route == "/api/speak":
+                return self.speak()
         except ModelError as exc:
-            return self.send_json({"error": str(exc)}, 502)
+            return self.fail(502, "model: %s" % exc, exc)
+        except sefaria.SefariaError as exc:
+            return self.fail(502, "sefaria_unreachable", exc)
         except Exception as exc:
-            traceback.print_exc()
-            return self.send_json({"error": "%s: %s" % (type(exc).__name__, exc)}, 500)
+            return self.fail(500, "internal", exc)
+        return self.fail(404, "not_found")
 
-    def transcribe(self):
-        """Audio in, text out, for speech the browser cannot handle.
+    def hear(self):
+        """Audio in. What was said, and whether it was reading or talking.
 
-        The browser's own recogniser is free and instant but takes one language
-        at a time, which is the wrong shape for someone who says a sentence in
-        English with the Aramaic still in it. This path costs money and handles
-        that, so the two sit side by side and the learner picks.
+        Reading gets followed silently -- the highlight moves and nothing is
+        said -- except once per line, when the reader reaches the hinge of a
+        machlokes. Talking is handed back so the client can show the words
+        at once and then ask for an answer.
         """
+        q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+        ref = (q.get("ref") or [""])[0]
+        line = int((q.get("line") or ["1"])[0] or 1)
+        sid = (q.get("session") or [""])[0]
+        language = (q.get("language") or ["auto"])[0]
         length = int(self.headers.get("Content-Length") or 0)
-        if not length:
-            return self.send_json({"error": "no audio"}, 400)
+        if not length or not allowed(ref):
+            return self.fail(400, "no_audio")
         audio = self.rfile.read(length)
-        try:
-            from .llm import LLM
-            client = LLM().client
-            buffer = io.BytesIO(audio)
-            buffer.name = "speech.webm"  # the SDK infers the format from this
-            result = client.audio.transcriptions.create(
-                model=os.environ.get("CHAVRUTA_MODEL_STT", "gpt-transcribe"),
-                file=buffer,
-                # Naming what it is about to hear is the cheapest accuracy win
-                # available: without it, Aramaic inside an English sentence
-                # comes back as approximate English words.
-                prompt=("Someone studying Talmud aloud. Speech mixes English with "
-                        "Hebrew and Aramaic mid-sentence, and includes terms like "
-                        "gemara, sugya, machlokes, Rashi, Tosafot, mishna."),
-            )
-            return self.send_json({"text": (result.text or "").strip()})
-        except Exception as exc:
-            return self.send_json({"error": "%s: %s" % (type(exc).__name__, exc)}, 502)
+        mime = self.headers.get("Content-Type", "audio/webm")
 
-    def health(self):
+        pack = load_pack(ref)
+        said = LLM().hear(audio, hint=hint_for(pack, line), keywords=KEYWORDS, mime=mime)
+        return self.after_hearing(pack, ref, line, sid, language, said)
+
+    def heard(self):
+        """The same, for words the browser already recognised itself."""
+        body = self.body_json()
+        ref = (body.get("ref") or "").strip()
+        if not allowed(ref):
+            return self.fail(400, "not_available")
+        return self.after_hearing(load_pack(ref), ref, int(body.get("line") or 1),
+                                  body.get("session"), body.get("language") or "auto",
+                                  (body.get("said") or "").strip())
+
+    def after_hearing(self, pack, ref, line, sid, language, said):
+        if not said:
+            return self.send_json({"said": "", "mode": "silence"})
+        heard = align.listen(page_of(pack), said)
+        state = session(sid)
+        if state.get("ref") != ref:
+            state.update(history=[], ref=ref, nudged=set())
+        if heard.get("line"):
+            state["line"] = heard["line"]
+        state["heard"] = heard
+        reply = {"said": said, "mode": heard["mode"], "heard": heard,
+                 "line": state["line"] or line}
+
+        if heard["mode"] == "reading" and not heard.get("stopped_mid_clause"):
+            key = (ref, heard["line"])
+            lang = language if language in ("he", "en") else \
+                ("he" if heard.get("hebrew", 0) > 0.5 else "en")
+            found = nudge(pack, heard["line"], lang)
+            if found and key not in state["nudged"]:
+                state["nudged"].add(key)
+                reply["nudge"], reply["nudge_ref"] = found
+        return self.send_json(reply)
+
+    def say(self):
+        body = self.body_json()
+        ref, said = (body.get("ref") or "").strip(), (body.get("said") or "").strip()
+        if not allowed(ref) or not said:
+            return self.fail(400, "need_ref_and_words")
+        state = session(body.get("session"))
+        if state.get("ref") != ref:
+            state.update(history=[], ref=ref, nudged=set())
+        line = int(body.get("line") or state.get("line") or 1)
+        state["line"] = line
+        pack = load_pack(ref)
         llm = LLM()
-        state = {"provider": llm.provider, "heavy": llm.heavy, "cheap": llm.cheap,
-                 "key": bool(os.environ.get("OPENAI_API_KEY")
-                             or os.environ.get("ANTHROPIC_API_KEY")),
-                 "packs": sorted(f[:-5].replace("_", " ")
-                                 for f in os.listdir(PACKS)) if os.path.isdir(PACKS) else []}
-        return state
+
+        route = retrieve.classify(llm, said)
+        nav = route.get("navigate")
+        if route["kind"] == "navigate" and nav:
+            masechta = pack.data.get("masechta", "Berakhot")
+            target = "%s %d%s" % (masechta, nav["daf"], nav["amud"])
+            if allowed(target):
+                return self.send_json({"mode": "navigate", "ref": target})
+
+        partner = Partner(pack, llm, depth=body.get("depth") or "daf",
+                          language=body.get("language") or "auto")
+        heard = body.get("heard") or state.get("heard")
+        text, verdict, state["history"], trace = partner.ask(
+            line, state["history"], said, heard=heard, route=route)
+        state["heard"] = None
+        return self.send_json({
+            "mode": "answer", "text": text, "grounded": verdict.ok,
+            "problem": None if verdict.ok else verdict.complaint(), "trace": trace,
+        })
+
+    def speak(self):
+        body = self.body_json()
+        text = speakable((body.get("text") or "").strip())
+        ref = (body.get("ref") or "").strip()
+        if ref and allowed(ref):
+            # The net under the «» marks: whatever the model did, no stretch of
+            # the page itself reaches the voice.
+            text = align.unspeak(text, page_of(load_pack(ref)))
+        if not text.strip(" …"):
+            return self.fail(400, "nothing_to_say")
+        audio, mime = LLM().speak(text)
+        return self.send_bytes(audio, mime)
 
 
-def serve(port=8765, open_browser=True):
+# -- health ----------------------------------------------------------------------
+
+_SEFARIA = {"at": 0, "ok": None}
+
+
+def health():
+    llm = LLM()
+    key = bool(os.environ.get("OPENAI_API_KEY") if llm.provider == "openai"
+               else os.environ.get("ANTHROPIC_API_KEY"))
+    if time.time() - _SEFARIA["at"] > 120:
+        _SEFARIA["ok"] = bool(sefaria.get("v3/texts/Berakhot 2a:1", soft=True, version="source"))
+        _SEFARIA["at"] = time.time()
+    cached = sorted(f[:-5] for f in os.listdir(PACKS) if f.endswith(".json")) if os.path.isdir(PACKS) else []
+    return {"provider": llm.provider, "heavy": llm.heavy, "cheap": llm.cheap,
+            "key": key, "sefaria": _SEFARIA["ok"], "can_hear": llm.can_hear and key,
+            "can_speak": llm.can_speak and key, "cached": len(cached)}
+
+
+def serve(port=8765, open_browser=True, host="127.0.0.1"):
     os.makedirs(PACKS, exist_ok=True)
-    httpd = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    logging.basicConfig(filename=LOG_PATH, level=logging.INFO,
+                        format="%(asctime)s %(levelname)s %(message)s")
+    httpd = ThreadingHTTPServer((host, port), Handler)
     url = "http://127.0.0.1:%d/" % port
-    print("chavruta -> %s   (ctrl-c to stop)" % url)
+    print("chavruta -> %s   (ctrl-c to stop; problems are written to chavruta.log)" % url)
     if open_browser:
         try:
             import webbrowser

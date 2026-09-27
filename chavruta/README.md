@@ -1,131 +1,103 @@
-# AI Chavruta
+# חברותא — AI Chavruta
 
-A study partner for Talmud. You open a daf, read it, and say what you think it
-means. It has already read the page and its commentaries, it cites everything,
-and it tells you when your reading does not hold.
+A study partner for Talmud. Open a page, put in earbuds, and read aloud. It follows
+you along the page and stays quiet while you read. When you say what you think a
+line means, it answers out loud — and if your reading does not hold, it says so and
+shows you why from the page.
 
-Spec: `../01d432aa-chavrutaspecv0.1.md`. Decisions: `docs/decisions.md`.
-Plan and findings: `docs/plan.md`.
+## Start
 
-## Run it
+    cd ~/sss && git pull && cd chavruta
+    ./run.sh doctor     # checks your key, Sefaria and the models — fix anything marked ✗
+    ./run.sh            # opens the app
 
-    ./run.sh
+The first run sets itself up and creates `.env`. Put your OpenAI key in it
+(`open -e .env`), then run again.
 
-First run makes a virtualenv, installs, and writes a `.env` for your API key.
-Put the key in, run it again, and the app opens in your browser. Type a daf —
-`Berakhot 2a`, `Bava Metzia 59a` — and it is fetched from Sefaria, cached, and
-opened. Pick a line, then talk to it.
+## Using it
 
-    ./run.sh doctor
+**Turn to a page** with the three menus at the top — מסכת, דף, עמוד — or the ‹ ›
+arrows, the ← → keys, or a swipe. Berakhot for now, 2a to 64a.
 
-Checks the three things that can be wrong — your key, Sefaria, and whether the
-models named in `.env` are actually reachable — and names which one failed.
+**Press the microphone** (or the space bar) once. It stays open; this is a
+conversation, not a chat.
 
-**Never commit `.env`.** It is gitignored. If a key is ever pasted anywhere
-public, rotate it immediately.
+- **Read aloud** from your gemara. The line you are on lights up and the words it
+  followed fade a little, so a glance shows where it thinks you are. It says nothing
+  while you read — except once, when you reach a place where the commentators split:
+  *"רגע — כאן תוספות מתווכח עם רש״י. רוצה להיכנס?"*
+- **Say what you think it means** — in English, Hebrew, or both in one sentence. When
+  you stop talking, it answers aloud. If you are wrong it tells you, and why.
+- **Ask**: "what does the Rashba say here?", "does he really hold that, I learned the
+  opposite elsewhere", "what's the halacha", "read it inside or summarise".
+- **Move by voice**: "go to daf 5 amud b" / "תעבור לדף ה עמוד ב".
+- **Interrupt** it by talking; it stops.
+
+What it will never do: correct *how you read the words*. It hears you through
+speech recognition and cannot know your pronunciation or havara, so it does not
+pretend to. It may tell you where a sentence *stops* — that is printed — and argue
+with what you *say it means*.
+
+**On screen**, as a companion to glance at: the words it quotes light up on the page;
+the sources it cites appear as buttons under its answer — tap one to read it.
+**מפרשים** shows everything Sefaria has on the current line, grouped the way the page
+is: on the page, Rishonim, Acharonim, then halacha, Tanakh, parallels. **תמליל** is the
+transcript, and has a box for typing when you cannot speak.
+
+**Two ways to see the page**: *צורת הדף* — the gemara in the middle, Rashi toward the
+binding, Tosafot outside, unvocalized like the printed page — or *שטיינזלץ*, vocalized
+and punctuated with the translation under each line.
+
+**Settings** (⚙): how deep it reaches on its own (the page / + Rishonim / + Acharonim),
+which language it answers in, how long it waits before answering (choose *long* if it
+cuts in while you think), whether it speaks up unasked, its voice.
 
 ## What it costs
 
-Two models, because two jobs. Deciding *what kind of question was that* is
-classification and runs on the budget model for a fraction of a cent. Telling
-you your reading cannot stand and showing why runs on the mid-tier model, once
-per turn, against a system prompt that barely changes — which providers cache
-automatically at roughly a tenth of the price, so a long session pays full
-price for the page about once.
+A cheap model decides what kind of thing you said; a mid-tier one answers, once per
+turn, against the whole amud held in a prompt the provider caches — so a long session
+pays full price for the page about once. Hearing and speaking cost a fraction of a
+cent a turn. The page itself — text, Rashi, Tosafot, Rishonim, Steinsaltz — comes
+free from Sefaria, and is cached after the first time.
 
-Defaults are `gpt-5.6-terra` (heavy) and `gpt-5.6-luna` (cheap), chosen on
-published September 2026 pricing. Model names move; `doctor` asks your key what
-it can actually see and tells you if a default has gone stale. Override in
-`.env`, or set `CHAVRUTA_PROVIDER=anthropic` to use Claude instead.
+To open every page of Berakhot now, so each opens instantly and works offline:
 
-## The backbone, and widening
+    ./run.sh prefetch
 
-What is printed on the daf — Steinsaltz, Rashi, Tosafot, and Rabbeinu Chananel
-where he appears — is the backbone. It loads with the page and is always in
-front of the model.
+## How it is built
 
-Everything else is on the bench. Sefaria returns every link on a daf in one
-request, so the wider Rishonim are already on disk from the first moment; what
-costs money and attention is how much of it enters the prompt. So a cheap model
-classifies what you just said, `commentators.py` says who answers that kind of
-question in this masechta, and only those come in. Widening is instant rather
-than a pause mid-sentence.
+    run.sh                    one command: set up, check, open
+    web/                      the page, the voice loop, the panels
+    chavruta/server.py        the local app
+    chavruta/sefaria.py       fetching an amud and building its pack
+    chavruta/align.py         following the reading: where on the page is the learner
+    chavruta/partner.py       what the partner is told, and what it is given
+    chavruta/retrieve.py      which sources come into a turn, and when
+    chavruta/commentators.py  who answers what, and who is strong where — editorial, correct it
+    chavruta/ground.py        nothing is said without a source behind it
+    chavruta/sugya.py         the argument a commentary states about itself
+    chavruta/llm.py           thinking, hearing, speaking
+    tests/                    unit tests and a browser test with a fake microphone,
+                              against real recorded Sefaria responses
 
-`chavruta/commentators.py` is the judgement layer: who the heavy hitters are,
-what each is actually for, who is strong in which masechta, and where the
-printed page is not what you would assume — Nedarim's "Rashi" is not Rashi's,
-Bava Batra is Rashbam from 29a. That file is opinionated and partly wrong.
-Correct it as you learn; that is the moat.
+Three rules are enforced in code rather than asked for in a prompt:
 
-## Levels
+1. **No invented sources.** Every name must come with a citation from the pack, in
+   English or Hebrew; a reference the pack never held is rejected. The answer is sent
+   back, and if it fails twice the reply is "I don't have that here — let's look."
+2. **The gemara is never spoken.** Quoted text is lit on the page instead.
+3. **Silence while you read.** Reading is recognised by lining up what it heard with
+   the page, and followed without a word.
 
-`standard` is the default: you read Aramaic but not fast, quotes stay in
-Hebrew, only the hard word gets glossed. `beginner` leans on English and
-explains terms unasked. `fluent` does not translate and goes straight to the
-difficulty. Switch it in the header.
+Tests: `./run.sh test` (unit), `python3 tests/e2e.py` (browser, needs Playwright).
 
-## What is here
+## If something is wrong
 
-    run.sh                  one command: set up, then open the app
-    chavruta/server.py      the local app
-    chavruta/commentators.py who to ask, for what, where they are strong
-    chavruta/retrieve.py    which sources enter the conversation, and when
-    chavruta/partner.py     what the partner is told and what it is given
-    chavruta/ground.py      the grounding gate
-    chavruta/llm.py         the model layer: OpenAI or Claude, cheap and heavy
-    chavruta/sefaria.py     fetching a daf and building its pack
-    chavruta/sugya.py       reads the argument structure out of a commentary
-    chavruta/pack.py        loading a pack and asking it questions
-    chavruta/cli.py         the same conversation in a terminal
-    pack/build_pack.py      pre-warm a pack you know you will learn
-    pack/verify_pack.py     diffs a pack against live Sefaria, char for char
-    web/index.html          the daf, the panel, and the conversation
+`./run.sh doctor` checks each piece for real and says what to do. The server writes
+problems to `chavruta.log`; the last few show up in `doctor`.
 
-### Daf packs
+Using it from a phone: the app runs on your Mac. `./run.sh --lan` lets a phone on the
+same wifi open it, but phones only allow the microphone over https, so for now use it
+on the Mac with earbuds, or mirror the Mac screen.
 
-A pack is everything about one amud, precomputed once and served to everyone
-who learns that page. Text, translation, commentaries, halachic landing points
-and cross-references are all retrieved, never generated, so any claim the
-partner makes can be traced to a reference you can open.
-
-Per segment: the vocalized text, an unpointed copy for matching against speech,
-the clause boundaries — where the printed text stops, which is what lets it
-tell you that you stopped a word early — the Steinsaltz gloss with its
-daf-words and expansion still separated, the commentaries keyed by their dibur
-hamatchil, the Ein Mishpat links out to Rambam / Tur / Shulchan Arukh, and the
-category counts the panel is drawn from.
-
-### The sugya structure
-
-`extract_sugya.py` reads the argument a commentary states about itself, from
-the fixed phrases it states it in — `פירש רש"י`, `ועוד קשה`, `ויש לומר`,
-`לכן פירש ר"ת`, `ומכאן נראה`, and the `(דף ה.)` citations. On the first Tosafot
-of shas it recovers, correctly: position → four difficulties → Rabbeinu Tam's
-alternative → a question → its answer → where the Ri lands → the conclusion,
-with four cross-references.
-
-That structure is retrieved rather than generated, so it can be shown with the
-words that produced it, and it fails visibly instead of becoming a confident
-paraphrase.
-
-### The grounding gate
-
-Two things are checked on every turn before it reaches you. A citation the pack
-never held means the source was invented. A commentator named without a
-citation means the attribution is floating — "Tosafot says" with nothing after
-it. Either sends the turn back to be answered again with the specific
-complaint; failing twice produces "I don't have that here, let's look."
-
-## Fixture data
-
-`packs/berakhot_2a.json` is built offline from `pack/fixture_source.py`, a
-transcription of the first three segments of Berakhot 2a. It exists so
-everything runs without network access. It is **not authoritative** — the
-partner says so on screen, and `verify_pack.py` is the check. Rebuild from the
-API before learning anything real off it.
-
-## Licensing
-
-The Steinsaltz / Davidson layer — the punctuation, the English, the Hebrew
-biur, and the bold alignment — is CC BY-NC. Fine for a free product; all four
-go at once if this ever charges. See `docs/plan.md`.
+Sefaria's Davidson/Steinsaltz texts are CC BY-NC: free to use, not to sell.

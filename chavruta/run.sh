@@ -1,38 +1,49 @@
 #!/usr/bin/env bash
-# One command: set up if needed, then open the app.
+# One command.
 #
-#   ./run.sh            open the app in a browser
-#   ./run.sh doctor     check the key, Sefaria, and the models are reachable
+#   ./run.sh              open the app in your browser
+#   ./run.sh doctor       check the key, Sefaria and the models, and say what to fix
+#   ./run.sh prefetch     build every page of Berakhot now, so each opens instantly
+#   ./run.sh test         run the tests
 set -euo pipefail
 cd "$(dirname "$0")"
 
 if ! command -v python3 >/dev/null 2>&1; then
-  echo "python3 is not installed."
-  echo "On a Mac, run:  xcode-select --install"
+  echo "python3 is not installed. On a Mac, run:  xcode-select --install"
   exit 1
 fi
 
 VENV=".venv"
 PY="$VENV/bin/python"
+STAMP="$VENV/.installed"
 
 if [ ! -x "$PY" ]; then
   echo "setting up (first run only)…"
   python3 -m venv "$VENV"
+fi
+# Reinstall whenever requirements.txt changes, not only the first time.
+if [ ! -f "$STAMP" ] || [ requirements.txt -nt "$STAMP" ]; then
   "$PY" -m pip install --quiet --upgrade pip
   "$PY" -m pip install --quiet -r requirements.txt
+  touch "$STAMP"
 fi
 
 if [ ! -f .env ]; then
   cp .env.example .env
-  echo
-  echo "  Put your API key in .env, then run this again:"
-  echo "    $(pwd)/.env"
-  echo
-  exit 1
 fi
 
+case "${1:-}" in
+  test)
+    exec "$PY" -W ignore -m unittest tests.test_units ;;
+  doctor|prefetch)
+    exec "$PY" -m chavruta "$@" ;;
+esac
+
 if ! grep -qE '^(OPENAI|ANTHROPIC)_API_KEY=.+' .env; then
-  echo "  .env has no API key yet — add one and run again."
+  echo
+  echo "  Put your API key in .env, then run ./run.sh again:"
+  echo "    open -e $(pwd)/.env"
+  echo
   exit 1
 fi
 

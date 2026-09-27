@@ -97,3 +97,53 @@ say about the line I just read" is a lookup, not a retrieval guess.
   it inside" — is a fluent learner's session, so v1 is being built for someone
   who reads Aramaic and does not lean on the English. Confirm before this
   hardens.
+
+---
+
+# Decisions from using it (September 2026)
+
+**7. It never corrects how the learner reads the words.** It hears through
+speech recognition, cannot hear pronunciation or havara, and a transcript that
+disagrees with the page is the transcript's error every time. It may correct
+where a sentence *stops* — printed, so knowable — and argue with what the
+learner *says a line means*. If it suspects a word was passed over it asks,
+and believes the answer. Enforced in the partner's constitution.
+
+**8. A conversation, not a chat.** One press opens the microphone; silence
+ends a turn; it answers aloud and listens again; talking over it stops it. The
+transcript exists, behind a button. Typing exists, inside the transcript, for a
+quiet room.
+
+**9. Reading is followed silently.** What it hears is lined up against the
+amud (word-level local alignment, `align.py`). If it is the page being read,
+the line lights and nothing is said. The one exception is the hinge of a
+machlokes, flagged once per line, from structure extracted out of the
+commentary's own words — templated, never generated.
+
+**10. The page looks like a page.** Default view is the printed daf:
+unvocalized, gemara in the middle, Rashi toward the binding (it flips between
+amud aleph and bet), Tosafot outside, Rashi script. The Steinsaltz view —
+vocalized, punctuated, translation under each line — is one tap away.
+
+**11. Turning pages is a date picker, not a search box.** מסכת / דף / עמוד,
+with Hebrew numerals, plus arrows, keys, swipe, and voice ("go to daf 5 b").
+One masechta until the routing judgement has been checked on another.
+
+**12. The gemara is never spoken; the partner's own Hebrew is.** Quotes are
+wrapped in «» by the partner, lit on the page, and silenced in speech. The
+first voice stripped *all* Hebrew, which silenced every Hebrew answer.
+
+**13. Depth and language are two separate settings.** Depth is how far past
+the printed page it reaches unasked (the page / + Rishonim / + Acharonim);
+naming a commentator always brings him regardless. Language is what it
+answers in (like me / Hebrew / English).
+
+**14. The whole amud is in view on every turn,** in a system prompt that holds
+still for the session and is cached. "Two lines down it says the opposite" can
+only be said about lines the partner can see.
+
+**15. The data pipeline is tested against recorded live responses.** The first
+version was written from memory and got two things wrong that together meant no
+real page ever loaded (a version name without its language; anchors trimmed so
+no commentary attached to any line). `tests/recorded/` holds real Sefaria
+responses and `tests/fake_sefaria.py` replays them, as strictly as the real API.
