@@ -109,6 +109,8 @@ def main():
         check("Tosafot column filled", page.locator("#col-outer .c").count() >= 4,
               "(%d)" % page.locator("#col-outer .c").count())
         check("runner in Hebrew", "ברכות" in page.inner_text("#runner"), page.inner_text("#runner"))
+        check("the units of the page are marked", page.locator(".unit").all_inner_texts() == ["משנה", "גמרא", "אמר מר"],
+              str(page.locator(".unit").all_inner_texts()))
         check("status ready", page.inner_text("#statustext") in ("מוכן", "ספריא לא זמינה"), page.inner_text("#statustext"))
         check("printed text has no nikud", not any(0x591 <= ord(c) <= 0x5c7 for c in page.inner_text("#gtext")))
         shot("01-daf")
@@ -155,7 +157,8 @@ def main():
             check("follows the reading on the page", page.locator(".w.read").count() >= 10,
                   "(%d words marked)" % page.locator(".w.read").count())
             page.wait_for_function("/Tosafot|תוספות/.test(document.querySelector('#reply').textContent)", timeout=25000)
-            check("speaks up once at the Tosafot, in the language read", "רש״י" in page.inner_text("#reply"),
+            check("speaks up once at the Tosafot, in the chosen language",
+                  "Rashi" in page.inner_text("#reply") or "רש״י" in page.inner_text("#reply"),
                   page.inner_text("#reply")[:80])
             check("marks exactly the words read", page.locator(".w.read").count() == 17,
                   "(%d of line 1's 17)" % page.locator(".w.read").count())

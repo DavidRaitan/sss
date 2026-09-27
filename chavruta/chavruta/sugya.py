@@ -127,3 +127,63 @@ def summarize(struct):
     order = " → ".join(m["kind"] for m in struct["moves"])
     who = ", ".join(struct["names"]) or "unattributed"
     return "%s | %s | cites: %s" % (order, who, ", ".join(struct["cites"]) or "none")
+
+
+# --- where one unit of learning ends and the next begins ----------------------
+
+# The daf announces its own structure. These openers are how a printed gemara
+# says a new unit has started, and they are what a person means by "let's finish
+# this piece" -- not a line number. Matched against text with the nikud removed,
+# because the pointing varies and the consonants do not.
+NIKUD = re.compile(r"[\u0591-\u05C7]")
+
+OPENERS = [
+    ("gemara",    r"^גמ[׳']", "גמרא"),
+    ("mishna",    r"^מתני[׳']|^מתניתין", "משנה"),
+    ("baraita",   r"^תנו רבנן|^ת[\"״]ר\b", "תנו רבנן"),
+    ("baraita",   r"^תניא\b", "תניא"),
+    ("statement", r"^איתמר\b", "איתמר"),
+    ("objection", r"^מיתיבי\b", "מיתיבי"),
+    ("question",  r"^איבעיא להו", "איבעיא להו"),
+    ("said",      r"^אמר מר\b", "אמר מר"),
+]
+OPENERS = [(kind, re.compile(pat), label) for kind, pat, label in OPENERS]
+
+
+def bare(text):
+    """The consonants only, so pointing never decides whether a marker matches."""
+    return NIKUD.sub("", text or "").strip()
+
+
+def opener(text):
+    """If this segment starts a new unit, say which kind and how it is named."""
+    head = bare(text)[:24]
+    for kind, pattern, label in OPENERS:
+        if pattern.search(head):
+            return {"kind": kind, "label": label}
+    return None
+
+
+def sections(segments):
+    """Split an amud into the units a learner would start and stop on.
+
+    Whatever precedes the first marker is its own section: an amud usually
+    carries on a sugya from the page before, and the mishna at the head of a
+    perek is not labelled -- the גמרא that follows it is what marks it.
+    """
+    found, current = [], None
+    for seg in segments:
+        mark = opener(seg.get("he", ""))
+        if mark or current is None:
+            current = {"kind": mark["kind"] if mark else "opening",
+                       "label": mark["label"] if mark else "",
+                       "from": seg["n"], "to": seg["n"]}
+            found.append(current)
+        else:
+            current["to"] = seg["n"]
+    # An unlabelled opening that runs into the gemara marker is the mishna.
+    if len(found) > 1 and found[0]["kind"] == "opening" and found[1]["kind"] == "gemara":
+        found[0].update(kind="mishna", label="משנה")
+    elif found and found[0]["kind"] == "opening":
+        found[0]["label"] = "המשך"
+    return found

@@ -38,6 +38,15 @@ speech recognition and cannot know your pronunciation or havara, so it does not
 pretend to. It may tell you where a sentence *stops* — that is printed — and argue
 with what you *say it means*.
 
+**Units of learning** are marked where the page opens them — משנה, גמרא, תניא,
+אמר מר — and tapping one lights the whole unit, so "let's finish this piece"
+means something. When three or more opinions are in play, the answer comes as a
+table on the screen (spoken: just the sentence around it).
+
+**"Didn't we learn this ten pages back?"** is answerable once the whole
+masechta is indexed (`./run.sh prefetch`, below): it points at the pages that
+share this unit's uncommon wording, as a lead — it says it has not read them.
+
 **On screen**, as a companion to glance at: the words it quotes light up on the page;
 the sources it cites appear as buttons under its answer — tap one to read it.
 **מפרשים** shows everything Sefaria has on the current line, grouped the way the page
@@ -60,7 +69,8 @@ pays full price for the page about once. Hearing and speaking cost a fraction of
 cent a turn. The page itself — text, Rashi, Tosafot, Rishonim, Steinsaltz — comes
 free from Sefaria, and is cached after the first time.
 
-To open every page of Berakhot now, so each opens instantly and works offline:
+To open every page of Berakhot now, so each opens instantly and works offline,
+and to build the whole-masechta index behind "didn't we learn this elsewhere":
 
     ./run.sh prefetch
 
@@ -75,7 +85,8 @@ To open every page of Berakhot now, so each opens instantly and works offline:
     chavruta/retrieve.py      which sources come into a turn, and when
     chavruta/commentators.py  who answers what, and who is strong where — editorial, correct it
     chavruta/ground.py        nothing is said without a source behind it
-    chavruta/sugya.py         the argument a commentary states about itself
+    chavruta/sugya.py         the argument a commentary states; the units of a page
+    chavruta/masechta_index.py  the whole tractate, for "didn't we see this already"
     chavruta/llm.py           thinking, hearing, speaking
     tests/                    unit tests and a browser test with a fake microphone,
                               against real recorded Sefaria responses

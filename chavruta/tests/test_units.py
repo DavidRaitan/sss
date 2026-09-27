@@ -55,6 +55,42 @@ class Sefaria(unittest.TestCase):
         self.assertEqual((len(a), a[0], a[-1]), (125, "Berakhot 2a", "Berakhot 64a"))
 
 
+class Sections(unittest.TestCase):
+    def test_berakhot_2a_divides_as_the_page_does(self):
+        got = [(s["label"], s["from"], s["to"]) for s in PACK["sections"]]
+        self.assertEqual(got, [("משנה", 1, 5), ("גמרא", 6, 11), ("אמר מר", 12, 14)])
+
+    def test_commentary_from_another_tractate_is_not_on_this_page(self):
+        names = {e["ref"] for s in PACK["segments"] for es in s["commentaries"].values() for e in es}
+        self.assertFalse(any("Pesachim" in r or "Zevachim" in r for r in names))
+
+
+class Index(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        import importlib.util, json
+        from chavruta.masechta_index import Index as Ix
+        spec = importlib.util.spec_from_file_location("build_index", os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "pack", "build_index.py"))
+        mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
+        mod.main(["Berakhot"])
+        cls.index = Ix.load(os.environ["CHAVRUTA_PACKS"], "Berakhot")
+
+    def test_whole_masechta_indexed(self):
+        self.assertEqual(len(self.index.pages), 125)
+
+    def test_a_phrase_is_found_on_its_page(self):
+        hits = self.index.phrase("תנא היכא קאי דקתני מאימתי")
+        self.assertTrue(any(h["ref"].startswith("Berakhot 2a") for h in hits))
+
+    def test_elsewhere_leads_are_citable_in_a_turn(self):
+        pack = Pack(PACK)
+        p = partner.Partner(pack, LLM(), index=self.index)
+        text, verdict, _, trace = p.ask(6, [], "didn't we learn something like this elsewhere? explain the structure")
+        self.assertIn("elsewhere", trace)
+        self.assertTrue(verdict.ok, text)
+
+
 class Following(unittest.TestCase):
     page = align.Page(PACK)
 
@@ -154,6 +190,12 @@ class Speaking(unittest.TestCase):
         self.assertNotIn("האשמורה", said)
         self.assertNotIn("[[", said)
         self.assertIn("רש״י אומר", said)   # its own Hebrew is spoken
+
+    def test_a_table_is_shown_not_spoken(self):
+        said = speakable("Three opinions; they're on the screen.\n| Who | Holds |\n|---|---|\n| ר' אליעזר | first watch |\nSo the Rabbis are in the middle.")
+        self.assertNotIn("|", said)
+        self.assertIn("on the screen", said)
+        self.assertIn("in the middle", said)
 
     def test_unmarked_gemara_is_still_not_spoken(self):
         page = align.Page(PACK)

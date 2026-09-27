@@ -28,6 +28,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from . import align, retrieve, sefaria
 from .commentators import MASECHTOT
 from .llm import LLM, ModelError, speakable
+from .masechta_index import Index
 from .pack import Pack
 from .partner import Partner, nudge
 
@@ -47,6 +48,14 @@ SESSION_LOCK = threading.Lock()
 BUILDING = {}
 BUILD_LOCK = threading.Lock()
 PAGES = {}   # ref -> align.Page, which is worth keeping between turns
+INDEXES = {}
+
+
+def index_for(masechta):
+    """The whole-tractate index, if `./run.sh prefetch` has built it."""
+    if masechta not in INDEXES or INDEXES[masechta] is None:
+        INDEXES[masechta] = Index.load(PACKS, masechta)
+    return INDEXES[masechta]
 
 
 # -- packs ---------------------------------------------------------------------
@@ -305,7 +314,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json({"mode": "navigate", "ref": target})
 
         partner = Partner(pack, llm, depth=body.get("depth") or "daf",
-                          language=body.get("language") or "auto")
+                          language=body.get("language") or "en",
+                          index=index_for(pack.data.get("masechta", "")))
         heard = body.get("heard") or state.get("heard")
         text, verdict, state["history"], trace = partner.ask(
             line, state["history"], said, heard=heard, route=route)
@@ -344,7 +354,8 @@ def health():
     cached = sorted(f[:-5] for f in os.listdir(PACKS) if f.endswith(".json")) if os.path.isdir(PACKS) else []
     return {"provider": llm.provider, "heavy": llm.heavy, "cheap": llm.cheap,
             "key": key, "sefaria": _SEFARIA["ok"], "can_hear": llm.can_hear and key,
-            "can_speak": llm.can_speak and key, "cached": len(cached)}
+            "can_speak": llm.can_speak and key, "cached": len(cached),
+            "index": any(c.startswith("_index_") for c in cached)}
 
 
 def serve(port=8765, open_browser=True, host="127.0.0.1"):

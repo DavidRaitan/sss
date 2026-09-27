@@ -278,7 +278,9 @@ def speakable(text):
     notice, and reading the gemara is the learner's job, not the machine's.
     Everything else is spoken, in whatever language it is in.
     """
-    out = CITE.sub("", text)
+    # A table is for the eye; reading pipes aloud helps nobody.
+    out = "\n".join(l for l in text.split("\n") if not l.strip().startswith("|"))
+    out = CITE.sub("", out)
     out = QUOTE.sub(" … ", out)
     out = re.sub(r"\s+([,.;:?!])", r"\1", out)
     out = re.sub(r"(\s*…\s*){2,}", " … ", out)

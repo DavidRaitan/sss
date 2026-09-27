@@ -35,4 +35,12 @@ def run(what, rebuild=False, out=sys.stdout):
             print("  %3d/%d  %-16s FAILED: %s" % (i, len(refs), ref, exc), file=out)
             failed += 1
     print("\n%d built, %d already cached, %d failed" % (built, cached, failed), file=out)
+    if len(refs) > 1:
+        # With every page in hand, the whole-tractate index costs no requests.
+        import importlib.util
+        path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "pack", "build_index.py")
+        spec = importlib.util.spec_from_file_location("build_index", path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        mod.main([what])
     return 1 if failed else 0

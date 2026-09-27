@@ -15,7 +15,7 @@ function el(tag, cls, text) {
 
 /* ---------------------------------------------------------------- settings */
 
-const DEFAULTS = { view: "daf", depth: "daf", language: "auto", voice: "natural",
+const DEFAULTS = { view: "daf", depth: "daf", language: "en", voice: "natural",
   hearing: "api", speak: true, pause: "normal", nudges: true, translate: false, stops: false };
 const PAUSES = { short: 1000, normal: 1500, long: 2400 };
 function loadSettings() {
@@ -254,7 +254,16 @@ function renderDaf() {
   // Rashi sits toward the binding: on the right of an amud aleph, the left of a bet.
   box.className = "daf " + (p && p.amud === "b" ? "bet" : "aleph");
   const g = $("gtext"); g.replaceChildren();
+  const opens = {};
+  for (const sec of pack.sections || []) if (sec.label) opens[sec.from] = sec;
   for (const seg of pack.segments) {
+    const sec = opens[seg.n];
+    if (sec) {
+      const mark = el("button", "unit", sec.label);
+      mark.title = "שורות " + sec.from + "–" + sec.to;
+      mark.onclick = (e) => { e.stopPropagation(); selectUnit(sec); };
+      g.append(mark, document.createTextNode(" "));
+    }
     const s = el("span", "seg"); s.dataset.n = seg.n;
     s.append(words(seg.he, seg.n, false));
     s.onclick = () => selectLine(seg.n, { scroll: "side" });
@@ -324,7 +333,9 @@ function selectLine(n, opts) {
   S.line = Math.min(Math.max(1, n), max);
   for (const node of document.querySelectorAll(".seg, .line, .c"))
     node.classList.toggle("on", +node.dataset.n === S.line);
-  $("where").textContent = "שורה " + S.line + " מתוך " + max;
+  const sec = sectionOf(S.line);
+  $("where").textContent = "שורה " + S.line + " מתוך " + max +
+    (sec && sec.label ? " · " + sec.label + " (" + sec.from + "–" + sec.to + ")" : "");
 
   const main = S.settings.view === "daf" ? $("col-gemara") : $("linear");
   const node = main.querySelector('[data-n="' + S.line + '"]');
@@ -339,6 +350,17 @@ function selectLine(n, opts) {
       if (target && !visible(target, col)) col.scrollTo({ top: target.offsetTop - 40, behavior: "smooth" });
     }
   }
+}
+
+function sectionOf(n) {
+  return ((S.pack && S.pack.sections) || []).find((s) => s.from <= n && n <= s.to) || null;
+}
+
+// A whole unit -- "let's finish this piece" -- lit at once.
+function selectUnit(sec) {
+  selectLine(sec.from, { scroll: "side" });
+  for (const node of document.querySelectorAll(".seg"))
+    if (+node.dataset.n >= sec.from && +node.dataset.n <= sec.to) node.classList.add("on");
 }
 
 // How far it followed the reading: position, never a verdict on the words.
@@ -426,19 +448,46 @@ function chipFor(ref) {
   return { label, go: () => window.open(sefariaUrl(ref), "_blank", "noopener") };
 }
 
+// A reply as it should look: «quotes» set in the page's type, [[refs]] lifted
+// out into buttons, and a pipe table drawn as a table. Returns the refs cited.
+function renderRich(box, text) {
+  const refs = [];
+  const lift = (t) => t.replace(/\[\[([^\]]+)\]\]/g, (_, ref) => { if (!refs.includes(ref)) refs.push(ref); return ""; });
+  const inline = (parent, t) => {
+    for (const part of lift(t).split(/(«[^»]+»)/)) {
+      if (/^«.*»$/.test(part)) parent.append(el("q", null, part.slice(1, -1)));
+      else parent.append(document.createTextNode(part.replace(/\s+([,.;:?!])/g, "$1")));
+    }
+  };
+  const lines = text.split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].trim().startsWith("|")) {
+      const rows = [];
+      while (i < lines.length && lines[i].trim().startsWith("|")) rows.push(lines[i++].trim());
+      i--;
+      const table = el("table", "positions"); table.dir = "auto";
+      rows.filter((r) => !/^\|[\s:|-]+\|$/.test(r)).forEach((r, k) => {
+        const tr = el("tr");
+        for (const cell of r.replace(/^\||\|$/g, "").split("|")) {
+          const td = el(k === 0 ? "th" : "td"); td.dir = "auto"; inline(td, cell.trim()); tr.append(td);
+        }
+        table.append(tr);
+      });
+      box.append(table);
+    } else if (lines[i].trim()) {
+      const p = el("div", "para"); p.dir = "auto"; inline(p, lines[i]); box.append(p);
+    }
+  }
+  return refs;
+}
+
 function showReply(text, opts) {
   opts = opts || {};
   const r = $("reply"), chips = $("chips");
   r.hidden = !text; r.replaceChildren(); chips.replaceChildren();
   r.classList.toggle("hint", !!opts.hint);
   if (!text) return;
-  const refs = [];
-  const clean = text.replace(/\[\[([^\]]+)\]\]/g, (_, ref) => { if (!refs.includes(ref)) refs.push(ref); return ""; });
-  for (const part of clean.split(/(«[^»]+»)/)) {
-    if (/^«.*»$/.test(part)) r.append(el("q", null, part.slice(1, -1)));
-    else r.append(document.createTextNode(part.replace(/\s+([,.;:?!])/g, "$1")));
-  }
-  for (const ref of refs) {
+  for (const ref of renderRich(r, text)) {
     const c = chipFor(ref), b = el("button", "chip", c.label);
     b.title = ref; b.onclick = c.go; chips.append(b);
   }
@@ -450,7 +499,8 @@ function showReply(text, opts) {
 let player = null, speakingDone = null;
 
 function speakable(text) {
-  return text.replace(/\[\[[^\]]+\]\]/g, "").replace(/«[^»]*»/g, " … ")
+  return text.split("\n").filter((l) => !l.trim().startsWith("|")).join("\n")
+    .replace(/\[\[[^\]]+\]\]/g, "").replace(/«[^»]*»/g, " … ")
     .replace(/\s+([,.;:?!])/g, "$1").replace(/(\s*…\s*){2,}/g, " … ").replace(/\s{2,}/g, " ").trim();
 }
 
@@ -821,11 +871,13 @@ function openLog() {
     panel.append(el("h2", null, "תמליל"), el("div", "sub", "מה שנאמר בשיחה הזאת"));
     if (!S.log.length) panel.append(el("div", "sub", "עוד לא דיברתם."));
     for (const t of S.log) {
-      const row = el("div", "turn" + (t.me ? " me" : ""),
-        (t.me && t.mode === "reading" ? "📖 " : "") + t.text.replace(/\[\[([^\]]+)\]\]/g, "($1)"));
+      const row = el("div", "turn" + (t.me ? " me" : ""));
       row.dir = "auto";
+      if (t.me) row.textContent = (t.mode === "reading" ? "📖 " : "") + t.text;
+      else renderRich(row, t.text);
       if (t.trace) row.append(el("span", "trace", "routed: " + t.trace.kind + (t.trace.claim ? " · claim" : "") +
-        (t.trace.opened && t.trace.opened.length ? " · opened: " + t.trace.opened.join(", ") : "")));
+        (t.trace.opened && t.trace.opened.length ? " · opened: " + t.trace.opened.join(", ") : "") +
+        (t.trace.elsewhere && t.trace.elsewhere.length ? " · elsewhere: " + t.trace.elsewhere.join(", ") : "")));
       panel.append(row);
     }
     // For a quiet room: say it by typing. Not a chat -- the answer still comes aloud.
@@ -866,7 +918,8 @@ function openSettings() {
     panel.append(
       choice("depth", "עומק", [["daf", "הדף — רש״י ותוספות"], ["rishonim", "+ ראשונים"], ["acharonim", "+ אחרונים"]],
         "מה החברותא מביא בעצמו. אם תשאל על מפרש מסוים, הוא יביא אותו בכל מקרה."),
-      choice("language", "שפת התשובה", [["auto", "כמוני"], ["he", "עברית"], ["en", "English"]]),
+      choice("language", "שפת התשובה", [["en", "English"], ["he", "עברית"], ["auto", "כמוני"]],
+        "באנגלית הוא מצטט את הגמרא בעברית, בתוך המשפט — כמו שמדברים בבית המדרש."),
       choice("view", "תצוגת הדף", [["daf", "צורת הדף"], ["lin", "שטיינזלץ, מנוקד"]]),
       choice("translate", "תרגום (בתצוגת שטיינזלץ)", [[false, "בלי"], [true, "עם תרגום"]]),
       choice("stops", "לסמן עצירות", [[false, "לא"], [true, "כן"]], "איפה המשפט נגמר. כבוי כברירת מחדל — זה חלק מהלימוד."),

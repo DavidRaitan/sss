@@ -60,7 +60,7 @@ _SEEN = {}
 
 # Bumped whenever the pack's shape or meaning changes. Older packs on disk are
 # rebuilt: version 1 packs had every commentary detached from its line.
-PACK_VERSION = 3
+PACK_VERSION = 4
 
 
 class SefariaError(RuntimeError):
@@ -191,6 +191,7 @@ def build(ref):
     """Everything retrieved about one amud, ready to learn from."""
     source, english, meta = fetch_daf(ref)
     links = fetch_links(ref)
+    masechta = ref.rsplit(" ", 1)[0]
 
     segments = []
     for n, html in enumerate(source, start=1):
@@ -220,6 +221,10 @@ def build(ref):
             by_n[n]["panel"][category] = by_n[n]["panel"].get(category, 0) + 1
 
         if category in KEEP_TEXT:
+            # Pinned to this masechta: a daf's links can carry commentary on
+            # another tractate that quotes it, and that is not on this page.
+            if masechta not in (link.get("index_title") or masechta):
+                continue
             name = commentator(link)
             body = plain(link.get("he"))
             if not body:
@@ -263,6 +268,8 @@ def build(ref):
         "weights": {c: WHO.get(c, {}).get("weight", 20) for c in present},
         "built_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "source": "sefaria.org",
+        # Where a learner would start and stop: mishna, gemara, a baraita.
+        "sections": sugya.sections(segments),
         "segments": segments,
     }
 

@@ -147,3 +147,13 @@ version was written from memory and got two things wrong that together meant no
 real page ever loaded (a version name without its language; anchors trimmed so
 no commentary attached to any line). `tests/recorded/` holds real Sefaria
 responses and `tests/fake_sefaria.py` replays them, as strictly as the real API.
+
+**16. Merged from the parallel session on the same branch.** That session, run
+where Sefaria was reachable, found the same fatal bugs independently, and added
+three things kept here: units of learning read off the page's own markers
+(sugya.sections), a whole-masechta index for "didn't we see this already"
+(masechta_index.py — phrase search now matches across punctuation), and tables
+when three or more positions are in play. Its finding that answers came back
+in Hebrew to English questions made English the default answer language. Its
+floating microphone was not kept: it sat over the gemara and hid words, and it
+had no caption to glance at; the voice bar keeps both.

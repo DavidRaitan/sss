@@ -79,12 +79,36 @@ from them: where they are on the page, what the listener heard them read, which
 extra sources were opened for this turn, which language to answer in. Use them;
 never mention them.
 
-No headers, no bullet lists, no bold, no emoji. Hebrew and Aramaic in Hebrew
-letters."""
+On tables. Count the positions before you answer. Three or more -- three
+tannaim, three Rishonim, three answers to one question -- and the positions go
+in a table, not paragraphs; noticing that the sugya has become a list is your
+job, not theirs. A markdown pipe table, one row per opinion, columns that
+actually distinguish them (who, what they hold, why), a few words a cell, the
+citation in the row:
+
+    | Who | Holds | Because |
+    |---|---|---|
+    | ר' אליעזר | until the end of the first watch | [[ref]] |
+
+A table is shown on the screen and not spoken, so put one sentence before it
+that works when heard alone -- "Three opinions here; they're on the screen" --
+and the one sentence that matters after it. Two positions is a sentence, not a
+table.
+
+On the rest of the masechta. Sometimes the app lists other pages that share
+uncommon wording with the unit they are learning. That is a lead, not a
+claim: say what the pages share, cite the page, and say you have not read it
+here. Never describe what a page you have not been given says.
+
+No headers, no bullet lists, no bold, no emoji outside a table. Hebrew and
+Aramaic in Hebrew letters."""
 
 LANGUAGE = {
+    # English is the default: in use it answered English questions in Hebrew.
+    "en": "Answer in English. Quote Hebrew and Aramaic in Hebrew letters, "
+          "untranslated, inside an English sentence -- that is how they talk and "
+          "how you should talk back.",
     "he": "Answer in Hebrew.",
-    "en": "Answer in English. Keep Hebrew terms and quotations in Hebrew letters.",
     "auto": "Answer in whichever language they mostly used this turn.",
 }
 
@@ -142,10 +166,20 @@ def amud_context(pack):
     return "\n".join(out)
 
 
+def section_of(pack, n):
+    for sec in pack.data.get("sections") or []:
+        if sec["from"] <= n <= sec["to"]:
+            return sec
+    return None
+
+
 def listener_note(pack, n, heard):
     """What the app knows about this turn, in words the partner can use."""
     seg = pack.segment(n)
     parts = ["they are on line %d [[%s]]" % (seg["n"], seg["ref"])]
+    sec = section_of(pack, n)
+    if sec and sec.get("label"):
+        parts.append("inside the unit that opens «%s» (lines %d-%d)" % (sec["label"], sec["from"], sec["to"]))
     if heard and heard.get("mode") in ("reading", "quoting") and heard.get("line"):
         read = heard.get("from_line"), heard.get("line")
         span = "line %d" % read[1] if read[0] == read[1] else "lines %d-%d" % read
@@ -155,6 +189,16 @@ def listener_note(pack, n, heard):
             parts.append("and stopped %d words before the end of the clause «%s»"
                          % (heard["words_left_in_clause"], clause))
     return "[" + "; ".join(parts) + "]"
+
+
+def elsewhere_note(hits):
+    if not hits:
+        return ""
+    out = ["[other pages of the masechta sharing uncommon wording with this unit -- "
+           "leads you have not read:"]
+    for hit in hits:
+        out.append("  [[%s]] shares: %s" % (hit["ref"], ", ".join(hit.get("shares", []))))
+    return "\n".join(out) + "]"
 
 
 def sources_note(chosen):
@@ -172,11 +216,12 @@ def sources_note(chosen):
 
 
 class Partner:
-    def __init__(self, pack, llm, depth="daf", language="auto"):
+    def __init__(self, pack, llm, depth="daf", language="en", index=None):
         self.pack = pack
         self.llm = llm
+        self.index = index
         self.depth = depth if depth in retrieve.DEPTHS else "daf"
-        self.language = language if language in LANGUAGE else "auto"
+        self.language = language if language in LANGUAGE else "en"
         self.known = pack.refs()
         self.system = CONSTITUTION + "\n\n" + amud_context(pack)
 
@@ -189,32 +234,45 @@ class Partner:
         """
         route = route or retrieve.classify(self.llm, said)
         chosen = retrieve.extras(self.pack, n, route, self.depth)
+        # "Didn't we see this ten pages back" is a question about the tractate.
+        # Matched on the whole unit, not the line: a single line is mostly
+        # structural wording, and matching that finds pages shaped the same
+        # rather than about the same thing.
+        elsewhere = []
+        if self.index is not None and route.get("kind") in ("conflict", "structure"):
+            sec = section_of(self.pack, n)
+            lines = range(sec["from"], sec["to"] + 1) if sec else [n]
+            unit = " ".join(self.pack.segment(i)["he_plain"] for i in lines)
+            elsewhere = self.index.related(unit, exclude=self.pack.ref) or []
+        known = self.known | {hit["ref"] for hit in elsewhere}
         language = self.language
         note = listener_note(self.pack, n, heard)
         note += " [%s Depth: %s.]" % (LANGUAGE[language], retrieve.DEPTHS[self.depth])
 
         kept = {"role": "user", "content": note + "\n" + said}
-        now = {"role": "user", "content": "\n".join(p for p in (note, sources_note(chosen), said) if p)}
+        now = {"role": "user", "content": "\n".join(
+            p for p in (note, sources_note(chosen), elsewhere_note(elsewhere), said) if p)}
         cache_key = "chavruta:%s" % self.pack.ref
 
         text = self.llm.say(self.system, history + [now], heavy=True, cache_key=cache_key)
-        verdict = ground.check(text, self.known)
+        verdict = ground.check(text, known)
         if not verdict.ok:
             retry = history + [now, {"role": "assistant", "content": text},
                                {"role": "user", "content": "[from the app, not the learner: " +
                                 verdict.complaint() + " Answer again.]"}]
             text = self.llm.say(self.system, retry, heavy=True, cache_key=cache_key)
-            verdict = ground.check(text, self.known)
+            verdict = ground.check(text, known)
             if not verdict.ok:
                 text = ("אין לי כאן מקור שאני יכול לעמוד מאחוריו, אז אני לא אענה מהזיכרון. בוא נחפש."
                         if language == "he" or (language == "auto" and route.get("language") == "he")
                         else "I don't have a source here I can stand behind, so I won't answer "
                              "that from memory. Let's look it up.")
-                verdict = ground.check(text, self.known)
+                verdict = ground.check(text, known)
 
         history = history + [kept, {"role": "assistant", "content": text}]
         trace = {"kind": route.get("kind"), "claim": route.get("claim"),
-                 "opened": [e["ref"] for _, e in chosen]}
+                 "opened": [e["ref"] for _, e in chosen],
+                 "elsewhere": [hit["ref"] for hit in elsewhere]}
         return text, verdict, history[-24:], trace
 
 
