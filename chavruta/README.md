@@ -33,22 +33,34 @@ conversation, not a chat.
 - **Move by voice**: "go to daf 5 amud b" / "תעבור לדף ה עמוד ב".
 - **Interrupt** it by talking; it stops.
 
-What it will never do: correct *how you read the words*. It hears you through
-speech recognition and cannot know your pronunciation or havara, so it does not
-pretend to. It may tell you where a sentence *stops* — that is printed — and argue
-with what you *say it means*.
+What it will never do: correct *how you say the words* — pronunciation, havara,
+Hebrew for Aramaic. It hears you through speech recognition and cannot know those,
+so it does not pretend to. What it does notice: a *different word* (you read מעשר
+where the page has תרומה), a skipped word that matters, words that are not on the
+page. Then it asks, once — "מעשר? I have בתרומתן here" — and says what it would
+change. (Settings can turn this off.) It may tell you where a sentence *stops* —
+that is printed — and argue with what you *say it means*.
+
+**It goes and gets things.** Ask about the halacha and it says "let me pull up the
+Tur and the Shulchan Aruch", fetches them from Sefaria (with the Rema inside the
+Shulchan Aruch, and the Mishnah Berurah on that seif), and answers from what it
+read. Name a Rishon who isn't printed on the page — Rabbeinu Yonah — and it follows
+the links to him. "Can you hear me?" gets "Yes, I hear you." — short questions get
+short answers.
 
 **Units of learning** are marked where the page opens them — משנה, גמרא, תניא,
 אמר מר — and tapping one lights the whole unit, so "let's finish this piece"
 means something. When three or more opinions are in play, the answer comes as a
-table on the screen (spoken: just the sentence around it).
+table on the screen, read aloud row by row. It speaks up unasked only when you
+finish a unit that holds a real machlokes.
 
 **"Didn't we learn this ten pages back?"** is answerable once the whole
 masechta is indexed (`./run.sh prefetch`, below): it points at the pages that
 share this unit's uncommon wording, as a lead — it says it has not read them.
 
 **On screen**, as a companion to glance at: the words it quotes light up on the page;
-the sources it cites appear as buttons under its answer — tap one to read it.
+the sources it cites are buttons inside its sentences — tap one to read it, even the
+Tur or the Rambam, which open right there.
 **מפרשים** shows everything Sefaria has on the current line, grouped the way the page
 is: on the page, Rishonim, Acharonim, then halacha, Tanakh, parallels. **תמליל** is the
 transcript, and has a box for typing when you cannot speak.
@@ -83,6 +95,7 @@ and to build the whole-masechta index behind "didn't we learn this elsewhere":
     chavruta/align.py         following the reading: where on the page is the learner
     chavruta/partner.py       what the partner is told, and what it is given
     chavruta/retrieve.py      which sources come into a turn, and when
+    chavruta/library.py       going past the page: fetching the codes and linked works live
     chavruta/commentators.py  who answers what, and who is strong where — editorial, correct it
     chavruta/ground.py        nothing is said without a source behind it
     chavruta/sugya.py         the argument a commentary states; the units of a page

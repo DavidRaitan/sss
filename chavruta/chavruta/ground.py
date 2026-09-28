@@ -41,6 +41,12 @@ NAMES = {
     "Tur": (["Tur"], ["הטור"], ["Tur,"]),
     "Rabbeinu Tam": (["Rabbeinu Tam"], ["רבינו תם", "ר~ת"], ["Tosafot on"]),
     "Shita Mekubetzet": (["Shita Mekubetzet"], ["שיטה מקובצת"], ["Shita Mekubetzet"]),
+    # Past the page, reached through links: the Rema speaks inside the
+    # Shulchan Arukh's own text, so a Shulchan Arukh citation stands behind him.
+    "Rema": (["Rema", "Rama", "Remah"], ["רמ~א"], ["Shulchan Arukh"]),
+    "Mishnah Berurah": (["Mishnah Berurah", "Mishna Berura"], ["משנה ברורה"], ["Mishnah Berurah"]),
+    "Rabbeinu Yonah": (["Rabbeinu Yonah"], ["רבינו יונה"], ["Rabbeinu Yonah"]),
+    "Beit Yosef": (["Beit Yosef"], ["בית יוסף"], ["Beit Yosef"]),
 }
 
 
@@ -71,8 +77,9 @@ class Verdict:
         if self.unknown:
             parts.append(
                 "These references are not in the material you were given, so they "
-                "cannot be used: %s. If the answer needs a source you do not have, "
-                "say you do not have it here." % ", ".join(sorted(self.unknown)))
+                "cannot be used: %s. Use only the refs in this prompt and this turn, "
+                "exactly as written; if what you wanted to say is not in them, say "
+                "what they do say." % ", ".join(sorted(self.unknown)))
         if self.uncited:
             parts.append(
                 "You named %s without a citation. Put the [[ref]] right after the "

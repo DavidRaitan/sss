@@ -39,10 +39,19 @@ def router(said):
                 "navigate": {"daf": int(nav.group(1)) if nav else 3,
                              "amud": (nav.group(2) if nav and nav.group(2) else "a")},
                 "language": "en"}
-    names = [n for n in ("Rashba", "Ritva", "Meiri", "Rif", "Rashi", "Tosafot") if n.lower() in low]
-    kind = "halacha" if "halacha" in low else ("conflict" if "elsewhere" in low else "meaning")
+    if re.search(r"can you hear|hear me read|go ahead", low):
+        return {"kind": "ping", "claim": False, "names": [], "navigate": None, "language": "en",
+                "reply": "Yes, I hear you." if "can you" in low else "Go ahead."}
+    names = [n for n in ("Rashba", "Ritva", "Meiri", "Rif", "Rashi", "Tosafot", "Tur",
+                         "Shulchan Aruch", "Rama") if n.lower() in low]
+    if re.search(r"read it (right|correctly)", low):
+        kind = "check_reading"
+    elif re.search(r"halacha|codified|\btur\b|shulchan", low):
+        kind = "halacha"
+    else:
+        kind = "conflict" if "elsewhere" in low else "meaning"
     return {"kind": kind, "claim": "saying" in low, "names": names, "navigate": None,
-            "language": "he" if re.search(r"[א-ת]{3}", said) else "en"}
+            "language": "he" if re.search(r"[א-ת]{3}", said) else "en", "reply": None}
 
 
 def partner(system, messages):
@@ -51,6 +60,13 @@ def partner(system, messages):
     ref = rashi.group(1) if rashi else "Berakhot 2a:1"
     if "UNGROUNDED" in last and not any("[from the app" in m["content"] for m in messages):
         return "The Rashba says the opposite, and so does Rashi."
+    fetched = re.search(r"\[\[(Tur, [^\]]+)\]\]", last)
+    if "fetched from Sefaria just now" in last and fetched:
+        return ("The Tur [[%s]] rules like Rabban Gamliel -- «והלכה כר\"ג» -- even "
+                "לכתחלה, until dawn." % fetched.group(1))
+    swap = re.search(r"said «([^»]+)» where the page has «([^»]+)»", last)
+    if swap:
+        return "%s? I have «%s» here -- and that changes when the time starts." % swap.groups()
     if "[from the app" in last:
         return "Rashi [[%s]] reads «עד סוף האשמורה הראשונה» as a third of the night." % ref
     he = bool(re.search(r"Answer in Hebrew", last)) or \

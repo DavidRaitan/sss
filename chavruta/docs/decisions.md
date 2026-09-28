@@ -129,7 +129,7 @@ vocalized, punctuated, translation under each line — is one tap away.
 with Hebrew numerals, plus arrows, keys, swipe, and voice ("go to daf 5 b").
 One masechta until the routing judgement has been checked on another.
 
-**12. The gemara is never spoken; the partner's own Hebrew is.** Quotes are
+**12. The gemara is never spoken; the partner's own Hebrew is** (revised by 20). Quotes are
 wrapped in «» by the partner, lit on the page, and silenced in speech. The
 first voice stripped *all* Hebrew, which silenced every Hebrew answer.
 
@@ -157,3 +157,59 @@ when three or more positions are in play. Its finding that answers came back
 in Hebrew to English questions made English the default answer language. Its
 floating microphone was not kept: it sat over the gemara and hid words, and it
 had no caption to glance at; the voice bar keeps both.
+
+## After the first real sitting (Berakhot 2a)
+
+The first recorded conversation was read back line by line. What it showed,
+and what changed:
+
+**17. A different word is asked about; an accent never is.** The learner read
+«מעשר» for «בתרומתן» and «השנייה» for «הראשונה», asked "did I read it
+correctly?", and was told "Yes." Decision 5 had been over-applied: the partner
+was told the transcript is always wrong, and reading turns never reached it at
+all. Now the alignment names where speech and print part ways — a swapped
+word, a skipped word that carries meaning, words not on the page — and ignores
+what speech recognition can't hear anyway (קוראים/קורין, בערבית/בערבין). A
+swap is asked about once, as a question, with what it would change ("מעשר?
+then they'd eat it in daylight"). Readings are remembered, so "did I read it
+right" is answered from what was heard. There is a setting to turn it off.
+
+**18. It goes and gets the source instead of saying it doesn't have it.**
+"Was this codified in the Tur?" got "I don't have a source… let's look it
+up", and it never looked. The page already says where to go: the ein mishpat
+names the Rambam, Tur and Shulchan Arukh (the Rema is inside its text); the
+Shulchan Arukh's links lead to the Mishnah Berurah on that seif; the Rif's lead
+to Rabbeinu Yonah. `library.py` fetches these in parallel, cached, with a
+deadline. While it fetches, the partner says so aloud ("let me pull up the
+Tur"), streamed ahead of the answer. Everything fetched is citable because it
+was read, and only then.
+
+**19. The size of the answer follows the question.** "Can you hear me?" got a
+sentence about the first watch. Small exchanges (mic checks, "go ahead",
+thanks) are recognised by the router, which also writes the few words back —
+no heavy model and no sources. Every other kind carries a length.
+
+**20. Short quotes are spoken (supersedes 12).** Silencing «quotes» left the
+learner hearing "it begins … and ends …", and a table was skipped entirely.
+Quotes are spoken and also lit on the page; tables are read row by row; only a
+run of nine or more of the page's own words is cut, keeping its first words so
+the sentence still points somewhere. A citation that the sentence leaned on
+("the text at [[Tur…]] and [[Shulchan Arukh…]]") is said as the book's name, and
+on screen citations sit in the sentence as buttons rather than leaving holes.
+
+**21. Warmer, and confident.** The partner hedged ("it's blurred", "not
+exact") and never played. It may now enjoy the page and the learner — the
+apple in the mishna deserves a laugh — as long as every claim has a source
+behind it. It may not argue from silence ("the Rif doesn't decide", from one
+line of the Rif).
+
+**22. Speaking up waits for the end of a unit.** The Tosafot remark broke in
+after the first line of the masechta. It now comes when the reader finishes
+the mishna, baraita or piece of gemara that holds the machlokes. A Tosafot's
+voices are labelled (Rashi → questions → Rabbeinu Tam → the Ri) in the pack,
+on the panel and in the prompt, so they are not run together.
+
+**23. The sources panel.** Ordered by number (2a:2 before 2a:10), argument
+shapes only on works that argue (not on remez), the Rishonim that Sefaria hangs
+on other lines of the amud one tap away, and every reference — halacha,
+Tanakh, Talmud — opens its text in place.

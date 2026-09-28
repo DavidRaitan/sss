@@ -35,6 +35,16 @@ def words(text):
     return [w for w in (norm(t) for t in text.split()) if w]
 
 
+def tokens(text):
+    """The heard words as said (for quoting back) beside their reduced form."""
+    out = []
+    for t in text.split():
+        k = norm(t)
+        if k:
+            out.append((t.strip(".,;:?!\"'()[]«»—-"), k))
+    return out
+
+
 def hebrew_share(text):
     he, la = len(HEBREW_CHAR.findall(text)), len(LATIN_CHAR.findall(text))
     return he / float(he + la) if he + la else 0.0
@@ -44,18 +54,21 @@ class Page:
     """Every word on the amud, with where it sits: line, clause, place in clause."""
 
     def __init__(self, pack):
-        self.words, self.where, self.at = [], [], []
+        self.words, self.where, self.at, self.surface = [], [], [], []
         for segment in pack["segments"]:
             clauses = segment.get("clauses") or [{"i": 0, "he": segment["he"]}]
             place = 0  # the word's place in its line, counted the way the page counts
             for clause in clauses:
-                ws = words(clause["he"])
+                said = tokens(NIKUD.sub("", clause["he"]))
+                ws = [k for _, k in said]
                 for k, w in enumerate(ws):
+                    self.surface.append(said[k][0])
                     self.words.append(w)
                     self.where.append((segment["n"], clause["i"], k, len(ws)))
                     self.at.append(place)
                     place += 1
         self._sim = {}
+        self.vocabulary = set(self.words)
 
     def grams(self, n):
         """Every run of n consecutive words on the amud, for spotting quotation."""
@@ -81,9 +94,11 @@ class Page:
 
         Smith-Waterman over words: the heard words need not be complete or in
         perfect order, and whatever they said before or after the reading does
-        not count against the match.
+        not count against the match. Also returns the alignment itself, so the
+        places where what was said and what is printed part ways can be named.
         """
-        heard = words(transcript)
+        said = tokens(transcript)
+        heard = [k for _, k in said]
         if not heard or not self.words:
             return None
         rows, cols = len(heard), len(self.words)
@@ -105,23 +120,34 @@ class Page:
             prev = cur
         if not best_at:
             return None
-        # Walk back to find where the matched run began and how much matched.
+        # Walk back: where the matched run began, how much matched, and each
+        # step of the alignment -- same, swapped, said-but-not-printed, or
+        # printed-but-not-said.
         i, j = best_at
-        matched, end_j, start_j = 0, j - 1, j - 1
-        # Rebuild scores cheaply by re-walking the trace.
+        end_i, end_j = i, j - 1
+        matched, start_j, start_i = 0, j - 1, i - 1
+        ops = []
         while i > 0 and j > 0 and (i, j) in trace:
             step = trace[(i, j)]
             if step == 0:
-                if self.sim(heard[i - 1], self.words[j - 1]) >= SIMILAR:
-                    matched += 1
-                start_j = j - 1
+                same = self.sim(heard[i - 1], self.words[j - 1]) >= SIMILAR
+                matched += same
+                ops.append(("same" if same else "swap", i - 1, j - 1))
+                start_j, start_i = j - 1, i - 1
                 i, j = i - 1, j - 1
             elif step == 1:
+                ops.append(("added", i - 1, None))
                 i -= 1
             else:
+                ops.append(("skipped", None, j - 1))
                 j -= 1
+        ops.reverse()
         return {"score": best, "matched": matched, "heard": len(heard),
-                "start": start_j, "end": end_j}
+                "start": start_j, "end": end_j, "start_heard": start_i, "end_heard": end_i,
+                "ops": ops, "said": said}
+
+    def printed(self, j):
+        return self.surface[j] if j < len(self.surface) else self.words[j]
 
 
 def listen(page, transcript):
@@ -160,16 +186,92 @@ def listen(page, transcript):
         "word": page.at[hit["end"]],
         "words_left_in_clause": left,
     }
+    slips = differences(page, hit)
+    if slips:
+        result["slips"] = slips
     return result
 
 
-def unspeak(text, page, run=4):
-    """Cut any stretch of the page's own words out of what will be spoken.
+# Small words the recogniser drops or invents all the time. Never worth a word.
+LIGHT = {norm(w) for w in "את של על ד ו ה לא הוא היא ליה להו אי מאי הכי נמי קא וכו כי אם עד כל זה".split()}
+# Below this, two words are different words rather than two spellings or two
+# pronunciations of one: מעשר/בתרומתן, השנייה/הראשונה -- but not
+# בערבית/בערבין or קוראים/קורין, which is how people say it and none of our business.
+DIFFERENT = 0.66
 
-    The partner marks its quotations with «» and those are silenced already;
-    this is the net underneath, for the time it forgets. Any run of `run` or
-    more consecutive words that appears on the amud is replaced with a pause,
-    so the rule "the gemara is never spoken" holds whatever the model does.
+
+def differences(page, hit):
+    """Where what was said and what is printed part ways -- in meaning, not accent.
+
+    A swapped word, a word that carries meaning left out, words that are not
+    on the page at all. These are the things a chavruta across the table
+    would hear and ask about ("מעשר? it says תרומה"), as opposed to how a
+    word was pronounced, which is none of the partner's business and which
+    speech recognition cannot hear anyway.
+    """
+    said, ops = hit["said"], hit["ops"]
+    swapped, skipped, added = [], [], []
+    for op, i, j in ops:
+        if op == "swap":
+            a, b = said[i][1], page.words[j]
+            if page.sim(a, b) < DIFFERENT and len(b) >= 3 and len(a) >= 2 and a not in LIGHT:
+                swapped.append([said[i][0], page.printed(j)])
+        elif op == "skipped":
+            if len(page.words[j]) >= 3 and page.words[j] not in LIGHT:
+                skipped.append(page.printed(j))
+        elif op == "added":
+            if len(said[i][1]) >= 3 and said[i][1] not in LIGHT:
+                added.append(said[i][0])
+    # What came after the last word that lined up. One or two words are the
+    # end of the reading said differently ("...האשמורה השנייה"); more is
+    # something else they said, in Hebrew, that is not on the page.
+    tail = said[hit["end_heard"]:]
+    after = ""
+    if tail and any(HEBREW_CHAR.search(w) for w, _ in tail):
+        if len(tail) <= 2:
+            for k, (word, key) in enumerate(tail):
+                j = hit["end"] + 1 + k
+                if j < len(page.words) and page.sim(key, page.words[j]) < DIFFERENT \
+                        and len(page.words[j]) >= 3 and key not in LIGHT:
+                    swapped.append([word, page.printed(j)])
+        elif sum(1 for _, key in tail if key in page.vocabulary) < 0.6 * len(tail):
+            # Mostly words the amud does not have. (Mostly words it does have
+            # is reading that skipped ahead, which is theirs to do.)
+            after = " ".join(w for w, _ in tail)
+    out = {}
+    if swapped:
+        out["swapped"] = swapped[:4]
+    if skipped:
+        out["skipped"] = skipped[:4]
+    if added:
+        out["added"] = added[:4]
+    if after:
+        out["after"] = after
+    return out
+
+
+def describe(slips):
+    """The comparison in a sentence the partner can use."""
+    parts = []
+    for said, printed in slips.get("swapped", []):
+        parts.append("said «%s» where the page has «%s»" % (said, printed))
+    if slips.get("skipped"):
+        parts.append("did not say «%s»" % "», «".join(slips["skipped"]))
+    if slips.get("added"):
+        parts.append("added «%s», which is not on the page" % "», «".join(slips["added"]))
+    if slips.get("after"):
+        parts.append("then went on, not from the page: «%s»" % slips["after"])
+    return "; ".join(parts)
+
+
+def unspeak(text, page, run=9, keep=5):
+    """Keep the voice from reading the gemara back to them.
+
+    Short quotes are how a chavruta points ("it says «עד חצות»") and are
+    spoken. A stretch of nine or more of the page's own words in a row is the
+    machine reading the daf aloud, which is the learner's job: the first few
+    words are kept, so the sentence still points somewhere, and the rest
+    becomes a pause.
     """
     tokens = text.split()
     keys = [norm(t) for t in tokens]
@@ -178,7 +280,7 @@ def unspeak(text, page, run=4):
     for i in range(len(tokens) - run + 1):
         window = keys[i:i + run]
         if all(window) and tuple(window) in grams:
-            for j in range(i, i + run):
+            for j in range(i + keep, i + run):
                 silence[j] = True
     out, quiet = [], False
     for token, hush in zip(tokens, silence):

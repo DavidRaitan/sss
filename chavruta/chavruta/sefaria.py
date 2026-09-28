@@ -59,8 +59,9 @@ DASH_OPENING = re.compile(r"^(.{2,90}?)\s+[–—-]\s+")
 _SEEN = {}
 
 # Bumped whenever the pack's shape or meaning changes. Older packs on disk are
-# rebuilt: version 1 packs had every commentary detached from its line.
-PACK_VERSION = 4
+# rebuilt: version 1 packs had every commentary detached from its line;
+# version 5 names who speaks in each move of an argument.
+PACK_VERSION = 5
 
 
 class SefariaError(RuntimeError):

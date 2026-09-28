@@ -16,7 +16,7 @@ function el(tag, cls, text) {
 /* ---------------------------------------------------------------- settings */
 
 const DEFAULTS = { view: "daf", depth: "daf", language: "en", voice: "natural",
-  hearing: "api", speak: true, pause: "normal", nudges: true, translate: false, stops: false };
+  hearing: "api", speak: true, pause: "normal", nudges: true, checks: true, translate: false, stops: false };
 const PAUSES = { short: 1000, normal: 1500, long: 2400 };
 function loadSettings() {
   try { return Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem("chavruta.settings") || "{}")); }
@@ -445,18 +445,27 @@ function chipFor(ref) {
   if (/^Mishneh Torah/.test(ref)) label = "רמב״ם · " + ref.replace(/^Mishneh Torah,\s*/, "");
   else if (/^Shulchan Arukh/.test(ref)) label = "שו״ע · " + ref.replace(/^Shulchan Arukh,\s*/, "");
   else if (/^Tur,/.test(ref)) label = "טור · " + ref.replace(/^Tur,\s*/, "");
-  return { label, go: () => window.open(sefariaUrl(ref), "_blank", "noopener") };
+  else if (/^Mishnah Berurah/.test(ref)) label = "משנה ברורה · " + ref.replace(/^Mishnah Berurah\s*/, "");
+  else if (/^Rabbeinu Yonah/.test(ref)) label = "רבינו יונה";
+  return { label, go: () => openText(ref) };
 }
 
-// A reply as it should look: «quotes» set in the page's type, [[refs]] lifted
-// out into buttons, and a pipe table drawn as a table. Returns the refs cited.
+// A reply as it should look: «quotes» set in the page's type, [[refs]] as
+// small buttons where they stand in the sentence (lifting them out left
+// "we need the text at and and"), and a pipe table drawn as a table.
+// Returns the refs cited.
 function renderRich(box, text) {
   const refs = [];
-  const lift = (t) => t.replace(/\[\[([^\]]+)\]\]/g, (_, ref) => { if (!refs.includes(ref)) refs.push(ref); return ""; });
   const inline = (parent, t) => {
-    for (const part of lift(t).split(/(«[^»]+»)/)) {
+    for (const part of t.split(/(«[^»]+»|\[\[[^\]]+\]\])/)) {
+      if (!part) continue;
       if (/^«.*»$/.test(part)) parent.append(el("q", null, part.slice(1, -1)));
-      else parent.append(document.createTextNode(part.replace(/\s+([,.;:?!])/g, "$1")));
+      else if (/^\[\[.*\]\]$/.test(part)) {
+        const ref = part.slice(2, -2).trim();
+        if (!refs.includes(ref)) refs.push(ref);
+        const c = chipFor(ref), b = el("button", "chip inline", c.label);
+        b.title = ref; b.onclick = c.go; parent.append(b);
+      } else parent.append(document.createTextNode(part.replace(/\s+([,.;:?!])/g, "$1")));
     }
   };
   const lines = text.split("\n");
@@ -487,10 +496,7 @@ function showReply(text, opts) {
   r.hidden = !text; r.replaceChildren(); chips.replaceChildren();
   r.classList.toggle("hint", !!opts.hint);
   if (!text) return;
-  for (const ref of renderRich(r, text)) {
-    const c = chipFor(ref), b = el("button", "chip", c.label);
-    b.title = ref; b.onclick = c.go; chips.append(b);
-  }
+  renderRich(r, text);
   if (opts.grounded === false) chips.append(el("span", "chip warn", "לא נמצא מקור — אל תסמוך על זה"));
 }
 
@@ -498,9 +504,28 @@ function showReply(text, opts) {
 
 let player = null, speakingDone = null;
 
+// The same rules as the server's speakable(): quotes are spoken, a table is
+// read row by row, and a citation is dropped where it follows its name.
 function speakable(text) {
-  return text.split("\n").filter((l) => !l.trim().startsWith("|")).join("\n")
-    .replace(/\[\[[^\]]+\]\]/g, "").replace(/«[^»]*»/g, " … ")
+  const out = [], lines = text.split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    if (!lines[i].trim().startsWith("|")) { out.push(lines[i]); continue; }
+    const rows = [];
+    while (i < lines.length && lines[i].trim().startsWith("|")) rows.push(lines[i++].trim());
+    i--;
+    const sep = (r) => /^\|[\s:|-]+\|$/.test(r);
+    let body = rows.filter((r) => !sep(r));
+    if (body.length > 1 && rows.some(sep)) body = body.slice(1);
+    out.push(body.map((r) => r.replace(/^\||\|$/g, "").split("|").map((c) => c.replace(/\[\[[^\]]+\]\]/g, "").trim())
+      .filter(Boolean).join(", ") + ".").join(" "));
+  }
+  return out.join("\n")
+    .replace(/\[\[([^\]]+)\]\]/g, (m, ref, at, all) => {
+      const name = ref.split(/ on |,/)[0].replace(/ \d.*$/, "");
+      return all.slice(Math.max(0, at - 60), at).toLowerCase().includes(name.split(" ")[0].toLowerCase()) ||
+        /[א-ת]["'״׳]?[א-ת]*\s*$/.test(all.slice(Math.max(0, at - 20), at)) ? "" : name;
+    })
+    .replace(/«([^»]*)»/g, "$1")
     .replace(/\s+([,.;:?!])/g, "$1").replace(/(\s*…\s*){2,}/g, " … ").replace(/\s{2,}/g, " ").trim();
 }
 
@@ -726,6 +751,36 @@ async function post(path, body, raw) {
   return data;
 }
 
+// /api/say answers in lines of JSON: sometimes a "let me pull up the Tur" line
+// while Sefaria is asked, then the answer. onLine sees each one as it lands.
+async function postStream(path, body, onLine) {
+  const r = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(Object.assign({ stream: true }, body)) });
+  if (!r.ok) {
+    let data = {};
+    try { data = await r.json(); } catch (e) {}
+    throw Object.assign(new Error(data.error || "http_" + r.status), { code: data.error });
+  }
+  if (!/ndjson/.test(r.headers.get("Content-Type") || "")) return r.json();
+  const reader = r.body.getReader(), dec = new TextDecoder();
+  let buf = "", last = null;
+  const take = (line) => {
+    if (!line.trim()) return;
+    const msg = JSON.parse(line);
+    if (msg.error) throw Object.assign(new Error(msg.error), { code: msg.error });
+    if (msg.mode === "interim") onLine(msg); else last = msg;
+  };
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    let k;
+    while ((k = buf.indexOf("\n")) >= 0) { take(buf.slice(0, k)); buf = buf.slice(k + 1); }
+  }
+  take(buf);
+  return last;
+}
+
 function explain(err) {
   const code = (err && (err.code || err.message)) || "";
   if (/OPENAI_API_KEY|api key|401/i.test(code)) return "המפתח ל-OpenAI לא עובד — בדוק את .env.";
@@ -743,10 +798,10 @@ async function handle(u) {
   const t0 = performance.now();
   try {
     const q = "ref=" + encodeURIComponent(S.pack.ref) + "&line=" + S.line + "&session=" + S.session +
-      "&language=" + S.settings.language;
+      "&language=" + S.settings.language + "&checks=" + (S.settings.checks ? 1 : 0);
     heard = u.blob ? await post("/api/hear?" + q, u.blob, u.blob.type || "audio/webm")
       : await post("/api/heard", { ref: S.pack.ref, line: S.line, session: S.session,
-          language: S.settings.language, said: u.text });
+          language: S.settings.language, said: u.text, checks: S.settings.checks });
   } catch (e) { return setMode(S.listening ? "listening" : "idle", explain(e), true); }
   if (!heard.said || heard.mode === "silence") return setMode(S.listening ? "listening" : "idle", "לא שמעתי מילים — נסה שוב.");
 
@@ -756,8 +811,12 @@ async function handle(u) {
   if (heard.line) selectLine(heard.line, { scroll: "side" });
   markRead(heard.heard);
 
+  if (heard.mode === "reading" && heard.respond) {
+    // A word came out as a different word: the chavruta asks, once.
+    return respond(heard, { about_reading: true });
+  }
   if (heard.mode === "reading") {
-    // Reading: follow along, say nothing -- unless this is the hinge of a machlokes.
+    // Reading: follow along, say nothing -- unless a unit just ended on a machlokes.
     setMode("listening", "עוקב אחרי הקריאה — שורה " + heard.line + ".");
     if (heard.nudge && S.settings.nudges) {
       showReply(heard.nudge + (heard.nudge_ref ? " [[" + heard.nudge_ref + "]]" : ""));
@@ -768,13 +827,27 @@ async function handle(u) {
     return;
   }
 
+  return respond(heard);
+}
+
+// Ask the partner and say what comes back.
+async function respond(heard, extra) {
   setMode("thinking", "חושב…");
   const t1 = performance.now();
-  let answer;
+  let answer, interim = null, meanwhile = null;
   try {
-    answer = await post("/api/say", { ref: S.pack.ref, line: S.line, session: S.session, said: heard.said,
-      heard: heard.heard, depth: S.settings.depth, language: S.settings.language });
+    answer = await postStream("/api/say", Object.assign({ ref: S.pack.ref, line: S.line, session: S.session,
+      said: heard.said, heard: heard.heard, depth: S.settings.depth, language: S.settings.language }, extra || {}),
+      (msg) => {
+        // "Let me pull up the Tur" -- said while Sefaria is asked.
+        interim = msg.text;
+        showReply(msg.text, { hint: true });
+        S.log.push({ me: false, text: msg.text, interim: true });
+        meanwhile = say(msg.text).then(() => setMode("thinking", "פותח את הספרים…"));
+      });
   } catch (e) { return setMode(S.listening ? "listening" : "idle", explain(e), true); }
+  if (meanwhile) await meanwhile;
+  if (!answer) return setMode(S.listening ? "listening" : "idle", explain(null), true);
 
   if (answer.mode === "navigate") {
     showReply("עובר ל" + runnerText(answer.ref) + ".", { hint: true });
@@ -821,6 +894,45 @@ function tier(name) {
   return "עוד";
 }
 
+// Works whose comments argue (a reading, a question on it, an answer): their
+// shape is worth drawing. Remez, derush and running explanation are not --
+// "קושיא ← קושיא" over a gematria only misleads.
+const ARGUED = new Set(["Tosafot", "Tosafot HaRosh", "Tosafot Rid", "Rashba", "Ritva", "Ramban", "Ran",
+  "Meiri", "Rosh", "Shita Mekubetzet", "Ra'ah", "Maharsha", "Penei Yehoshua", "Tzelach", "Rashash",
+  "Chiddushei Rabbi Akiva Eiger", "Reshimot Shiurim"]);
+
+// "Meiri on Berakhot 2a:10" after 2a:9, not after 2a:1.
+function refKey(ref) {
+  return (ref.match(/\d+/g) || []).map(Number);
+}
+function byRef(a, b) {
+  const x = refKey(a), y = refKey(b);
+  for (let i = 0; i < Math.max(x.length, y.length); i++) {
+    if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) - (y[i] || 0);
+  }
+  return a.localeCompare(b);
+}
+
+// A Tosafot as its moves, with who is speaking and repeats counted:
+// פירוש רש״י ← קושיא ×4 ← ר״ת ← קושיא ← תירוץ ← … ← ר״י ← מסקנה
+function drawShape(moves) {
+  const shape = el("div", "shape"), runs = [];
+  for (const m of moves) {
+    const label = m.by && m.kind !== "conclusion" ? (m.kind === "position" ? "פירוש " + m.by : m.by)
+      : (MOVES[m.kind] || m.kind);
+    const last = runs[runs.length - 1];
+    if (last && last.label === label && !m.by) last.n++;
+    else runs.push({ label, n: 1, m });
+  }
+  runs.forEach((r, i) => {
+    if (i) shape.append(el("span", "arrow", "←"));
+    const t = el("span", "mv " + r.m.kind + (r.m.by ? " by" : ""), r.label + (r.n > 1 ? " ×" + r.n : ""));
+    t.title = r.m.marker + " — " + r.m.text.slice(0, 120);
+    shape.append(t);
+  });
+  return shape;
+}
+
 function openSources(n, focus) {
   if (!S.pack) return;
   const seg = S.pack.segments.find((s) => s.n === n) || S.pack.segments[0];
@@ -830,8 +942,9 @@ function openSources(n, focus) {
     for (const [name, list] of Object.entries(seg.commentaries))
       for (const e of list) (groups[tier(name)] = groups[tier(name)] || []).push([name, e]);
     let target = null;
+    const weight = (name) => (S.pack.weights || {})[name] || 0;
     for (const g of ["על הדף", "ראשונים", "אחרונים", "עוד"]) {
-      const rows = (groups[g] || []).sort((a, b) => ((S.pack.weights || {})[b[0]] || 0) - ((S.pack.weights || {})[a[0]] || 0));
+      const rows = (groups[g] || []).sort((a, b) => weight(b[0]) - weight(a[0]) || a[0].localeCompare(b[0]) || byRef(a[1].ref, b[1].ref));
       if (!rows.length) continue;
       panel.append(el("div", "grp", g));
       for (const [name, e] of rows) {
@@ -839,18 +952,8 @@ function openSources(n, focus) {
         const who = el("div", "who", heName(name));
         if (e.dibur) who.append(el("span", "dib", e.dibur));
         box.append(who, el("div", "body", e.he));
-        if (e.structure && e.structure.moves && e.structure.moves.length) {
-          // The argument the comment states about itself, as its shape:
-          // פירוש → קושיא → קושיא → פירוש אחר → תירוץ → מסקנה.
-          const shape = el("div", "shape");
-          e.structure.moves.forEach((m, i) => {
-            if (i) shape.append(el("span", "arrow", "←"));
-            const t = el("span", "mv " + m.kind, MOVES[m.kind] || m.kind);
-            t.title = m.marker + " — " + m.text.slice(0, 120);
-            shape.append(t);
-          });
-          box.append(shape);
-        }
+        const moves = (e.structure && e.structure.moves) || [];
+        if (ARGUED.has(name) && moves.length >= 2) box.append(drawShape(moves));
         const meta = el("div", "meta");
         const more = el("button", "more", "הכל");
         more.onclick = () => { box.classList.toggle("open"); more.textContent = box.classList.contains("open") ? "פחות" : "הכל"; };
@@ -860,16 +963,73 @@ function openSources(n, focus) {
         panel.append(box);
       }
     }
+    // The Rishonim on this amud that Sefaria hangs on other lines -- the Rosh
+    // on this mishna sits on line 12. One tap takes you to them.
+    const here = new Set(Object.keys(seg.commentaries));
+    const elsewhere = {};
+    for (const other of S.pack.segments) {
+      if (other.n === seg.n) continue;
+      for (const name of Object.keys(other.commentaries))
+        if (!here.has(name) && tier(name) === "ראשונים") (elsewhere[name] = elsewhere[name] || []).push(other.n);
+    }
+    const names = Object.keys(elsewhere).sort((a, b) => weight(b) - weight(a));
+    if (names.length) {
+      panel.append(el("div", "grp", "ראשונים בשורות אחרות בעמוד"));
+      const box = el("div", "others");
+      for (const name of names) {
+        for (const ln of elsewhere[name].slice(0, 3)) {
+          const b = el("button", "chip", heName(name) + " · שורה " + ln);
+          b.onclick = () => { selectLine(ln); openSources(ln); };
+          box.append(b);
+        }
+      }
+      panel.append(box);
+    }
     const related = Object.assign({}, seg.related || {});
     if (seg.halacha && seg.halacha.length) related.Halakhah = [...new Set(seg.halacha.concat(related.Halakhah || []))];
     for (const cat of Object.keys(RELATED_HE)) {
       const refs = related[cat]; if (!refs || !refs.length) continue;
       panel.append(el("div", "grp", RELATED_HE[cat]));
       const box = el("div", "rel");
-      for (const r of refs) { const a = el("a", null, r); a.href = sefariaUrl(r); a.target = "_blank"; a.rel = "noopener"; box.append(a); }
+      for (const r of refs) box.append(textLink(r));
       panel.append(box);
     }
     if (target) setTimeout(() => target.scrollIntoView({ block: "center" }), 60);
+  });
+}
+
+// A reference that opens its text right here, fetched from Sefaria through the
+// server, with Sefaria itself one more tap away.
+function textLink(ref) {
+  const wrap = el("div", "tl");
+  const a = el("button", "tref", ref);
+  const body = el("div", "body"); body.hidden = true; body.dir = "rtl";
+  a.onclick = async () => {
+    if (!body.hidden) { body.hidden = true; return; }
+    body.hidden = false;
+    if (body.dataset.done) return;
+    body.textContent = "פותח…";
+    try {
+      const r = await fetch("/api/text?ref=" + encodeURIComponent(ref));
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error);
+      body.textContent = data.he;
+      body.dataset.done = "1";
+      const go = el("a", "lnk", "בספריא ↗"); go.href = sefariaUrl(ref); go.target = "_blank"; go.rel = "noopener";
+      body.append(el("br"), go);
+    } catch (e) { body.textContent = "לא הצלחתי להביא את זה מספריא."; }
+  };
+  wrap.append(a, body);
+  return wrap;
+}
+
+// A source off the page, opened in the panel -- the Tur the partner cited.
+function openText(ref) {
+  openPanel((panel) => {
+    panel.append(el("h2", null, chipFor(ref).label || ref), el("div", "sub", ref));
+    const link = textLink(ref);
+    panel.append(link);
+    link.querySelector(".tref").click();
   });
 }
 
@@ -884,6 +1044,7 @@ function openLog() {
       else renderRich(row, t.text);
       if (t.trace) row.append(el("span", "trace", "routed: " + t.trace.kind + (t.trace.claim ? " · claim" : "") +
         (t.trace.opened && t.trace.opened.length ? " · opened: " + t.trace.opened.join(", ") : "") +
+        (t.trace.fetched && t.trace.fetched.length ? " · fetched: " + t.trace.fetched.join(", ") : "") +
         (t.trace.elsewhere && t.trace.elsewhere.length ? " · elsewhere: " + t.trace.elsewhere.join(", ") : "")));
       panel.append(row);
     }
@@ -923,15 +1084,20 @@ function sessionReport() {
       lines.push("ME: " + t.text);
       if (hd.mode && hd.mode !== "talking")
         lines.push("   [aligned: lines " + (hd.from_line || "?") + "-" + (hd.line || "?") + ", coverage " + hd.coverage +
-          (hd.stopped_mid_clause ? ", stopped mid-clause, " + hd.words_left_in_clause + " words left" : "") + "]");
+          (hd.stopped_mid_clause ? ", stopped mid-clause, " + hd.words_left_in_clause + " words left" : "") +
+          (hd.slips ? ", differs from the page: " + JSON.stringify(hd.slips) : "") + "]");
     } else {
+      if (t.interim) { lines.push("CHAVRUTA (while fetching): " + t.text, ""); continue; }
       lines.push("CHAVRUTA" + (t.ms_answer ? " (" + t.ms_answer + " ms to answer" +
         (t.ms_spoken ? ", " + t.ms_spoken + " ms speaking" : "") + ")" : "") + ":");
       lines.push(t.text);
       const tr = t.trace || {};
       if (tr.kind) lines.push("   [routed: " + tr.kind + (tr.claim ? ", claim" : "") +
         (tr.names && tr.names.length ? ", named " + tr.names.join("/") : "") +
+        (tr.quick ? " · quick reply" : "") +
         (tr.opened && tr.opened.length ? " · opened " + tr.opened.join(", ") : "") +
+        (tr.fetched && tr.fetched.length ? " · fetched " + tr.fetched.join(", ") + " in " + tr.fetch_seconds + "s" : "") +
+        (tr.missed && tr.missed.length ? " · could not fetch " + tr.missed.join(", ") : "") +
         (tr.elsewhere && tr.elsewhere.length ? " · elsewhere " + tr.elsewhere.join(", ") : "") +
         (t.grounded === false ? " · UNGROUNDED" : "") + "]");
       if (tr.first_try) lines.push("   [first try was rejected: " + tr.first_try.problem + "]\n   " + tr.first_try.text);
@@ -974,7 +1140,9 @@ function openSettings() {
       choice("stops", "לסמן עצירות", [[false, "לא"], [true, "כן"]], "איפה המשפט נגמר. כבוי כברירת מחדל — זה חלק מהלימוד."),
       choice("pause", "כמה לחכות לפני שאני עונה", [["short", "קצר"], ["normal", "רגיל"], ["long", "ארוך"]],
         "אם הוא קוטע אותך באמצע מחשבה — בחר ארוך."),
-      choice("nudges", "הערות יזומות", [[true, "כן"], [false, "לא"]], "רק כשמגיעים לנקודה שבה המפרשים נחלקים."),
+      choice("nudges", "הערות יזומות", [[true, "כן"], [false, "לא"]], "בסוף יחידה (משנה, ברייתא), כשיש בה מחלוקת מפרשים."),
+      choice("checks", "לשאול על מילה שיצאה אחרת", [[true, "כן"], [false, "לא"]],
+        "כשאמרת מילה אחרת מהכתוב (מעשר במקום תרומה) — לא על מבטא או הגייה."),
       choice("speak", "שיענה בקול", [[true, "כן"], [false, "לא"]]),
       choice("voice", "קול", [["natural", "טבעי (OpenAI)"], ["browser", "הדפדפן (חינם)"]]),
       choice("hearing", "זיהוי דיבור", [["api", "מדויק, עברית ואנגלית יחד"], ["browser", "הדפדפן (חינם, שפה אחת)"]]),

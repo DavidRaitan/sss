@@ -89,9 +89,27 @@ def moves(body):
                 "at": offset + match.start(),
                 "text": clause,
                 "names": sorted(set(NAMED.findall(clause))),
+                "by": speaker(kind, clause),
             })
             break
     return found
+
+
+# Who a reading belongs to, when the clause says so in its opening words:
+# "פי' רש"י", "לכן פי' ר"ת", "על כן אומר ר"י". A Tosafot is often three voices --
+# Rashi's reading, Rabbeinu Tam's, the Ri's -- and they must not be run together.
+SPEAKERS = [(_p(r"רש~י|הקונטרס"), "רש״י"), (_p(r"ר~ת|רבינו תם"), "ר״ת"), (_p(r"ר~י(?!ף)"), "ר״י"),
+            (_p(r"ריב~א"), "ריב״א"), (_p(r"ר~ח|רבינו חננאל"), "ר״ח")]
+
+
+def speaker(kind, clause):
+    if kind not in ("position", "alternative", "conclusion"):
+        return None
+    head = clause[:30]
+    for pattern, name in SPEAKERS:
+        if pattern.search(head):
+            return name
+    return None
 
 
 def citations(body):

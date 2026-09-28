@@ -265,23 +265,82 @@ class LLM:
 
 # -- what gets spoken ----------------------------------------------------------
 
-QUOTE = re.compile(r"«[^»]*»")
-CITE = re.compile(r"\[\[[^\]]+\]\]")
+QUOTE = re.compile(r"«([^»]*)»")
+CITE = re.compile(r"\[\[([^\]]+)\]\]")
+SEPARATOR = re.compile(r"^\|[\s:|-]+\|$")
+
+# How a cited book is said aloud when the sentence leaned on the citation
+# instead of naming it ("at [[Tur, Orach Chayim 235]] and ..." read as "at and").
+SAY_AS = [("Mishneh Torah", "the Rambam"), ("Shulchan Arukh", "the Shulchan Aruch"),
+          ("Tur,", "the Tur"), ("Rashi on", "Rashi"), ("Tosafot on", "Tosafot"),
+          ("Mishnah Berurah", "the Mishnah Berurah")]
+
+
+def said_as(ref):
+    for prefix, name in SAY_AS:
+        if ref.startswith(prefix):
+            return name
+    if " on " in ref:
+        return ref.split(" on ")[0]
+    head = ref.split(",")[0]
+    return head.rsplit(" ", 1)[0] if head[-1:].isdigit() and " " in head else head
+
+
+def _names(name):
+    bare = name.replace("the ", "").lower()
+    return {bare, bare.split()[0]}
+
+
+def _cite_aloud(text):
+    """Drop a citation that follows its name; say the book where nothing named it."""
+    out, last = [], 0
+    for m in CITE.finditer(text):
+        before = text[max(0, m.start() - 60):m.start()].lower()
+        name = said_as(m.group(1).strip())
+        out.append(text[last:m.start()])
+        hebrew_name = re.search(r"[א-ת][\"'״׳]?[א-ת]*\s*$", text[max(0, m.start() - 20):m.start()])
+        if not (any(n in before for n in _names(name)) or hebrew_name):
+            out.append(name)
+        last = m.end()
+    out.append(text[last:])
+    return "".join(out)
+
+
+def _table_aloud(rows):
+    """A table read the way you would read it to someone: row by row."""
+    spoken = []
+    body = [r for r in rows if not SEPARATOR.match(r)]
+    if len(body) > 1 and any(SEPARATOR.match(r) for r in rows):
+        body = body[1:]  # the header row is for the eye
+    for row in body:
+        cells = [CITE.sub("", c).strip() for c in row.strip().strip("|").split("|")]
+        cells = [c for c in cells if c]
+        if cells:
+            spoken.append(", ".join(cells) + ".")
+    return " ".join(spoken)
 
 
 def speakable(text):
     """The reply as it should sound.
 
-    Citations are for the screen. Quotations of the text -- which the partner
-    wraps in «» -- are shown and highlighted on the page instead of read aloud,
-    because synthesised Aramaic sounds wrong to exactly the ear that would
-    notice, and reading the gemara is the learner's job, not the machine's.
-    Everything else is spoken, in whatever language it is in.
+    Everything is spoken, in whatever language it is in -- including the short
+    quotations, which the partner marks with «» and which are also lit on the
+    page. (Silencing them left the learner hearing "it begins … and ends …".)
+    Citations are for the screen. A table is read out row by row.
     """
-    # A table is for the eye; reading pipes aloud helps nobody.
-    out = "\n".join(l for l in text.split("\n") if not l.strip().startswith("|"))
-    out = CITE.sub("", out)
-    out = QUOTE.sub(" … ", out)
-    out = re.sub(r"\s+([,.;:?!])", r"\1", out)
-    out = re.sub(r"(\s*…\s*){2,}", " … ", out)
-    return re.sub(r"\s{2,}", " ", out).strip()
+    lines, out, i = text.split("\n"), [], 0
+    while i < len(lines):
+        if lines[i].strip().startswith("|"):
+            rows = []
+            while i < len(lines) and lines[i].strip().startswith("|"):
+                rows.append(lines[i].strip())
+                i += 1
+            out.append(_table_aloud(rows))
+            continue
+        out.append(lines[i])
+        i += 1
+    spoken = _cite_aloud("\n".join(out))
+    spoken = QUOTE.sub(lambda m: m.group(1), spoken)
+    spoken = re.sub(r"\s+([,.;:?!])", r"\1", spoken)
+    spoken = re.sub(r"(\s*…\s*){2,}", " … ", spoken)
+    return re.sub(r"\s{2,}", " ", spoken).strip()

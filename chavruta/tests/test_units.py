@@ -18,7 +18,7 @@ os.environ.update(CHAVRUTA_SEFARIA_API=SEF_URL, OPENAI_BASE_URL=OAI_URL, OPENAI_
 
 from chavruta import sefaria  # noqa: E402
 importlib.reload(sefaria)
-from chavruta import align, ground, partner, retrieve  # noqa: E402
+from chavruta import align, ground, library, partner, retrieve, sugya  # noqa: E402
 from chavruta.llm import LLM, speakable  # noqa: E402
 from chavruta.pack import Pack  # noqa: E402
 
@@ -158,6 +158,46 @@ class Routing(unittest.TestCase):
         got = {name for name, _ in retrieve.extras(self.pack, 1, {"kind": "halacha"}, "daf")}
         self.assertTrue({"Rif", "Meiri"} & got)
 
+    def test_halacha_opens_where_the_meiri_rules_not_where_he_starts(self):
+        refs = [e["ref"] for _, e in retrieve.extras(self.pack, 1, {"kind": "halacha"}, "daf")]
+        self.assertIn("Meiri on Berakhot 2a:2", refs)       # "ולענין פסק הלכה"
+        self.assertNotIn("Meiri on Berakhot 2a:1", refs)
+        self.assertTrue(any(r.startswith("Rosh on Berakhot") for r in refs))  # hung on line 12
+
+    def test_a_mic_check_opens_nothing_whatever_the_depth(self):
+        self.assertEqual(retrieve.extras(self.pack, 1, {"kind": "ping"}, "rishonim"), [])
+        self.assertEqual(retrieve.plan(self.pack, 1, {"kind": "ping"}), [])
+
+    def test_halacha_plans_the_codes_from_the_ein_mishpat(self):
+        jobs = [job for job, _ in retrieve.plan(self.pack, 1, {"kind": "halacha", "names": []})]
+        self.assertIn(("text", "Tur, Orach Chayim 235"), jobs)
+        self.assertIn(("text", "Shulchan Arukh, Orach Chayim 235:1"), jobs)
+        self.assertIn(("text", "Mishneh Torah, Reading the Shema 1:9"), jobs)
+        self.assertIn(("follow", "Shulchan Arukh, Orach Chayim 235:1", "Mishnah Berurah"), jobs)
+
+    def test_a_rishon_off_the_page_is_reached_through_the_rif(self):
+        jobs = [job for job, _ in retrieve.plan(self.pack, 1, {"kind": "meaning", "names": ["Rabbeinu Yonah"]})]
+        self.assertEqual(jobs, [("follow", "Rif Berakhot 1a:1", "Rabbeinu Yonah")])
+        found, missed, _ = library.gather(jobs)
+        self.assertEqual(found[0][0], "Rabbeinu Yonah")
+
+
+class Library(unittest.TestCase):
+    def test_the_mishnah_berurah_on_this_seif_only(self):
+        got = library.follow("Shulchan Arukh, Orach Chayim 235:1", "Mishnah Berurah")
+        refs = [e["ref"] for _, e in got]
+        self.assertEqual(refs[0], "Mishnah Berurah 235:1")
+        self.assertEqual(len(refs), 15)          # not 233:5 or 90:32, which quote it
+        self.assertTrue(all(r.startswith("Mishnah Berurah 235:") for r in refs))
+
+    def test_the_rema_comes_inside_the_shulchan_arukh(self):
+        self.assertIn("הגה", library.text("Shulchan Arukh, Orach Chayim 235:1")["he"])
+
+    def test_names_as_people_say_them(self):
+        self.assertEqual(library.name_of("Tur, Orach Chayim 235"), "Tur")
+        self.assertEqual(library.name_of("Mishnah Berurah 235:4"), "Mishnah Berurah")
+        self.assertEqual(library.name_of("Rabbeinu Yonah on Berakhot 1a:1"), "Rabbeinu Yonah")
+
 
 class Partner(unittest.TestCase):
     pack = Pack(PACK)
@@ -167,8 +207,55 @@ class Partner(unittest.TestCase):
         self.assertEqual(ctx.count("=== LINE"), 14)
         self.assertIn("[[Tosafot on Berakhot 2a:1:1]]", ctx)
 
-    def test_never_correct_their_words(self):
-        self.assertIn("Never correct their Hebrew", partner.CONSTITUTION)
+    def test_never_correct_their_accent_but_ask_about_a_different_word(self):
+        self.assertIn("never comment on how a word was pronounced", partner.CONSTITUTION)
+        self.assertIn("never \"yes\" when it shows a swapped word", partner.CONSTITUTION)
+
+    def test_a_mic_check_gets_a_few_words_and_no_thinking(self):
+        fake_openai.STATE["log"].clear()
+        text, verdict, history, trace = partner.Partner(self.pack, LLM()).ask(1, [], "can you hear me?")
+        self.assertEqual(text, "Yes, I hear you.")
+        self.assertTrue(trace["quick"])
+        self.assertEqual([e["model"] for e in fake_openai.STATE["log"] if e["path"] == "chat"], ["gpt-5.6-luna"] * 2)
+
+    def test_did_i_read_it_right_is_answered_from_what_was_heard(self):
+        page = align.Page(PACK)
+        said = "מאימתי קורין את שמע בערבית משעה שהכהנים נכנסים לאכול מעשר עד סוף האשמורה השנייה"
+        heard = align.listen(page, said)
+        text, verdict, _, _ = partner.Partner(self.pack, LLM()).ask(
+            1, [], "did I read it correctly?", recent=[{"said": said, "heard": heard}])
+        self.assertIn("מעשר?", text)
+        self.assertIn("בתרומתן", text)
+
+    def test_a_halacha_question_goes_and_gets_the_codes(self):
+        said_meanwhile = []
+        text, verdict, _, trace = partner.Partner(self.pack, LLM()).ask(
+            1, [], "was this codified in the Tur or Shulchan Aruch or the Rama?", announce=said_meanwhile.append)
+        self.assertTrue(verdict.ok, text)
+        self.assertIn("[[Tur, Orach Chayim 235]]", text)
+        self.assertIn("Tur, Orach Chayim 235", trace["fetched"])
+        self.assertIn("Shulchan Arukh, Orach Chayim 235:1", trace["fetched"])
+        self.assertTrue(any(r.startswith("Mishnah Berurah 235:") for r in trace["fetched"]))
+        self.assertIn("the Tur", said_meanwhile[0])
+
+    def test_the_fallback_names_what_it_checked_and_passes_the_gate(self):
+        entry = {"ref": "Tur, Orach Chayim 235", "he": "x"}
+        text = partner.fallback([("Tur", entry)], "en")
+        self.assertIn("the Tur [[Tur, Orach Chayim 235]]", text)
+        self.assertTrue(ground.check(text, {"Tur, Orach Chayim 235"}).ok)
+        self.assertNotIn("look it up", text)
+
+    def test_the_nudge_waits_for_the_end_of_the_unit(self):
+        self.assertIsNone(partner.unit_nudge(self.pack, {"line": 1}, "en", set()))
+        text, ref, n = partner.unit_nudge(self.pack, {"line": 5}, "en", set())
+        self.assertIn("Rashi", text)
+        self.assertEqual(n, 1)
+        self.assertIsNone(partner.unit_nudge(self.pack, {"line": 5}, "en", {(self.pack.ref, 1)}))
+
+    def test_tosafot_voices_are_kept_apart(self):
+        line = partner.argument_line(PACK["segments"][0]["commentaries"]["Tosafot"][0]["structure"])
+        self.assertIn("position (by רש״י) -> difficulty x4 -> alternative (by ר״ת)", line)
+        self.assertIn("alternative (by ר״י)", line)
 
     def test_nudge_only_at_the_real_machlokes(self):
         self.assertIn("Rashi", partner.nudge(self.pack, 1, "en")[0])
@@ -185,31 +272,66 @@ class Partner(unittest.TestCase):
 
 
 class Speaking(unittest.TestCase):
-    def test_quotes_and_citations_are_not_spoken(self):
-        said = speakable("תסתכל על «עד סוף האשמורה» [[Rashi on Berakhot 2a:1:2]] — רש״י אומר שליש הלילה.")
-        self.assertNotIn("האשמורה", said)
-        self.assertNotIn("[[", said)
-        self.assertIn("רש״י אומר", said)   # its own Hebrew is spoken
+    def test_short_quotes_are_spoken_and_citations_are_not(self):
+        # In use the silenced quotes left "it begins … and ends …".
+        said = speakable("Rashi [[Rashi on Berakhot 2a:1:2]] reads «עד סוף האשמורה» as a third of the night.")
+        self.assertEqual(said, "Rashi reads עד סוף האשמורה as a third of the night.")
 
-    def test_a_table_is_shown_not_spoken(self):
-        said = speakable("Three opinions; they're on the screen.\n| Who | Holds |\n|---|---|\n| ר' אליעזר | first watch |\nSo the Rabbis are in the middle.")
+    def test_a_citation_used_as_a_word_leaves_no_hole(self):
+        # In use: "we need the actual text at and and."
+        said = speakable("We need the text at [[Tur, Orach Chayim 235]] and [[Shulchan Arukh, Orach Chayim 235:1]].")
+        self.assertEqual(said, "We need the text at the Tur and the Shulchan Aruch.")
+
+    def test_a_table_is_read_row_by_row(self):
+        said = speakable("Three opinions.\n| Who | Holds |\n|---|---|\n| ר' אליעזר | «סוף האשמורה» [[Rashi on Berakhot 2a:1:2]] |\n| חכמים | עד חצות |\nSo the Rabbis are in the middle.")
         self.assertNotIn("|", said)
-        self.assertIn("on the screen", said)
+        self.assertNotIn("Who", said)
+        self.assertIn("ר' אליעזר, סוף האשמורה.", said)
+        self.assertIn("חכמים, עד חצות.", said)
         self.assertIn("in the middle", said)
 
-    def test_unmarked_gemara_is_still_not_spoken(self):
+    def test_a_long_stretch_of_gemara_is_not_read_back(self):
         page = align.Page(PACK)
-        said = align.unspeak("So look: עד סוף האשמורה הראשונה דברי רבי אליעזר — that is his view.", page)
-        self.assertNotIn("האשמורה", said)
+        line = "מאימתי קורין את שמע בערבין משעה שהכהנים נכנסים לאכול בתרומתן עד סוף האשמורה הראשונה"
+        said = align.unspeak("So look: %s — that is his view." % line, page)
+        self.assertNotIn("בתרומתן", said)
+        self.assertIn("מאימתי קורין", said)          # the first words still point
         self.assertIn("that is his view", said)
+        short = "he reads עד סוף האשמורה הראשונה as a third"
+        self.assertEqual(align.unspeak(short, page), short)
         own = "רש״י אומר שזה שליש הלילה, ולכן חכמים חולקים עליו"
-        self.assertEqual(align.unspeak(own, page), own)   # the partner's own Hebrew stays
+        self.assertEqual(align.unspeak(own, page), own)
 
     def test_effort_ladder_survives_a_refusal(self):
         fake_openai.STATE["log"].clear()
         LLM().say("x", [{"role": "user", "content": "y"}], heavy=False)
         efforts = [e["effort"] for e in fake_openai.STATE["log"] if e["path"] == "chat"]
         self.assertEqual(efforts[:2], ["none", "minimal"])
+
+
+class Reading(unittest.TestCase):
+    page = align.Page(PACK)
+
+    def test_a_different_word_is_noticed(self):
+        heard = align.listen(self.page, "מאימתי קורין את שמע בערבית משעה שהכהנים נכנסים לאכול מעשר "
+                                        "עד סוף האשמורה השנייה")
+        self.assertEqual(heard["mode"], "reading")
+        self.assertEqual(heard["slips"]["swapped"], [["מעשר", "בתרומתן"], ["השנייה", "הראשונה"]])
+
+    def test_how_they_say_it_is_not_noticed(self):
+        heard = align.listen(self.page, "מאימתי קרינן את שמע בערבית משעה שהכהנים נכנסין לאכול בתרומתם "
+                                        "עד סוף אשמורה הראשונה")
+        self.assertNotIn("slips", heard)
+
+    def test_words_that_are_not_on_the_page(self):
+        heard = align.listen(self.page, "ממתי קוראים את שמע בערבית? משעה שנכנסים לאכול מעשר, "
+                                        "באמצע הלילה אני אוהב לאכול תפוח.")
+        self.assertIn("תפוח", heard["slips"]["after"])
+        self.assertIn("שהכהנים", heard["slips"]["skipped"])
+
+    def test_who_speaks_in_a_tosafot(self):
+        struct = sugya.structure("x", PACK["segments"][0]["commentaries"]["Tosafot"][0]["he"])
+        self.assertEqual([m["by"] for m in struct["moves"] if m["by"]], ["רש״י", "ר״ת", "ר״י"])
 
 
 class Server(unittest.TestCase):

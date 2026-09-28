@@ -13,9 +13,20 @@ learner named it, because the question is the kind that commentator answers,
 or because the learner has asked to learn deeper.
 """
 
-from . import commentators as who
+import re
 
-KINDS = list(who.ROUTES) + ["reading", "navigate", "other"]
+from . import commentators as who
+from . import library
+
+# Beyond the question kinds: the small exchanges of sitting together, which
+# want a few words back and not a lecture.
+LIGHT = {
+    "ping": "checking you can hear them, telling you to go ahead or listen while "
+            "they read, thanks, hello, a joke -- anything that needs a few words back",
+    "check_reading": "asking whether they read it right, or whether they missed or "
+                     "swapped a word",
+}
+KINDS = list(who.ROUTES) + list(LIGHT) + ["reading", "navigate", "other"]
 
 # Depth: how far past the printed page to reach without being asked.
 DEPTHS = {
@@ -35,7 +46,10 @@ study partner. Reply with JSON only:
           (e.g. "Rashi", "Tosafot", "Rashba", "Rambam", "Meiri"), else [],
  "navigate": {"daf": number, "amud": "a" or "b"} if they asked to go to a
              page, else null,
- "language": "he" if they spoke mostly Hebrew, "en" if mostly English}
+ "language": "he" if they spoke mostly Hebrew, "en" if mostly English,
+ "reply": only when kind is "ping": the few words a study partner across the
+          table would say back, in their language ("Yes, I hear you.", "Go
+          ahead.", "כן, שומע אותך.", "יאללה, קדימה."), else null}
 
 The kinds:
 %s
@@ -45,7 +59,7 @@ The kinds:
 
 Hebrew numerals for pages: ב=2, י=10, יא=11, טו=15, כ=20, ל=30, מ=40, נ=50, ס=60.
 "עמוד א" is a, "עמוד ב" is b. If no amud is said, use a.""" % (
-    KINDS, "\n".join("- %s: %s" % (k, v) for k, v in who.ROUTES.items()))
+    KINDS, "\n".join("- %s: %s" % (k, v) for k, v in list(who.ROUTES.items()) + list(LIGHT.items())))
 
 
 def classify(llm, said):
@@ -53,7 +67,8 @@ def classify(llm, said):
     try:
         out = llm.json(ROUTER_SYSTEM, [{"role": "user", "content": said}], heavy=False)
     except Exception:
-        return {"kind": "other", "claim": False, "names": [], "navigate": None, "language": None}
+        return {"kind": "other", "claim": False, "names": [], "navigate": None, "language": None,
+                "reply": None}
     kind = out.get("kind")
     nav = out.get("navigate")
     if not (isinstance(nav, dict) and str(nav.get("daf", "")).isdigit()):
@@ -66,6 +81,7 @@ def classify(llm, said):
         "names": [str(n) for n in (out.get("names") or []) if n][:4],
         "navigate": nav,
         "language": out.get("language") if out.get("language") in ("he", "en") else None,
+        "reply": str(out["reply"])[:160] if kind == "ping" and out.get("reply") else None,
     }
 
 
@@ -97,8 +113,27 @@ ALIASES = {
     "shitamekubetzet": "Shita Mekubetzet", "shittahmekubbetzet": "Shita Mekubetzet",
     "rabbeinuchananel": "Rabbeinu Chananel", "rabbeinutam": "Tosafot",
     "steinsaltz": "Steinsaltz", "rabbiakivaeiger": "Chiddushei Rabbi Akiva Eiger",
-    "akivaeiger": "Chiddushei Rabbi Akiva Eiger",
+    "akivaeiger": "Chiddushei Rabbi Akiva Eiger", "tzelach": "Tzelach", "צלח": "Tzelach",
+    # Past the page: reached through the links rather than found in the pack.
+    "rabbeinuyonah": "Rabbeinu Yonah", "רבינויונה": "Rabbeinu Yonah",
+    "tur": "Tur", "טור": "Tur", "הטור": "Tur",
+    "shulchanarukh": "Shulchan Arukh", "shulchanaruch": "Shulchan Arukh",
+    "שולחןערוך": "Shulchan Arukh", "שוע": "Shulchan Arukh",
+    "rama": "Rema", "rema": "Rema", "ramo": "Rema", "רמא": "Rema",
+    "mishnahberurah": "Mishnah Berurah", "mishnaberura": "Mishnah Berurah",
+    "משנהברורה": "Mishnah Berurah", "magenavraham": "Magen Avraham",
+    "taz": "Turei Zahav", "טז": "Turei Zahav", "beityosef": "Beit Yosef", "ביתיוסף": "Beit Yosef",
+    "bach": "Bach", "arukhhashulchan": "Arukh HaShulchan", "kafhachayim": "Kaf HaChayim",
+    "shiltei hagiborim": "Shiltei HaGiborim", "shilteihagiborim": "Shiltei HaGiborim",
 }
+
+# The codes, and where each hangs: the Rema is inside the Shulchan Arukh's
+# text; the later poskim are comments on its seif, or on the Tur's siman.
+CODES = ("Rambam", "Tur", "Shulchan Arukh")
+ON_THE_SEIF = ("Mishnah Berurah", "Magen Avraham", "Turei Zahav", "Kaf HaChayim",
+               "Beur HaGra", "Biur Halacha", "Ba'er Hetev")
+ON_THE_TUR = ("Beit Yosef", "Bach", "Prisha")
+ON_THE_RIF = ("Rabbeinu Yonah", "Shiltei HaGiborim", "Ra'ah")
 
 
 def _key(name):
@@ -115,23 +150,43 @@ def _canonical(name, present):
     return target if target in present else None
 
 
+def resolve(name, present):
+    """A spoken name as the pack or the library knows it, or None."""
+    return _canonical(name, present) or ALIASES.get(_key(name)) or ALIASES.get(name.lower())
+
+
+# Where a commentary says it is ruling. Positional choice picked the Meiri's
+# opening paragraph when asked about halacha, while "ולענין פסק הלכה" sat three
+# comments further down the same amud.
+RULING = re.compile(r"^.{0,40}?(פסק|הלכה|הלכתא|נמצא|לענין מעשה|והלכך)")
+
+# Small exchanges and page-turns open nothing: a mic check does not need the Meiri.
+QUIET = ("ping", "reading", "navigate")
+
+
 def extras(pack, n, route, depth="daf", budget=7):
-    """Bench sources that come into this one turn, beyond the backbone."""
+    """Sources already in the pack that come into this one turn, beyond the backbone."""
+    kind = route.get("kind")
+    if kind in QUIET:
+        return []
     masechta = pack.data.get("masechta", "")
     present = set(pack.commentators())
     backbone = set(who.backbone_for(masechta))
     chosen = []
 
+    def add(pair):
+        if pair not in chosen:
+            chosen.append(pair)
+
     def take(names, reach, per=2):
         for name in names:
             if name in backbone or name not in present:
                 continue
-            got = _near(pack, n, name, reach)[:per]
-            for pair in got:
-                if pair not in chosen:
-                    chosen.append(pair)
+            for pair in _near(pack, n, name, reach)[:per]:
+                add(pair)
 
-    # Named by the learner: always, and look further afield for them.
+    # Named by the learner: always, and look across the whole amud for them --
+    # Sefaria hangs the Rosh on this mishna off line 12.
     for spoken in route.get("names", []):
         match = _canonical(spoken, present)
         if match:
@@ -140,9 +195,14 @@ def extras(pack, n, route, depth="daf", budget=7):
             if len(chosen) == before:
                 take([match], 99, per=2)
 
-    kind = route.get("kind")
     if kind == "halacha":
-        take(["Rif", "Rosh", "Meiri"], 2)
+        # Where the Rishonim on this amud say how it is ruled, wherever it sits.
+        for segment in pack.segments:
+            for name in ("Meiri", "Rosh", "Rif", "Tosafot HaRosh", "Rashba"):
+                for entry in segment["commentaries"].get(name, []):
+                    if RULING.search(entry["he"]) and len(chosen) < 4:
+                        add((name, entry))
+        take(["Rif", "Rosh"], 99, per=1)
     elif kind in ("logic", "conflict"):
         take(who.wide_for(masechta, [kind])[:3], 1, per=1)
     elif kind == "on_commentary":
@@ -150,9 +210,83 @@ def extras(pack, n, route, depth="daf", budget=7):
     elif kind == "structure":
         take(["Meiri"], 1, per=1)
 
-    if depth in ("rishonim", "acharonim"):
-        take(who.wide_for(masechta)[:5], 1, per=1)
-    if depth == "acharonim":
-        take(ACHARONIM, 1, per=1)
+    if kind not in ("check_reading",):
+        if depth in ("rishonim", "acharonim"):
+            take(who.wide_for(masechta)[:5], 1, per=1)
+        if depth == "acharonim":
+            take(ACHARONIM, 1, per=1)
 
     return chosen[:budget]
+
+
+def _line_refs(pack, n, reach=0):
+    lines = [s for s in pack.segments if abs(s["n"] - n) <= reach]
+    lines.sort(key=lambda s: abs(s["n"] - n))
+    return lines
+
+
+def plan(pack, n, route):
+    """What to go and get from Sefaria for this turn -- the calls past the page.
+
+    Returns [(job, label)], where a job is what library.gather runs and the
+    label is the book as a person would say it, for "let me pull up ...".
+    """
+    kind = route.get("kind")
+    if kind in QUIET or kind == "check_reading":
+        return []
+    present = set(pack.commentators())
+    jobs = []
+
+    def add(job, label):
+        if job not in [j for j, _ in jobs]:
+            jobs.append((job, label))
+
+    # The ein mishpat of the whole unit they are in, nearest lines first, two
+    # per code: asked from the end of the mishna about its opening, the line
+    # alone pointed at the Rambam on sacrifices rather than on Shema.
+    sec = next((x for x in pack.data.get("sections") or [] if x["from"] <= n <= x["to"]), None)
+    lines = [s for s in pack.segments if sec and sec["from"] <= s["n"] <= sec["to"]] or _line_refs(pack, n, 3)
+    lines.sort(key=lambda s: abs(s["n"] - n))
+    found, titles = {}, set()
+    for segment in lines:
+        for ref in segment.get("halacha", []):
+            book = library.name_of(ref)
+            title = ref.rsplit(" ", 1)[0]   # "Mishneh Torah, Reading the Shema"
+            if book not in CODES or ref in found.setdefault(book, []) or len(found[book]) >= 2:
+                continue
+            if book == "Rambam" and title in titles:
+                continue  # one halacha per set of hilchot, so each topic is heard
+            titles.add(title)
+            found[book].append(ref)
+    codes = {book: refs[0] for book, refs in found.items()}
+    rif = [e["ref"] for s in _line_refs(pack, n, reach=2)
+           for e in s["commentaries"].get("Rif", [])][:1]
+
+    named = [resolve(x, present) for x in route.get("names", [])]
+    named = [x for x in named if x]
+    wants_codes = kind == "halacha" or any(x in CODES + ("Rema",) + ON_THE_SEIF + ON_THE_TUR for x in named)
+    if wants_codes:
+        for book in CODES:
+            for ref in found.get(book, []):
+                add(("text", ref), book)
+        later = [x for x in named if x in ON_THE_SEIF] or ["Mishnah Berurah"]
+        for seif in found.get("Shulchan Arukh", []):
+            for book in later:
+                add(("follow", seif, book), book)
+        tur = codes.get("Tur")
+        for book in [x for x in named if x in ON_THE_TUR]:
+            if tur:
+                add(("follow", tur, book), book)
+
+    # A Rishon who is not on this page but hangs off the Rif.
+    for book in named:
+        if book in ON_THE_RIF and rif:
+            add(("follow", rif[0], book), book)
+
+    # "I remember the opposite elsewhere": what the page itself points at.
+    if kind == "conflict":
+        seg = pack.segment(n)
+        mine = re.compile(r"^%s \d+[ab]:\d+(-\d+)?$" % re.escape(pack.data.get("masechta", "")))
+        for ref in [r for r in seg.get("xrefs", []) if mine.match(r)][:2]:
+            add(("text", ref), ref)
+    return jobs

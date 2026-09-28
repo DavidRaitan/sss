@@ -56,11 +56,22 @@ def synthetic_text(ref):
                  "languageFamilyName": "english", "actualLanguage": "en", "text": en}]}
 
 
+def _name(ref):
+    return ref.replace(" ", "_").replace(":", "_")
+
+
 def texts(ref, versions):
+    if not ref.startswith("Berakhot "):
+        whole = _load("texts_%s.json.gz" % _name(ref))
+        # A book other than the gemara: what the partner fetches on demand.
+        data = whole or {"ref": ref, "heRef": ref, "versions": [
+            {"versionTitle": "synthetic", "languageFamilyName": "hebrew", "actualLanguage": "he",
+             "isSource": True, "text": "טקסט של %s לבדיקות." % ref}]}
+        return dict(data, versions=[v for v in data["versions"] if v.get("languageFamilyName") == "hebrew"])
     line = None
     if re.search(r":\d+$", ref):             # a single line, as the health check asks
         ref, line = ref.rsplit(":", 1)
-    data = _load("texts_%s.json.gz" % ref.replace(" ", "_")) or synthetic_text(ref)
+    data = _load("texts_%s.json.gz" % _name(ref)) or synthetic_text(ref)
     if line:
         data = dict(data, versions=[dict(v, text=v["text"][int(line) - 1]) for v in data["versions"]])
     wanted = []
@@ -81,9 +92,11 @@ def texts(ref, versions):
 
 
 def links(ref):
-    data = _load("links_%s.json.gz" % ref.replace(" ", "_"))
+    data = _load("links_%s.json.gz" % _name(ref))
     if data is not None:
         return data
+    if not ref.startswith("Berakhot "):
+        return []
     return [{"ref": "Rashi on %s:%d:1" % (ref, i), "anchorRef": "%s:%d" % (ref, i),
              "anchorRefExpanded": ["%s:%d" % (ref, i)], "category": "Commentary",
              "type": "commentary", "collectiveTitle": {"en": "Rashi", "he": "רש\"י"},

@@ -144,11 +144,20 @@ def main():
         page.wait_for_selector(".seg")
 
         if args.part in ("all", "voice"):
-            # 1. They read line 1 aloud: followed silently, then the one nudge.
-            queue_transcript(control, "מאימתי קורין את שמע בערבין משעה שהכהנים נכנסים לאכול בתרומתן "
-                                      "עד סוף האשמורה הראשונה דברי רבי אליעזר")
-            # 2. Then they say what they think it means.
+            # The sitting that taught us what was wrong, replayed.
+            line1 = ("מאימתי קורין את שמע בערבין משעה שהכהנים נכנסים לאכול בתרומתן "
+                     "עד סוף האשמורה הראשונה דברי רבי אליעזר")
+            queue_transcript(control, line1)                                  # 1. read right: silence
+            queue_transcript(control, line1.replace("בתרומתן", "מעשר"))      # 2. a different word: asked
+            queue_transcript(control, "וחכמים אומרים עד חצות רבן גמליאל אומר עד שיעלה עמוד השחר "
+                                      "מעשה ובאו בניו מבית המשתה אמרו לו לא קרינו את שמע אמר להם "
+                                      "אם לא עלה עמוד השחר חייבין אתם לקרות ולא זו בלבד אמרו אלא כל מה "
+                                      "שאמרו חכמים עד חצות מצותן עד שיעלה עמוד השחר הקטר חלבים ואברים "
+                                      "מצותן עד שיעלה עמוד השחר וכל הנאכלים ליום אחד מצותן עד שיעלה "
+                                      "עמוד השחר אם כן למה אמרו חכמים עד חצות כדי להרחיק אדם מן העבירה")  # 3. to the end of the mishna
             queue_transcript(control, "so he's saying you read shema whenever you happen to go to sleep")
+            queue_transcript(control, "and was this codified in the Tur or Shulchan Aruch or the Rama?")
+            queue_transcript(control, "can you hear me?")
             page.click("#mic")
             page.wait_for_function("['listening','capturing'].includes(document.querySelector('#mic').dataset.state)",
                                    timeout=8000)
@@ -156,46 +165,67 @@ def main():
             page.wait_for_function("document.querySelectorAll('.w.read').length > 5", timeout=25000)
             check("follows the reading on the page", page.locator(".w.read").count() >= 10,
                   "(%d words marked)" % page.locator(".w.read").count())
-            page.wait_for_function("/Tosafot|תוספות/.test(document.querySelector('#reply').textContent)", timeout=25000)
-            check("speaks up once at the Tosafot, in the chosen language",
-                  "Rashi" in page.inner_text("#reply") or "רש״י" in page.inner_text("#reply"),
-                  page.inner_text("#reply")[:80])
-            check("marks exactly the words read", page.locator(".w.read").count() == 17,
-                  "(%d of line 1's 17)" % page.locator(".w.read").count())
+            said = lambda pattern, t=60000: page.wait_for_function(
+                "S.log.some((t) => !t.me && %s.test(t.text))" % pattern, timeout=t)
+            said("/מעשר\\?/")
+            log = page.evaluate("S.log.map((t) => [t.me ? 'me' : 'it', t.mode || '', t.text])")
+            check("a clean reading gets no reply", log[0][:2] == ["me", "reading"] and log[1][0] == "me",
+                  str(log[:2])[:160])
+            check("a different word is asked about, once", sum("מעשר?" in t[2] for t in log) == 1,
+                  next((t[2] for t in log if "מעשר?" in t[2]), "")[:90])
+            said("/takes on Rashi/")
+            check("speaks up at the end of the mishna, not the first line", True)
             shot("03-reading")
-            page.wait_for_function("document.querySelector('#reply').textContent.includes(\"can't be right\")",
-                                   timeout=40000)
-            check("answers the explanation", True, page.inner_text("#reply")[:90])
-            check("cites with a tappable chip", page.locator(".chip").count() >= 1,
-                  str(page.locator(".chip").all_inner_texts()))
-            check("lights the quoted words on the page", page.locator(".w.quoted").count() >= 3,
-                  "(%d)" % page.locator(".w.quoted").count())
+            said("/can't be right/")
+            check("answers the explanation", True)
+            said("/pull up/")
+            said("/rules like Rabban Gamliel/")
+            log = page.evaluate("S.log.map((t) => [t.me ? 'me' : 'it', t.interim ? 'interim' : '', t.text])")
+            fetching = next(t[2] for t in log if t[1] == "interim")
+            check("says it is fetching, then answers from the Tur", "the Tur" in fetching, fetching)
+            said("/^Yes, I hear you\\.$/")
+            check("a mic check gets a few words", True)
             shot("04-answer")
-            log = json.loads(urllib.request.urlopen(control + "/control/log").read())
-            spoken = [e for e in log if e["path"] == "speech"]
-            check("reply was spoken", bool(spoken))
-            # The chavruta's own Hebrew is spoken; the text of the daf never is.
-            check("gemara never sent to the voice",
-                  not any("עד סוף האשמורה" in e["input"] or "[[" in e["input"] for e in spoken),
-                  " | ".join(e["input"][:50] for e in spoken))
-            heard = [e for e in log if e["path"] == "transcribe"]
+            spoken = [e for e in json.loads(urllib.request.urlopen(control + "/control/log").read())
+                      if e["path"] == "speech"]
+            check("replies are spoken", len(spoken) >= 5, "(%d)" % len(spoken))
+            check("the fetching line is spoken before the answer",
+                  any("pull up" in e["input"] for e in spoken))
+            check("short quotes are spoken, the gemara is not read back",
+                  any("בתרומתן" in e["input"] for e in spoken) and
+                  not any("נכנסים לאכול בתרומתן עד סוף האשמורה הראשונה" in e["input"] for e in spoken),
+                  " | ".join(e["input"][:40] for e in spoken[:4]))
+            check("no citation markers reach the voice", not any("[[" in e["input"] for e in spoken))
+            heard = [e for e in json.loads(urllib.request.urlopen(control + "/control/log").read())
+                     if e["path"] == "transcribe"]
             check("transcription primed with the page",
                   bool(heard) and any("מאימתי" in e["prompt"] for e in heard),
                   heard[0]["prompt"][-60:] if heard else "")
             report = page.evaluate("sessionReport()")
-            check("session export has the whole turn",
-                  "heard as reading" in report and "routed:" in report and "ms to answer" in report,
+            check("session export has the whole sitting",
+                  "heard as reading" in report and "differs from the page" in report and
+                  "Tur, Orach Chayim 235" in report and "while fetching" in report and "quick reply" in report,
                   "(%d chars)" % len(report))
             if args.shots:
                 open(os.path.join(args.shots, "session.md"), "w").write(report)
             recorded = os.listdir(os.path.join(os.path.dirname(HERE), "sessions"))
             check("each turn is recorded on disk", bool(recorded), str(recorded))
-            page.click(".chip")
+            page.click("#mic")
+            # Citations sit in the sentence and open what they cite.
+            page.evaluate("showReply(S.log.find((t) => /can't be right/.test(t.text)).text)")
+            check("a citation sits inside the sentence", page.locator("#reply .chip.inline").count() >= 1)
+            page.click("#reply .chip.inline")
             page.wait_for_selector("#over.open", timeout=5000)
             check("chip opens the source", page.locator(".src.flash").count() == 1)
             shot("05-source")
             page.keyboard.press("Escape")
-            page.click("#mic")
+            page.evaluate("showReply(S.log.find((t) => /rules like Rabban Gamliel/.test(t.text)).text)")
+            page.click("#reply .chip.inline")
+            page.wait_for_function("/הלכה כר/.test((document.querySelector('.tl .body') || {}).textContent || '')",
+                                   timeout=8000)
+            check("a code off the page opens in the panel, fetched from Sefaria", True)
+            shot("06-tur")
+            page.keyboard.press("Escape")
             check("mic closes", page.get_attribute("#mic", "data-state") == "idle")
 
         page.click("#open-settings")

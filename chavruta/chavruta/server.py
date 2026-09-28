@@ -5,7 +5,9 @@
     GET  /api/daf?ref=           an amud's pack (built from Sefaria, then cached)
     POST /api/hear?ref=&line=    audio in; what was said, and whether it was reading
     POST /api/heard              the same for words the browser already recognised
-    POST /api/say                a turn of conversation
+    POST /api/say                a turn of conversation (streamed: a "let me pull
+                                 that up" line first when it goes to Sefaria)
+    GET  /api/text?ref=          any text on Sefaria, for the sources panel
     POST /api/speak              a reply as audio, never the gemara
     GET  /api/health             what works, and what to fix if it does not
 
@@ -26,12 +28,12 @@ import traceback
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from . import align, retrieve, sefaria
+from . import align, library, retrieve, sefaria
 from .commentators import MASECHTOT
 from .llm import LLM, ModelError, speakable
 from .masechta_index import Index
 from .pack import Pack
-from .partner import Partner, nudge
+from .partner import Partner, unit_nudge
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WEB = os.path.join(ROOT, "web")
@@ -144,7 +146,28 @@ def page_of(pack):
 def session(sid):
     with SESSION_LOCK:
         return SESSIONS.setdefault(sid or "default", {
-            "history": [], "ref": None, "line": 1, "nudged": set(), "language": "auto"})
+            "history": [], "ref": None, "line": 1, "nudged": set(), "language": "auto",
+            "recent": [], "spoke": None})
+
+
+def fresh_page(state, ref):
+    if state.get("ref") != ref:
+        state.update(history=[], ref=ref, nudged=set(), recent=[], spoke=None)
+
+
+def worth_asking(heard):
+    """Whether a reading differed from the page in a way a chavruta would ask about.
+
+    A swapped word, always. A skipped word only when the rest was heard well --
+    otherwise it is the recogniser that skipped it. Words that are not on the
+    page, when there are enough of them to be something they said.
+    """
+    slips = heard.get("slips") or {}
+    if slips.get("swapped") or slips.get("after"):
+        return True
+    if slips.get("skipped") and heard.get("coverage", 0) >= 0.75:
+        return True
+    return len(slips.get("added", [])) >= 2
 
 
 def hint_for(pack, line):
@@ -204,6 +227,14 @@ class Handler(BaseHTTPRequestHandler):
 
         if url.path == "/api/health":
             return self.send_json(health())
+        if url.path == "/api/text":
+            ref = arg("ref")
+            if not ref or len(ref) > 200:
+                return self.fail(400, "need_ref")
+            entry = library.text(ref)
+            if not entry:
+                return self.fail(404, "not_on_sefaria")
+            return self.send_json(entry)
         if url.path == "/api/masechtot":
             return self.send_json({"masechtot": MASECHTOT})
         if url.path == "/api/daf":
@@ -271,7 +302,8 @@ class Handler(BaseHTTPRequestHandler):
 
         pack = load_pack(ref)
         said = LLM().hear(audio, hint=hint_for(pack, line), keywords=KEYWORDS, mime=mime)
-        return self.after_hearing(pack, ref, line, sid, language, said)
+        checks = (q.get("checks") or ["1"])[0] != "0"
+        return self.after_hearing(pack, ref, line, sid, language, said, checks)
 
     def heard(self):
         """The same, for words the browser already recognised itself."""
@@ -281,30 +313,37 @@ class Handler(BaseHTTPRequestHandler):
             return self.fail(400, "not_available")
         return self.after_hearing(load_pack(ref), ref, int(body.get("line") or 1),
                                   body.get("session"), body.get("language") or "auto",
-                                  (body.get("said") or "").strip())
+                                  (body.get("said") or "").strip(), body.get("checks", True) is not False)
 
-    def after_hearing(self, pack, ref, line, sid, language, said):
+    def after_hearing(self, pack, ref, line, sid, language, said, checks=True):
         if not said:
             return self.send_json({"said": "", "mode": "silence"})
         heard = align.listen(page_of(pack), said)
         record("heard", session=sid, ref=ref, line=line, said=said, heard=heard)
         state = session(sid)
-        if state.get("ref") != ref:
-            state.update(history=[], ref=ref, nudged=set())
+        fresh_page(state, ref)
         if heard.get("line"):
             state["line"] = heard["line"]
         state["heard"] = heard
         reply = {"said": said, "mode": heard["mode"], "heard": heard,
                  "line": state["line"] or line}
 
-        if heard["mode"] == "reading" and not heard.get("stopped_mid_clause"):
-            key = (ref, heard["line"])
+        if heard["mode"] == "reading":
+            # Followed silently -- and remembered, so "did I read that right?"
+            # is answered from what was actually heard.
+            state["recent"] = (state["recent"] + [{"said": said, "heard": heard}])[-4:]
+            if checks and worth_asking(heard):
+                # A different word, not a different accent: the partner asks.
+                reply["respond"] = True
+                return self.send_json(reply)
             lang = language if language in ("he", "en") else \
                 ("he" if heard.get("hebrew", 0) > 0.5 else "en")
-            found = nudge(pack, heard["line"], lang)
-            if found and key not in state["nudged"]:
-                state["nudged"].add(key)
-                reply["nudge"], reply["nudge_ref"] = found
+            found = unit_nudge(pack, heard, lang, state["nudged"])
+            if found:
+                text, nudge_ref, n = found
+                state["nudged"].add((ref, n))
+                state["spoke"] = text
+                reply["nudge"], reply["nudge_ref"] = text, nudge_ref
         return self.send_json(reply)
 
     def say(self):
@@ -313,14 +352,21 @@ class Handler(BaseHTTPRequestHandler):
         if not allowed(ref) or not said:
             return self.fail(400, "need_ref_and_words")
         state = session(body.get("session"))
-        if state.get("ref") != ref:
-            state.update(history=[], ref=ref, nudged=set())
+        fresh_page(state, ref)
         line = int(body.get("line") or state.get("line") or 1)
         state["line"] = line
         pack = load_pack(ref)
         llm = LLM()
+        heard = body.get("heard") or state.get("heard")
 
-        route = retrieve.classify(llm, said)
+        if body.get("about_reading"):
+            # They were reading and a word came out different: nothing to route.
+            route = {"kind": "check_reading", "claim": False, "names": [], "navigate": None,
+                     "language": "he" if (heard or {}).get("hebrew", 0) > 0.5 else None, "reply": None}
+            recent = state["recent"][:-1]  # the last one is this reading itself
+        else:
+            route = retrieve.classify(llm, said)
+            recent = state["recent"]
         nav = route.get("navigate")
         if route["kind"] == "navigate" and nav:
             masechta = pack.data.get("masechta", "Berakhot")
@@ -329,22 +375,52 @@ class Handler(BaseHTTPRequestHandler):
                 record("navigate", session=body.get("session"), ref=ref, said=said, to=target)
                 return self.send_json({"mode": "navigate", "ref": target})
 
+        # Streamed as lines of JSON when the client can take it: a first line
+        # to say while Sefaria is asked ("let me pull up the Tur"), then the
+        # answer. Silence while fetching sounded like a partner who gave up.
+        stream = bool(body.get("stream"))
+        if stream:
+            self.send_response(200)
+            self.send_header("Content-Type", "application/x-ndjson; charset=utf-8")
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+
+        def emit(payload):
+            self.wfile.write((json.dumps(payload, ensure_ascii=False) + "\n").encode("utf-8"))
+            self.wfile.flush()
+
+        interim = []
+
+        def announce(text):
+            interim.append(text)
+            if stream:
+                emit({"mode": "interim", "text": text})
+
         partner = Partner(pack, llm, depth=body.get("depth") or "daf",
                           language=body.get("language") or "en",
                           index=index_for(pack.data.get("masechta", "")))
-        heard = body.get("heard") or state.get("heard")
         started = time.time()
-        text, verdict, state["history"], trace = partner.ask(
-            line, state["history"], said, heard=heard, route=route)
+        try:
+            text, verdict, state["history"], trace = partner.ask(
+                line, state["history"], said, heard=heard, route=route,
+                recent=recent, spoke=state.get("spoke"), announce=announce)
+        except Exception as exc:
+            if not stream:
+                raise
+            log.error("say: %s\n%s", exc, traceback.format_exc())
+            emit({"error": "model: %s" % exc if isinstance(exc, ModelError) else "internal"})
+            return
         trace["seconds"] = round(time.time() - started, 1)
+        trace["interim"] = interim[0] if interim else None
         record("answer", session=body.get("session"), ref=ref, line=line, said=said,
                depth=body.get("depth"), language=body.get("language"), text=text,
                grounded=verdict.ok, trace=trace, models=[llm.heavy, llm.cheap])
-        state["heard"] = None
-        return self.send_json({
-            "mode": "answer", "text": text, "grounded": verdict.ok,
-            "problem": None if verdict.ok else verdict.complaint(), "trace": trace,
-        })
+        state.update(heard=None, recent=[], spoke=None)
+        payload = {"mode": "answer", "text": text, "grounded": verdict.ok,
+                   "problem": None if verdict.ok else verdict.complaint(), "trace": trace}
+        if stream:
+            return emit(payload)
+        return self.send_json(payload)
 
     def speak(self):
         body = self.body_json()
