@@ -327,3 +327,29 @@ before and told to answer it in full, not restate it.
 Tosafot and halacha. Each kind of question now carries a word count (about
 25–45 words for meaning), and the partner is told to say the one thing asked
 and offer the next layer in a few words rather than deliver it.
+
+## Speed, and a queue
+
+**41. Answers are spoken as they are written.** From the end of a question:
+the pause that ends it (~1 s), speech to text (~2 s), routing (~1–2 s), then
+the answer — 5 to 16 seconds — and only then the first word. Now the answer
+streams: each sentence is checked on its own and spoken while the next is
+written (the one after is voiced ahead, so there is no gap between them). A
+sentence is held until the next begins, because a citation often follows the
+full stop; if one fails its own check the speaking stops there, and once the
+whole answer passes the rest is said, or the whole answer if it had to be
+written again.
+
+**42. Quick thinking for quick questions.** "What does this mean?", "who was
+he", small talk and reading checks use the model's minimal reasoning; halacha,
+machlokes and questions about Rashi and Tosafot keep the deeper setting.
+
+**43. Speed of speech.** A setting (slow to very fast), applied to the audio as
+it plays, and by voice: "a bit faster", "slower", "תדבר יותר מהר".
+
+**44. A queue you can see.** The bar showed the next question while the
+answer to the previous one was still being said. Now each thing asked is a
+turn: the bar shows the turn being answered — its question and its answer,
+growing as it is spoken — and the others wait below it as a queue (⏳ still
+thinking, ✓ ready), with ⏭ to skip the current answer and ⏩ to go straight to
+the latest question. "Enough" / "skip" / "די" by voice does the same as ⏭.

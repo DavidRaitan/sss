@@ -48,6 +48,25 @@ class ModelError(RuntimeError):
     pass
 
 
+def _loosen(kwargs, exc):
+    """Drop or soften the one parameter a model refused. False if none applies."""
+    ladder = {"none": "minimal", "minimal": "low"}
+    if "reasoning_effort" in kwargs and _rejects(exc, "reasoning_effort", "reasoning effort"):
+        nxt = ladder.get(kwargs["reasoning_effort"])
+        if nxt:
+            kwargs["reasoning_effort"] = nxt
+        else:
+            kwargs.pop("reasoning_effort")
+        return True
+    if "prompt_cache_key" in kwargs and _rejects(exc, "prompt_cache_key"):
+        kwargs.pop("prompt_cache_key")
+        return True
+    if "max_completion_tokens" in kwargs and _rejects(exc, "max_completion_tokens"):
+        kwargs["max_tokens"] = kwargs.pop("max_completion_tokens")
+        return True
+    return False
+
+
 def _rejects(exc, *words):
     text = str(exc).lower()
     return any(w in text for w in words)
@@ -118,14 +137,63 @@ class LLM:
 
     # -- thinking ----------------------------------------------------------------
 
-    def say(self, system, messages, heavy=True, max_tokens=None, as_json=False, cache_key=None):
+    def say(self, system, messages, heavy=True, max_tokens=None, as_json=False, cache_key=None, effort=None):
         """One completion. `messages` is [{'role': 'user'|'assistant', 'content': str}]."""
         model = self.heavy if heavy else self.cheap
         budget = max_tokens or (4000 if heavy else 1200)
         if self.provider == "openai":
             return self._openai(model, system, messages, budget, as_json,
-                                self.effort if heavy else "none", cache_key, "heavy" if heavy else "cheap")
+                                (effort or self.effort) if heavy else "none", cache_key,
+                                "heavy" if heavy else "cheap")
         return self._anthropic(model, system, messages, budget)
+
+    def say_stream(self, system, messages, cache_key=None, effort=None, max_tokens=None):
+        """The partner's answer as it is written: yields pieces of text.
+
+        Waiting for the whole answer before saying a word was most of the
+        wait -- five to sixteen seconds. Streamed, the first sentence can be
+        spoken while the rest is still being written. Where streaming is not
+        available, the whole answer comes as one piece.
+        """
+        if self.provider != "openai":
+            yield self.say(system, messages, heavy=True, cache_key=cache_key)
+            return
+        budget = max_tokens or 4000
+        kwargs = {"model": self.heavy, "stream": True, "max_completion_tokens": budget,
+                  "messages": [{"role": "system", "content": system}] + list(messages)}
+        if effort or self.effort:
+            kwargs["reasoning_effort"] = effort or self.effort
+        if cache_key:
+            kwargs["prompt_cache_key"] = cache_key
+        stream = None
+        for _ in range(6):
+            try:
+                stream = self.leashed("heavy").chat.completions.create(**kwargs)
+                break
+            except Exception as exc:
+                if _rejects(exc, "stream"):
+                    break
+                if not _loosen(kwargs, exc):
+                    raise ModelError("%s: %s" % (self.heavy, exc))
+        if stream is None:
+            yield self.say(system, messages, heavy=True, cache_key=cache_key, effort=effort)
+            return
+        said = False
+        try:
+            for chunk in stream:
+                if not getattr(chunk, "choices", None):
+                    continue
+                piece = chunk.choices[0].delta.content if chunk.choices[0].delta else None
+                if piece:
+                    said = True
+                    yield piece
+        except Exception as exc:
+            if said:
+                raise ModelError("%s: cut off: %s" % (self.heavy, exc))
+        if not said:
+            # All of the budget went on thinking: ask again, whole, with more room.
+            yield self.say(system, messages, heavy=True, cache_key=cache_key, effort=effort,
+                           max_tokens=budget * 2)
 
     def _openai(self, model, system, messages, budget, as_json, effort, cache_key, job="heavy"):
         kwargs = {

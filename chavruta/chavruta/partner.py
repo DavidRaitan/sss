@@ -379,7 +379,8 @@ class Partner:
             return route.get("language") or "en"
         return self.language
 
-    def ask(self, n, history, said, heard=None, route=None, recent=None, spoke=None, announce=None):
+    def ask(self, n, history, said, heard=None, route=None, recent=None, spoke=None, announce=None,
+            on_part=None):
         """One turn: route cheaply, reach for what it needs, answer carefully,
         check before it ships.
 
@@ -443,7 +444,13 @@ class Partner:
             p for p in (note, sources_note(chosen, fetched, missed), elsewhere_note(elsewhere), said) if p)}
         cache_key = "chavruta:%s" % self.pack.ref
 
-        text = self.llm.say(self.system, history + [now], heavy=True, cache_key=cache_key)
+        # Simple questions get quick thinking; halacha and machlokes get more.
+        effort = EFFORT.get(kind)
+        spoken = 0
+        if on_part:
+            text, spoken = self.stream(history + [now], cache_key, effort, known, on_part)
+        else:
+            text = self.llm.say(self.system, history + [now], heavy=True, cache_key=cache_key, effort=effort)
         verdict = ground.check(text, known)
         first_try = None
         if not verdict.ok:
@@ -474,9 +481,92 @@ class Partner:
                  "fetch_seconds": waited,
                  "elsewhere": [hit["ref"] for hit in elsewhere],
                  "language": route.get("language"), "names": route.get("names"),
-                 "first_try": first_try}
+                 "first_try": first_try, "effort": effort or self.llm.effort,
+                 # Said aloud as it was written; "retried" means what was said
+                 # is not the final answer, which is then said whole.
+                 "streamed": spoken, "retried": bool(first_try) and spoken > 0,
+                 "unsaid": "" if first_try else getattr(self, "unsaid", "")}
         return text, verdict, history[-24:], trace
 
+    def stream(self, messages, cache_key, effort, known, on_part):
+        """Write the answer, handing each finished sentence on to be spoken.
+
+        A sentence is released only when the next has begun -- a citation often
+        follows the full stop -- and only if it passes the grounding check on
+        its own. The first that does not stops the speaking; the whole answer
+        is still checked, and retried if need be, as before.
+        """
+        # Units are (text, start, end) positions in the whole answer, so that
+        # whatever was not said aloud can be handed back to be said at the end.
+        state = {"pending": None, "table": [], "spoiled": False, "spoken": 0, "said_to": 0}
+        whole = ""
+        at = 0   # where the unconsumed part of the answer begins
+
+        def release(unit):
+            text, start, end = unit
+            if state["spoiled"] or not text.strip():
+                return
+            if not ground.check(text, known).ok:
+                state["spoiled"] = True
+                return
+            on_part(text.strip())
+            state["spoken"] += 1
+            state["said_to"] = end
+
+        def push(text, start, end):
+            lead = LEADING_CITES.match(text)
+            if lead and state["pending"] is not None:
+                p_text, p_start, _ = state["pending"]
+                state["pending"] = (p_text.rstrip() + " " + lead.group(0).strip(), p_start, start + lead.end())
+                text, start = text[lead.end():], start + lead.end()
+            if not text.strip():
+                return
+            if state["pending"] is not None:
+                release(state["pending"])
+            state["pending"] = (text, start, end)
+
+        def flush_table():
+            rows = state["table"]
+            if rows:
+                push("\n".join(r[0] for r in rows), rows[0][1], rows[-1][2])
+                state["table"] = []
+
+        for piece in self.llm.say_stream(self.system, messages, cache_key=cache_key, effort=effort):
+            whole += piece
+            while True:
+                buf = whole[at:]
+                if buf.lstrip().startswith("|"):
+                    # A table is said row by row, but only once it is whole.
+                    nl = buf.find("\n")
+                    if nl < 0:
+                        break
+                    state["table"].append((buf[:nl].strip(), at, at + nl + 1))
+                    at += nl + 1
+                    continue
+                if buf.strip():
+                    flush_table()
+                end = SENTENCE_END.search(buf)
+                if not end:
+                    break
+                push(buf[:end.end()], at, at + end.end())
+                at += end.end()
+        flush_table()
+        push(whole[at:], at, len(whole))
+        if state["pending"] is not None:
+            release(state["pending"])
+        # What was held back after a sentence failed its own check, to be said
+        # once the whole answer has passed.
+        self.unsaid = whole[state["said_to"]:].strip() if state["spoiled"] else ""
+        return whole.strip(), state["spoken"]
+
+
+# Where a spoken sentence ends, and the citations that belong to the one before.
+SENTENCE_END = re.compile(r"(?<=[.!?;])\s+|\n+")
+LEADING_CITES = re.compile(r"^\s*(\[\[[^\]]+\]\]\s*)+")
+# How hard the model thinks, by question. "What does this mean?" does not need
+# the deliberation a machlokes does, and thinking is time before the first word.
+EFFORT = {"meaning": "minimal", "people": "minimal", "other": "minimal", "check_reading": "minimal",
+          "ping": "minimal"}
 
 ANSWER_IT = re.compile(r"\b(answer|go on|continue|you didn'?t answer|what was my question|"
                        r"my (last|previous) question|the question i asked)\b|תענה|תמשיך|לא ענית|מה שאלתי", re.I)

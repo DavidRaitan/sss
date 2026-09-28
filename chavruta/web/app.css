@@ -146,6 +146,16 @@ footer { background: var(--paper); border-top: 1px solid var(--rule); padding: 1
 .mine, .reply, .turn { unicode-bidi: plaintext; text-align: start; }
 .reply q { unicode-bidi: isolate; direction: rtl; quotes: none; font-family: var(--square); background: var(--quote); border-radius: 3px; padding: 0 3px; }
 .reply.hint { color: var(--dim); font-size: 15px; }
+/* The question the answer below is answering. */
+.asked { font-size: 13.5px; color: var(--dim); margin-top: 3px; unicode-bidi: plaintext; text-align: start; }
+.asked::before { content: "❓ "; opacity: .6; }
+/* What is waiting behind it. */
+.queue { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 8px;
+  padding-top: 6px; border-top: 1px dashed var(--rule); font-size: 12.5px; }
+.queue .qlabel { color: var(--faint); }
+.queue .qitem { border: 1px solid var(--rule); border-radius: 14px; padding: 1px 9px; color: var(--dim);
+  max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; unicode-bidi: plaintext; }
+.queue .qbtn { padding: 1px 10px; font-size: 13px; }
 .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 7px; }
 .chip { font-size: 12.5px; border: 1px solid var(--edge); border-radius: 20px; padding: 2px 10px;
   background: var(--paper); cursor: pointer; font-family: var(--square); }

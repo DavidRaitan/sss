@@ -388,6 +388,15 @@ class Handler(BaseHTTPRequestHandler):
         # "Hey", "can you hear me?", "go ahead": answered from the words alone,
         # with no model, before anything else happens.
         quick = smalltalk.reply(said, language) if heard["mode"] == "talking" else None
+        if quick and quick[0] == "skip":
+            reply["skip"] = True
+            return self.send_json(reply)
+        if quick and quick[0] in ("faster", "slower"):
+            # Speaking speed is the page's to change; it answers in a word.
+            record("answer", session=sid, ref=ref, line=line, said=said, text="(speed %s)" % quick[0],
+                   grounded=True, trace={"kind": "small talk: " + quick[0], "quick": True, "seconds": 0})
+            reply["rate"] = 1 if quick[0] == "faster" else -1
+            return self.send_json(reply)
         if quick and quick[0] == "again":
             # "What?" -- the page says its last answer again.
             record("answer", session=sid, ref=ref, line=line, said=said, text="(said again)",
@@ -482,7 +491,9 @@ class Handler(BaseHTTPRequestHandler):
         try:
             text, verdict, state["history"], trace = partner.ask(
                 line, state["history"], said, heard=heard, route=route,
-                recent=recent, spoke=state.get("spoke"), announce=announce)
+                recent=recent, spoke=state.get("spoke"), announce=announce,
+                # Each sentence as it is written, to be spoken while the rest is.
+                on_part=(lambda text: emit({"mode": "part", "text": text})) if stream else None)
         except Exception as exc:
             if not stream:
                 raise

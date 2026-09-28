@@ -264,6 +264,20 @@ def main():
             page.wait_for_function("/hear you|I'm here/.test(document.querySelector('#turns').textContent)",
                                    timeout=15000)
             check("typing answers in the open transcript", page.locator("#over.open").count() == 1)
+            # Two questions in a row: the bar shows the one being answered, the
+            # other waits in the queue, and ⏩ goes straight to it.
+            page.fill("#panel input", "so he's saying you read shema whenever you happen to go to sleep")
+            page.press("#panel input", "Enter")
+            page.fill("#panel input", "and was this codified in the Tur or Shulchan Aruch or the Rama?")
+            page.press("#panel input", "Enter")
+            page.wait_for_selector("#queue .qitem", timeout=15000)
+            check("a second question waits in a visible queue",
+                  "codified" in page.inner_text("#queue") and "codified" not in page.inner_text("#asked"),
+                  page.inner_text("#asked")[:40] + " | " + page.inner_text("#queue")[:60])
+            shot("08-queue")
+            page.click("#queue .qbtn:last-child")
+            page.wait_for_function("/codified/.test(document.querySelector('#asked').textContent)", timeout=15000)
+            check("⏩ jumps to the latest question", page.locator("#queue .qitem").count() == 0)
             box = page.evaluate("(() => { const g = document.querySelector('#col-gemara').getBoundingClientRect();"
                                 " const p = document.querySelector('#panel').getBoundingClientRect();"
                                 " return [g.left, g.right, p.left, p.right]; })()")

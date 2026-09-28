@@ -20,6 +20,16 @@ EN = re.compile(r"[A-Za-z]")
 
 # (pattern, English replies, Hebrew replies). First match wins.
 KINDS = [
+    # "Enough" / "skip": the rest of the current answer is dropped.
+    ("skip", r"^(ok(ay)?,? )?(skip( it)?|next|enough|that'?s enough|stop|move on|די|דלג|הבא|מספיק|תפסיק)[.!]?$",
+     None, None),
+    # "A bit faster" / "slower": the page changes its speaking speed.
+    ("faster", r"\b(speak|talk|go|say it|read)?\s*(a (bit|little) )?faster\b|\bspeed (it )?up\b|"
+               r"(תדבר|דבר|תקרא)?\s*(קצת )?(יותר )?מהר( יותר)?\b",
+     None, None),
+    ("slower", r"\b(speak|talk|go|say it|read)?\s*(a (bit|little) )?slower\b|\bslow (it )?down\b|"
+               r"(תדבר|דבר|תקרא)?\s*(קצת )?(יותר )?לאט( יותר)?\b",
+     None, None),
     # "What?" after an answer means it was not heard: say it again, don't
     # reassure them that *it* can hear ("Yes, I hear you" to "I didn't hear you").
     ("again", r"^(what|huh|sorry|pardon)\??$|\bsay (that|it) again\b|\brepeat (that|it|yourself)\b|"
@@ -78,7 +88,7 @@ def reply(said, language="en"):
         if len(rest) > 2:
             return None
         hebrew = language == "he" or (language == "auto" and not EN.search(text))
-        if kind == "again":
+        if kind in ("again", "faster", "slower", "skip"):
             return kind, ""
         if kind == "time":
             now = time.strftime("%H:%M")

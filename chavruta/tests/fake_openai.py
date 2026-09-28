@@ -131,6 +131,25 @@ class Handler(BaseHTTPRequestHandler):
                 content = json.dumps(router(said), ensure_ascii=False)
             else:
                 content = partner(system, body["messages"][1:])
+            STATE["log"][-1]["stream"] = bool(body.get("stream"))
+            if body.get("stream"):
+                # Server-sent events, a few words a chunk, as the real API streams.
+                self.send_response(200)
+                self.send_header("Content-Type", "text/event-stream")
+                self.end_headers()
+                words = re.findall(r"\S+\s*", content)
+                for i in range(0, len(words), 3):
+                    chunk = {"id": "x", "object": "chat.completion.chunk", "created": 0, "model": body.get("model"),
+                             "choices": [{"index": 0, "delta": {"content": "".join(words[i:i + 3])},
+                                          "finish_reason": None}]}
+                    self.wfile.write(("data: %s\n\n" % json.dumps(chunk, ensure_ascii=False)).encode("utf-8"))
+                    self.wfile.flush()
+                    time.sleep(0.02)
+                done = {"id": "x", "object": "chat.completion.chunk", "created": 0, "model": body.get("model"),
+                        "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}]}
+                self.wfile.write(("data: %s\n\ndata: [DONE]\n\n" % json.dumps(done)).encode("utf-8"))
+                self.wfile.flush()
+                return
             return self.reply({"id": "x", "object": "chat.completion", "created": 0,
                                "model": body.get("model"),
                                "choices": [{"index": 0, "finish_reason": "stop",

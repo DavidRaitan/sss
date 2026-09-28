@@ -453,6 +453,46 @@ class FifthRound(unittest.TestCase):
         self.assertIn("It is a conversation: short turns", partner.CONSTITUTION)
 
 
+class Streaming(unittest.TestCase):
+    pack = Pack(PACK)
+
+    def test_an_answer_is_spoken_sentence_by_sentence(self):
+        parts = []
+        text, verdict, _, trace = partner.Partner(self.pack, LLM()).ask(
+            1, [], "so he's saying you read shema whenever you go to sleep", on_part=parts.append)
+        self.assertTrue(verdict.ok)
+        self.assertEqual(len(parts), 2)
+        self.assertEqual(" ".join(parts), text)
+        self.assertEqual((trace["streamed"], trace["retried"], trace["unsaid"]), (2, False, ""))
+        self.assertEqual(trace["effort"], "minimal")          # a meaning question thinks briefly
+
+    def test_a_citation_after_the_full_stop_stays_with_its_sentence(self):
+        p = partner.Partner(self.pack, LLM())
+        p.llm = type("L", (), {"say_stream": lambda self_, *a, **k: iter(
+            ["Rashi reads it as a third. ", "[[Rashi on Berakhot 2a:1:2]] ", "And that is all."])})()
+        parts = []
+        p.stream([], None, None, self.pack.refs(), parts.append)
+        self.assertEqual(parts, ["Rashi reads it as a third. [[Rashi on Berakhot 2a:1:2]]", "And that is all."])
+
+    def test_what_is_held_back_is_said_at_the_end(self):
+        p = partner.Partner(self.pack, LLM())
+        p.llm = type("L", (), {"say_stream": lambda self_, *a, **k: iter(
+            ["The night has three watches. ", "Rashi says a third. ", "Tosafot [[Tosafot on Berakhot 2a:1:1]] asks. ",
+             "Rashi [[Rashi on Berakhot 2a:1:2]] answers."])})()
+        parts = []
+        text, spoken = p.stream([], None, None, self.pack.refs(), parts.append)
+        self.assertEqual(parts, ["The night has three watches."])   # stops at the unsourced Rashi
+        self.assertTrue(p.unsaid.startswith("Rashi says a third."))
+
+    def test_speed_by_voice(self):
+        from chavruta import smalltalk
+        self.assertEqual(smalltalk.reply("Talk a bit faster please")[0], "faster")
+        self.assertEqual(smalltalk.reply("תדבר יותר לאט")[0], "slower")
+        self.assertIsNone(smalltalk.reply("why is he faster than the other"))
+        self.assertEqual(smalltalk.reply("Okay, enough.")[0], "skip")
+        self.assertEqual(smalltalk.reply("די")[0], "skip")
+
+
 class Server(unittest.TestCase):
     def test_only_berakhot(self):
         from chavruta import server
