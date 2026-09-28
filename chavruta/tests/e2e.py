@@ -127,6 +127,7 @@ def main():
         page.click("#next")
         page.wait_for_function("document.querySelector('#runner').textContent.includes('ד׳')", timeout=20000)
         check("next flips to ד ע״א", "ד׳" in page.inner_text("#runner"), page.inner_text("#runner"))
+        page.wait_for_function("S.pack && S.pack.ref === 'Berakhot 4a'", timeout=20000)
         page.keyboard.press("ArrowRight")
         page.wait_for_function("document.querySelector('#runner').textContent.includes('דף ג׳ · עמוד ב׳')", timeout=20000)
         check("→ key flips back to ג ע״ב", "עמוד ב׳" in page.inner_text("#runner"), page.inner_text("#runner"))
@@ -217,6 +218,7 @@ def main():
             recorded = os.listdir(os.path.join(os.path.dirname(HERE), "sessions"))
             check("each turn is recorded on disk", bool(recorded), str(recorded))
             page.click("#mic")
+            page.wait_for_function("!saying && !speakingDone", timeout=15000)
             # Citations sit in the sentence and open what they cite.
             page.evaluate("showReply(S.log.find((t) => /can't be right/.test(t.text)).text)")
             check("a citation sits inside the sentence", page.locator("#reply .chip.inline").count() >= 1)
