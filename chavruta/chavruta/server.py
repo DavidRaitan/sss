@@ -14,6 +14,7 @@ disk and the neighbouring amudim are built in the background, so turning the
 page is instant.
 """
 
+import errno
 import io
 import json
 import logging
@@ -362,7 +363,23 @@ def serve(port=8765, open_browser=True, host="127.0.0.1"):
     os.makedirs(PACKS, exist_ok=True)
     logging.basicConfig(filename=LOG_PATH, level=logging.INFO,
                         format="%(asctime)s %(levelname)s %(message)s")
-    httpd = ThreadingHTTPServer((host, port), Handler)
+    # An earlier copy left running holds the port. Say so plainly and use the
+    # next free one, rather than dying with a traceback.
+    httpd = None
+    for candidate in range(port, port + 10):
+        try:
+            httpd = ThreadingHTTPServer((host, candidate), Handler)
+            break
+        except OSError as exc:
+            if exc.errno not in (errno.EADDRINUSE, 48, 98):
+                raise
+            if candidate == port:
+                print("port %d is taken -- probably an earlier chavruta still running.\n"
+                      "  to close it:  lsof -ti :%d | xargs kill\n"
+                      "  meanwhile, using the next free port." % (port, port))
+    if httpd is None:
+        raise SystemExit("no free port between %d and %d" % (port, port + 9))
+    port = httpd.server_address[1]
     url = "http://127.0.0.1:%d/" % port
     print("chavruta -> %s   (ctrl-c to stop; problems are written to chavruta.log)" % url)
     if open_browser:
