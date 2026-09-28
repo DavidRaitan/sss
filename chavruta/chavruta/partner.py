@@ -397,8 +397,13 @@ def fetching_line(labels, lang):
 
 
 class Partner:
-    def __init__(self, pack, llm, depth="daf", language="en", index=None):
+    def __init__(self, pack, llm, depth="daf", language="en", index=None, favor=None, voices=None):
         self.pack = pack
+        # The learner's table, from settings: who they want to hear from, who
+        # they asked to leave out, and how many voices past the page a turn opens.
+        self.favor = {k: v for k, v in (favor or {}).items() if v in (1, -1)}
+        self.prefer, self.mute = who.seats(self.favor)
+        self.voices = voices if isinstance(voices, int) and 1 <= voices <= 6 else 3
         self.llm = llm
         self.index = index
         self.depth = depth if depth in retrieve.DEPTHS else "daf"
@@ -453,7 +458,8 @@ class Partner:
         # "Let's say in Tel Aviv" holds for the rest of the sitting.
         if library.place_in(said):
             memory["place"] = library.place_in(said)
-        route = dict(route, said=said, place=memory.get("place"), avoid=sorted({
+        route = dict(route, said=said, place=memory.get("place"), prefer=self.prefer, mute=self.mute,
+                     voices=self.voices, avoid=sorted({
             self.ref_names[r.strip()] for text in recent for r in ground.CITE.findall(text)
             if r.strip() in self.ref_names}))
         chosen = retrieve.extras(self.pack, n, route, self.depth)
@@ -482,6 +488,12 @@ class Partner:
         # Tosafot on the first line.
         if kind == "on_commentary" or SO_FAR.search(said):
             note += " " + covered_note(self.pack, n, history)
+        liked = [n for n, v in self.favor.items() if v == 1]
+        left_out = [n for n, v in self.favor.items() if v == -1]
+        if (liked or left_out) and kind not in ("ping", "people"):
+            note += " [their table%s%s]" % (
+                ": they like to hear from %s when he has something to say here" % ", ".join(liked) if liked else "",
+                "; they asked to leave out %s unless they ask for him" % ", ".join(left_out) if left_out else "")
         # "Can you read it for me?" -- then it reads, in full.
         if READ_TO_ME.search(said):
             note += (" [they asked you to read it to them: quote the line or lines they mean, in full, "

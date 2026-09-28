@@ -398,3 +398,12 @@ never found: Sefaria files him on Berakhot as "Chidushei Halachot" and
 "Chidushei Agadot". The partner is told what each kind of work is for, that
 Maran and the Rema are both reported, and that the gemara's give-and-take is
 not yet the halacha.
+
+**47. Who sits at the table is the learner's.** Settings has "מי ליד השולחן":
+every Rishon, Acharon and poseik the app can reach, grouped. Tap once for ★
+(always, when he has something in this unit), again for ⊘ (only when asked by
+name), again for neither. ★ codes come with every halacha question (a ★ Magen
+Avraham is followed from the seif beside the Mishnah Berurah); ⊘ ones are not
+fetched. "How many voices" caps what a turn opens unasked (1, 2, 3, broad; a
+halacha chain gets two more). The partner is told the table too. Rashi and
+Tosafot are the page and always there.

@@ -17,7 +17,7 @@ function el(tag, cls, text) {
 
 const DEFAULTS = { view: "daf", depth: "daf", language: "en", voice: "natural",
   hearing: "api", speak: true, pause: "normal", nudges: true, checks: true, translate: false, stops: false,
-  speakers: false, rate: 1 };
+  speakers: false, rate: 1, favor: {}, voices: 3 };
 const PAUSES = { short: 1000, normal: 1500, long: 2400 };
 function loadSettings() {
   try { return Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem("chavruta.settings") || "{}")); }
@@ -1186,7 +1186,8 @@ async function respond(batch, g) {
   let answer;
   try {
     answer = await postStream("/api/say", Object.assign({ ref: S.pack.ref, line: last.line || S.line, session: S.session,
-      said, heard: last.heard.heard, depth: S.settings.depth, language: S.settings.language }, extra),
+      said, heard: last.heard.heard, depth: S.settings.depth, language: S.settings.language,
+      favor: S.settings.favor, voices: S.settings.voices }, extra),
       (msg) => {
         if (g !== S.gen) return;
         if (msg.mode === "read") {
@@ -1573,6 +1574,47 @@ function sessionReport() {
   return lines.join("\n");
 }
 
+// Who sits at the table: tap a name once to always want him (★), again to
+// leave him out (⊘), again for neither. Rashi and Tosafot are the page itself.
+function seatsBox() {
+  const box = el("div", "set seats");
+  box.append(el("div", "lbl", "מי ליד השולחן"));
+  box.append(el("div", "help", "לחיצה: ★ תמיד כשיש לו מה לומר כאן · ⊘ רק כשאני מבקש · שוב — רגיל. " +
+    "רש״י ותוספות תמיד."));
+  const mark = { 1: "★ ", "-1": "⊘ " };
+  const draw = (b, name, he) => {
+    const v = S.settings.favor[name] || 0;
+    b.textContent = (mark[v] || "") + he;
+    b.dataset.v = v;
+    b.setAttribute("aria-pressed", String(v === 1));
+  };
+  fetch("/api/table").then((r) => r.json()).then(({ table }) => {
+    for (const { group, names } of table) {
+      box.append(el("div", "sub", group));
+      const row = el("div", "opts");
+      for (const { name, he } of names) {
+        const b = el("button", "btn seat");
+        b.title = name;
+        draw(b, name, he);
+        b.onclick = () => {
+          const v = S.settings.favor[name] || 0;
+          const next = v === 0 ? 1 : v === 1 ? -1 : 0;
+          S.settings.favor = Object.assign({}, S.settings.favor);
+          if (next) S.settings.favor[name] = next; else delete S.settings.favor[name];
+          saveSettings();
+          draw(b, name, he);
+        };
+        row.append(b);
+      }
+      box.append(row);
+    }
+    const reset = el("button", "btn", "לאפס");
+    reset.onclick = () => { S.settings.favor = {}; saveSettings(); openSettings(); };
+    box.append(reset);
+  }).catch(() => box.append(el("div", "help", "לא הצלחתי לטעון את הרשימה.")));
+  return box;
+}
+
 function openSettings() {
   const choice = (key, label, options, help) => {
     const box = el("div", "set");
@@ -1600,6 +1642,9 @@ function openSettings() {
     panel.append(
       choice("depth", "עומק", [["daf", "הדף — רש״י ותוספות"], ["rishonim", "+ ראשונים"], ["acharonim", "+ אחרונים"]],
         "מה החברותא מביא בעצמו. אם תשאל על מפרש מסוים, הוא יביא אותו בכל מקרה."),
+      choice("voices", "כמה קולות בתשובה", [[1, "אחד"], [2, "שניים"], [3, "שלושה"], [5, "רחב"]],
+        "כמה מפרשים מעבר לרש״י ותוספות הוא פותח בעצמו לכל שאלה (בהלכה — קצת יותר, בשביל השרשרת)."),
+      seatsBox(),
       choice("language", "שפת התשובה", [["en", "English"], ["he", "עברית"], ["auto", "כמוני"]],
         "באנגלית הוא מצטט את הגמרא בעברית, בתוך המשפט — כמו שמדברים בבית המדרש."),
       choice("view", "תצוגת הדף", [["daf", "צורת הדף"], ["lin", "שטיינזלץ, מנוקד"]]),

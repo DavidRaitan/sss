@@ -320,6 +320,14 @@ def main():
 
         page.click("#open-settings")
         check("settings open", page.locator(".set").count() >= 8)
+        # Seat the Ritva, leave out the Meiri: kept, and sent with every question.
+        page.wait_for_selector(".seat[title='Ritva']", timeout=8000)
+        page.click(".seat[title='Ritva']")
+        page.click(".seat[title='Meiri']")
+        page.click(".seat[title='Meiri']")
+        check("who sits at the table is chosen in settings",
+              page.evaluate("JSON.stringify(S.settings.favor)") == '{"Ritva":1,"Meiri":-1}',
+              page.inner_text(".seats")[:80])
         shot("06-settings")
         page.keyboard.press("Escape")
         page.click("#open-log")

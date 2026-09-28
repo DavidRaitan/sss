@@ -209,6 +209,17 @@ def extras(pack, n, route, depth="daf", budget=7):
                 take([match], 99, per=2)
 
     named = len(chosen)
+    # The learner's favourites, where they have something in this unit.
+    if kind in who.ROUTES and route.get("prefer"):
+        sec = next((x for x in pack.data.get("sections") or [] if x["from"] <= n <= x["to"]), None)
+        unit = [s for s in pack.segments
+                if (sec["from"] <= s["n"] <= sec["to"] if sec else abs(s["n"] - n) <= 2)]
+        unit.sort(key=lambda s: abs(s["n"] - n))
+        for wanted in route["prefer"]:
+            for name in who.filed(wanted, present):
+                entry = next((s["commentaries"][name][0] for s in unit if s["commentaries"].get(name)), None)
+                if entry and name not in backbone:
+                    add((name, entry))
     if kind == "halacha":
         # Where the Rishonim on this amud say how it is ruled, wherever it
         # sits -- one ruling each, not four paragraphs of the same Meiri.
@@ -252,7 +263,7 @@ def extras(pack, n, route, depth="daf", budget=7):
         pool = who.wide_for(masechta)[:6] + (ACHARONIM if depth == "acharonim" else [])
         avoid = set(route.get("avoid") or [])
         fresh = [x for x in pool if x not in avoid]     # the just-cited sit this one out
-        room = 3
+        room = min(3, route.get("voices") or 3)
         for name in fresh:
             if room <= 0:
                 break
@@ -263,11 +274,21 @@ def extras(pack, n, route, depth="daf", budget=7):
                 add(got[0])
                 room -= 1
 
-    # One comment per commentator unless the learner asked for him by name.
-    out, seen = [], set()
+    # One comment per commentator unless the learner asked for him by name;
+    # nobody they asked to leave out, unless they name him; and no more
+    # unasked voices than they set (a halacha chain needs at least three).
+    mute = set(route.get("mute") or ())
+    voices = route.get("voices") or 3
+    if kind == "halacha":
+        voices = max(voices + 2, 5)
+    out, seen, unasked = [], set(), 0
     for i, (name, entry) in enumerate(chosen):
-        if i >= named and name in seen:
-            continue
+        if i >= named:
+            if name in seen or name in mute:
+                continue
+            if name not in seen and unasked >= voices:
+                continue
+            unasked += 1
         seen.add(name)
         out.append((name, entry))
     return out[:budget]
@@ -320,17 +341,29 @@ def plan(pack, n, route):
 
     named = [resolve(x, present) for x in route.get("names", [])]
     named = [x for x in named if x]
+    # The learner's table: a favourite poseik comes with every halacha
+    # question; one they left out comes only when named.
+    prefer = [x for x in route.get("prefer") or () if x not in named]
+    mute = {x for x in route.get("mute") or () if x not in named}
     wants_codes = kind == "halacha" or any(x in CODES + ("Rema",) + ON_THE_SEIF + ON_THE_TUR for x in named)
     if wants_codes:
         for book in CODES:
+            if book in mute:
+                continue
             for ref in found.get(book, []):
                 add(("text", ref), book)
-        later = [x for x in named if x in ON_THE_SEIF] or ["Mishnah Berurah"]
+        later = [x for x in named if x in ON_THE_SEIF] or \
+            [x for x in ["Mishnah Berurah"] if x not in mute]
+        if kind == "halacha":
+            later += [p for p in prefer if p in ON_THE_SEIF and p not in later]
         for seif in found.get("Shulchan Arukh", []):
             for book in later:
                 add(("follow", seif, book), book)
         tur = codes.get("Tur")
-        for book in [x for x in named if x in ON_THE_TUR]:
+        on_tur = [x for x in named if x in ON_THE_TUR]
+        if kind == "halacha":
+            on_tur += [p for p in prefer if p in ON_THE_TUR and p not in on_tur]
+        for book in on_tur:
             if tur:
                 add(("follow", tur, book), book)
 
@@ -338,8 +371,10 @@ def plan(pack, n, route):
     # Rif is read with Talmidei Rabbeinu Yonah as a matter of course, so a
     # halacha question brings him unasked.
     rif_voices = [x for x in named if x in ON_THE_RIF]
-    if kind == "halacha" and pack.data.get("masechta") == "Berakhot":
+    if kind == "halacha" and pack.data.get("masechta") == "Berakhot" and "Rabbeinu Yonah" not in mute:
         rif_voices.append("Rabbeinu Yonah")
+    if kind == "halacha":
+        rif_voices += [p for p in prefer if p in ON_THE_RIF and p not in rif_voices]
     for book in rif_voices:
         if rif:
             add(("follow", rif[0], book), book)

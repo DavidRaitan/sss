@@ -32,7 +32,7 @@ import traceback
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from . import align, library, retrieve, sefaria, smalltalk
+from . import align, commentators, library, retrieve, sefaria, smalltalk
 from .commentators import MASECHTOT
 from .llm import LLM, VOICE_DIRECTION, ModelError, speakable
 from .masechta_index import Index
@@ -279,6 +279,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json(entry)
         if url.path == "/api/masechtot":
             return self.send_json({"masechtot": MASECHTOT})
+        if url.path == "/api/table":
+            return self.send_json({"table": commentators.table()})
         if url.path == "/api/daf":
             ref = arg("ref")
             if not allowed(ref):
@@ -500,9 +502,11 @@ class Handler(BaseHTTPRequestHandler):
             if stream:
                 emit({"mode": "interim", "text": text})
 
+        favor = body.get("favor") if isinstance(body.get("favor"), dict) else {}
         partner = Partner(pack, llm, depth=body.get("depth") or "daf",
                           language=body.get("language") or "en",
-                          index=index_for(pack.data.get("masechta", "")))
+                          index=index_for(pack.data.get("masechta", "")),
+                          favor=favor, voices=body.get("voices"))
         # "Can you read it for me?" -- the page's words may be spoken in full.
         read_out = bool(READ_TO_ME.search(said))
         if read_out and stream:

@@ -276,6 +276,41 @@ ROUTES = {
 }
 
 
+# Who the learner can seat at the table, or ask to stay out of it (settings).
+# Rashi and Tosafot are the page itself and are always there.
+TABLE = [
+    ("ראשונים", [("Rif", 'רי"ף'), ("Rabbeinu Yonah", "רבינו יונה"), ("Rosh", 'רא"ש'),
+                 ("Tosafot HaRosh", 'תוספות הרא"ש'), ("Rabbeinu Chananel", "רבינו חננאל"),
+                 ("Ramban", 'רמב"ן'), ("Rashba", 'רשב"א'), ("Ritva", 'ריטב"א'), ("Ran", 'ר"ן'),
+                 ("Ra'ah", 'רא"ה'), ("HaMaor", "בעל המאור"), ("Meiri", "מאירי"),
+                 ("Shita Mekubetzet", "שיטה מקובצת")]),
+    ("אחרונים", [("Maharsha", 'מהרש"א'), ("Penei Yehoshua", "פני יהושע"),
+                 ("Chiddushei Rabbi Akiva Eiger", "רבי עקיבא איגר"), ("Gilyon HaShas", 'גליון הש"ס'),
+                 ("Tzelach", 'צל"ח'), ("Rashash", 'רש"ש'), ("Petach Einayim", "פתח עינים"),
+                 ("Ben Yehoyada", "בן יהוידע")]),
+    ("פוסקים", [("Rambam", 'רמב"ם'), ("Tur", "טור"), ("Beit Yosef", "בית יוסף"), ("Bach", 'ב"ח'),
+                ("Shulchan Arukh", "שולחן ערוך"), ("Magen Avraham", "מגן אברהם"),
+                ("Turei Zahav", 'ט"ז'), ("Mishnah Berurah", "משנה ברורה"), ("Kaf HaChayim", "כף החיים")]),
+]
+
+
+def table():
+    return [{"group": group, "names": [{"name": n, "he": he} for n, he in names]} for group, names in TABLE]
+
+
+def seats(favor):
+    """{name: 1 | -1} from settings -> (preferred, muted), each with the names
+    Sefaria files them under."""
+    prefer, mute = [], set()
+    for name, value in (favor or {}).items():
+        names = [name] + FILED_AS.get(name, [])
+        if value == 1:
+            prefer.extend(names)
+        elif value == -1:
+            mute.update(names)
+    return prefer, mute
+
+
 def filed(name, present):
     """The names a commentator is found under on this page."""
     return [n for n in [name] + FILED_AS.get(name, []) if n in present]

@@ -650,6 +650,54 @@ class Shelf(unittest.TestCase):
         self.assertIn("light as an authority", who.WHO["Meiri"]["specialty"])
 
 
+class Table(unittest.TestCase):
+    """Settings: who the learner seats at the table, and how many voices a turn opens."""
+    pack = Pack(PACK)
+
+    def route(self, kind, favor=None, voices=3, names=()):
+        from chavruta import commentators as who
+        prefer, mute = who.seats(favor or {})
+        return {"kind": kind, "names": list(names), "prefer": prefer, "mute": mute, "voices": voices}
+
+    def test_a_favourite_comes_when_he_has_something_here(self):
+        got = [n for n, _ in retrieve.extras(self.pack, 1, self.route("meaning", {"Ritva": 1}), "daf")]
+        self.assertIn("Ritva", got)
+
+    def test_one_left_out_stays_out_unless_named(self):
+        got = [n for n, _ in retrieve.extras(self.pack, 1, self.route("structure", {"Meiri": -1}), "rishonim")]
+        self.assertNotIn("Meiri", got)
+        got = [n for n, _ in retrieve.extras(self.pack, 1, self.route("structure", {"Meiri": -1}, names=["Meiri"]),
+                                             "rishonim")]
+        self.assertIn("Meiri", got)
+
+    def test_voices_caps_what_opens_unasked(self):
+        got = retrieve.extras(self.pack, 1, self.route("logic", voices=1), "acharonim")
+        self.assertEqual(len(got), 1)
+
+    def test_codes_follow_the_table(self):
+        jobs = [j for j, _ in retrieve.plan(self.pack, 1, self.route(
+            "halacha", {"Mishnah Berurah": -1, "Magen Avraham": 1, "Rambam": -1}))]
+        self.assertNotIn(("follow", "Shulchan Arukh, Orach Chayim 235:1", "Mishnah Berurah"), jobs)
+        self.assertIn(("follow", "Shulchan Arukh, Orach Chayim 235:1", "Magen Avraham"), jobs)
+        self.assertFalse(any(j[0] == "text" and j[1].startswith("Mishneh Torah") for j in jobs))
+
+    def test_the_partner_is_told(self):
+        seen = []
+
+        class Model:
+            effort = None
+
+            def say(self, system, messages, **k):
+                seen.append(messages[-1]["content"])
+                return "The gemara says so."
+
+        p = partner.Partner(self.pack, LLM(), favor={"Ritva": 1, "Meiri": -1})
+        p.llm = Model()
+        p.ask(1, [], "what does this mean?", route={"kind": "meaning", "names": []})
+        self.assertIn("they like to hear from Ritva", seen[0])
+        self.assertIn("leave out Meiri", seen[0])
+
+
 class Server(unittest.TestCase):
     def test_only_berakhot(self):
         from chavruta import server
