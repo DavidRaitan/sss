@@ -256,7 +256,9 @@ class Partner:
 
         text = self.llm.say(self.system, history + [now], heavy=True, cache_key=cache_key)
         verdict = ground.check(text, known)
+        first_try = None
         if not verdict.ok:
+            first_try = {"text": text, "problem": verdict.complaint()}
             retry = history + [now, {"role": "assistant", "content": text},
                                {"role": "user", "content": "[from the app, not the learner: " +
                                 verdict.complaint() + " Answer again.]"}]
@@ -272,7 +274,9 @@ class Partner:
         history = history + [kept, {"role": "assistant", "content": text}]
         trace = {"kind": route.get("kind"), "claim": route.get("claim"),
                  "opened": [e["ref"] for _, e in chosen],
-                 "elsewhere": [hit["ref"] for hit in elsewhere]}
+                 "elsewhere": [hit["ref"] for hit in elsewhere],
+                 "language": route.get("language"), "names": route.get("names"),
+                 "first_try": first_try}
         return text, verdict, history[-24:], trace
 
 

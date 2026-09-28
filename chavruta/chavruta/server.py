@@ -37,6 +37,19 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WEB = os.path.join(ROOT, "web")
 PACKS = os.environ.get("CHAVRUTA_PACKS") or os.path.join(ROOT, "packs")
 LOG_PATH = os.path.join(ROOT, "chavruta.log")
+SESSIONS_DIR = os.path.join(ROOT, "sessions")
+
+
+def record(kind, **fields):
+    """One line per turn in sessions/<date>.jsonl -- the whole story of a sitting,
+    so it can be read back afterwards and the partner improved from real use."""
+    try:
+        os.makedirs(SESSIONS_DIR, exist_ok=True)
+        fields.update(kind=kind, at=time.strftime("%Y-%m-%d %H:%M:%S"))
+        with open(os.path.join(SESSIONS_DIR, time.strftime("%Y-%m-%d") + ".jsonl"), "a", encoding="utf-8") as f:
+            f.write(json.dumps(fields, ensure_ascii=False) + "\n")
+    except Exception as exc:
+        log.info("could not record turn: %s", exc)
 
 TYPES = {".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8",
          ".css": "text/css; charset=utf-8", ".json": "application/json; charset=utf-8",
@@ -274,6 +287,7 @@ class Handler(BaseHTTPRequestHandler):
         if not said:
             return self.send_json({"said": "", "mode": "silence"})
         heard = align.listen(page_of(pack), said)
+        record("heard", session=sid, ref=ref, line=line, said=said, heard=heard)
         state = session(sid)
         if state.get("ref") != ref:
             state.update(history=[], ref=ref, nudged=set())
@@ -312,14 +326,20 @@ class Handler(BaseHTTPRequestHandler):
             masechta = pack.data.get("masechta", "Berakhot")
             target = "%s %d%s" % (masechta, nav["daf"], nav["amud"])
             if allowed(target):
+                record("navigate", session=body.get("session"), ref=ref, said=said, to=target)
                 return self.send_json({"mode": "navigate", "ref": target})
 
         partner = Partner(pack, llm, depth=body.get("depth") or "daf",
                           language=body.get("language") or "en",
                           index=index_for(pack.data.get("masechta", "")))
         heard = body.get("heard") or state.get("heard")
+        started = time.time()
         text, verdict, state["history"], trace = partner.ask(
             line, state["history"], said, heard=heard, route=route)
+        trace["seconds"] = round(time.time() - started, 1)
+        record("answer", session=body.get("session"), ref=ref, line=line, said=said,
+               depth=body.get("depth"), language=body.get("language"), text=text,
+               grounded=verdict.ok, trace=trace, models=[llm.heavy, llm.cheap])
         state["heard"] = None
         return self.send_json({
             "mode": "answer", "text": text, "grounded": verdict.ok,

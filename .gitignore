@@ -15,3 +15,4 @@ packs/*.json
 !packs/berakhot_2a.json
 !packs/berakhot_2b.json
 chavruta.log
+chavruta/sessions/

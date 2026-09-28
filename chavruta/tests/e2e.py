@@ -182,6 +182,14 @@ def main():
             check("transcription primed with the page",
                   bool(heard) and any("מאימתי" in e["prompt"] for e in heard),
                   heard[0]["prompt"][-60:] if heard else "")
+            report = page.evaluate("sessionReport()")
+            check("session export has the whole turn",
+                  "heard as reading" in report and "routed:" in report and "ms to answer" in report,
+                  "(%d chars)" % len(report))
+            if args.shots:
+                open(os.path.join(args.shots, "session.md"), "w").write(report)
+            recorded = os.listdir(os.path.join(os.path.dirname(HERE), "sessions"))
+            check("each turn is recorded on disk", bool(recorded), str(recorded))
             page.click(".chip")
             page.wait_for_selector("#over.open", timeout=5000)
             check("chip opens the source", page.locator(".src.flash").count() == 1)

@@ -740,6 +740,7 @@ async function handle(u) {
   if (ears) ears.guard = false;
   setMode("hearing", "מקשיב למה שאמרת…");
   let heard;
+  const t0 = performance.now();
   try {
     const q = "ref=" + encodeURIComponent(S.pack.ref) + "&line=" + S.line + "&session=" + S.session +
       "&language=" + S.settings.language;
@@ -750,7 +751,8 @@ async function handle(u) {
   if (!heard.said || heard.mode === "silence") return setMode(S.listening ? "listening" : "idle", "לא שמעתי מילים — נסה שוב.");
 
   showMine(heard.said);
-  S.log.push({ me: true, text: heard.said, mode: heard.mode });
+  S.log.push({ me: true, text: heard.said, mode: heard.mode, ref: S.pack.ref, line: heard.line || S.line,
+    heard: heard.heard, ms_hear: Math.round(performance.now() - t0), at: new Date().toLocaleTimeString() });
   if (heard.line) selectLine(heard.line, { scroll: "side" });
   markRead(heard.heard);
 
@@ -767,6 +769,7 @@ async function handle(u) {
   }
 
   setMode("thinking", "חושב…");
+  const t1 = performance.now();
   let answer;
   try {
     answer = await post("/api/say", { ref: S.pack.ref, line: S.line, session: S.session, said: heard.said,
@@ -780,8 +783,12 @@ async function handle(u) {
   }
   showReply(answer.text, { grounded: answer.grounded });
   markQuotes(answer.text);
-  S.log.push({ me: false, text: answer.text, trace: answer.trace });
+  const entry = { me: false, text: answer.text, trace: answer.trace, grounded: answer.grounded,
+    ms_answer: Math.round(performance.now() - t1) };
+  S.log.push(entry);
+  const t2 = performance.now();
   await say(answer.text);
+  entry.ms_spoken = Math.round(performance.now() - t2);
 }
 
 async function say(text) {
@@ -880,6 +887,14 @@ function openLog() {
         (t.trace.elsewhere && t.trace.elsewhere.length ? " · elsewhere: " + t.trace.elsewhere.join(", ") : "")));
       panel.append(row);
     }
+    const copy = el("button", "btn", "📋 העתק את כל השיחה");
+    copy.onclick = async () => {
+      const text = sessionReport();
+      try { await navigator.clipboard.writeText(text); copy.textContent = "✓ הועתק — הדבק ל-Claude"; }
+      catch (e) { const ta = el("textarea"); ta.value = text; ta.style.width = "100%"; ta.rows = 10;
+        panel.append(ta); ta.select(); copy.textContent = "סמן והעתק מהתיבה"; }
+    };
+    panel.append(el("div", "grp", "לשתף"), copy);
     // For a quiet room: say it by typing. Not a chat -- the answer still comes aloud.
     panel.append(el("div", "grp", "להקליד במקום לדבר"));
     const form = el("form"); form.style.display = "flex"; form.style.gap = "6px";
@@ -890,6 +905,40 @@ function openLog() {
     panel.append(form);
     setTimeout(() => panel.scrollTo({ top: panel.scrollHeight }), 30);
   });
+}
+
+// The whole sitting as plain text: what was heard, how it was read, what came
+// back, which sources it opened, how long each step took. Made to be pasted
+// back into a conversation about improving the partner.
+function sessionReport() {
+  const h = S.health || {};
+  const lines = ["# Chavruta session — " + new Date().toLocaleString(),
+    "models: " + (h.heavy || "?") + " / " + (h.cheap || "?"),
+    "settings: " + JSON.stringify(S.settings), ""];
+  for (const t of S.log) {
+    if (t.me) {
+      const hd = t.heard || {};
+      lines.push("## " + (t.at || "") + " · " + (t.ref || "") + " line " + (t.line || "") +
+        " · heard as " + (t.mode || "?") + (t.ms_hear ? " (" + t.ms_hear + " ms)" : ""));
+      lines.push("ME: " + t.text);
+      if (hd.mode && hd.mode !== "talking")
+        lines.push("   [aligned: lines " + (hd.from_line || "?") + "-" + (hd.line || "?") + ", coverage " + hd.coverage +
+          (hd.stopped_mid_clause ? ", stopped mid-clause, " + hd.words_left_in_clause + " words left" : "") + "]");
+    } else {
+      lines.push("CHAVRUTA" + (t.ms_answer ? " (" + t.ms_answer + " ms to answer" +
+        (t.ms_spoken ? ", " + t.ms_spoken + " ms speaking" : "") + ")" : "") + ":");
+      lines.push(t.text);
+      const tr = t.trace || {};
+      if (tr.kind) lines.push("   [routed: " + tr.kind + (tr.claim ? ", claim" : "") +
+        (tr.names && tr.names.length ? ", named " + tr.names.join("/") : "") +
+        (tr.opened && tr.opened.length ? " · opened " + tr.opened.join(", ") : "") +
+        (tr.elsewhere && tr.elsewhere.length ? " · elsewhere " + tr.elsewhere.join(", ") : "") +
+        (t.grounded === false ? " · UNGROUNDED" : "") + "]");
+      if (tr.first_try) lines.push("   [first try was rejected: " + tr.first_try.problem + "]\n   " + tr.first_try.text);
+    }
+    lines.push("");
+  }
+  return lines.join("\n");
 }
 
 function openSettings() {
