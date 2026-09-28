@@ -427,7 +427,8 @@ class FifthRound(unittest.TestCase):
     def test_when_did_he_live_uses_whoever_was_just_cited(self):
         jobs = [j for j, _ in retrieve.plan(self.pack, 4, {"kind": "people", "names": [],
                                                           "avoid": ["Meiri", "Rashba"]})]
-        self.assertEqual(jobs, [("person", "Meiri", "Meiri on Berakhot"), ("person", "Rashba", "Rashba on Berakhot")])
+        self.assertEqual(jobs, [("person", "Meiri", "Meiri on Berakhot", "Berakhot 2a"),
+                                ("person", "Rashba", "Rashba on Berakhot", "Berakhot 2a")])
         found, missed, _ = library.gather(jobs)
         text = " ".join(e["he"] for _, e in found)
         self.assertIn("lived 1249–1315", text)
@@ -526,6 +527,17 @@ class SixthSitting(unittest.TestCase):
         one = library.person("Rabbi Eliezer")
         self.assertNotIn("Several", one["he"])
         self.assertIn("Hyrcanus", one["he"])
+
+    def test_sefaria_says_which_namesake_is_on_this_page(self):
+        entry = library.person("Rabban Gamliel", page="Berakhot 2a")
+        self.assertIn("Sefaria ties this page (Berakhot 2a:4-5)", entry["he"])
+        self.assertIn("Yavneh", entry["he"])
+        self.assertNotIn("haZaken", entry["he"])
+        # On a page Sefaria ties to neither, both stay and the partner decides.
+        self.assertIn("haZaken", library.person("Rabban Gamliel", page="Berakhot 40a")["he"])
+
+    def test_an_empty_stub_is_not_a_person(self):
+        self.assertIsNone(library._topic("rashba"))
 
     def test_what_was_fetched_a_turn_ago_is_still_citable(self):
         seen = []

@@ -127,7 +127,7 @@ def gather(jobs):
         elif job[0] == "zmanim":
             futures.append((job, POOL.submit(zmanim, *job[1:])))
         elif job[0] == "person":
-            futures.append((job, POOL.submit(person, job[1], job[2])))
+            futures.append((job, POOL.submit(person, *job[1:])))
         else:
             futures.append((job, POOL.submit(follow, job[1], job[2])))
     wait([f for _, f in futures], timeout=DEADLINE)
@@ -160,7 +160,7 @@ def cached(job):
             place = job[2] if len(job) > 2 and (job[2] in PLACES or job[2] == "Jerusalem") else None
             return (job[1], place) in _ZMANIM
         if job[0] == "person":
-            return (job[1], job[2]) in _PEOPLE
+            return (job[1], job[2], job[3] if len(job) > 3 else None) in _PEOPLE
         return (job[1] in _TEXTS) if job[0] == "text" else (job[1] in _LINKS)
 
 
@@ -185,11 +185,34 @@ def _human(slug):
     return " ".join("ben" if w == "b" else w if w.startswith("(") else w[:1].upper() + w[1:] for w in words)
 
 
+def _pages(slug):
+    """Every passage Sefaria ties to a person -- how it tells namesakes apart."""
+    data = sefaria.get("v2/topics/%s" % slug, soft=True, with_refs=1) or {}
+    out = []
+    for group in (data.get("refs") or {}).values():
+        out += [r.get("ref") or "" for r in (group or {}).get("refs") or []]
+    return out
+
+
+def on_page(slugs, page):
+    """The one of these people Sefaria ties to this amud, and where, or (None, None)."""
+    hits = []
+    for slug in slugs:
+        where = [r for r in _pages(slug) if r == page or r.startswith(page + ":")]
+        if where:
+            hits.append((slug, where[0]))
+    return hits[0] if len(hits) == 1 else (None, None)
+
+
 def _topic(slug):
     data = sefaria.get("v2/topics/%s" % slug, soft=True, with_links=1, group_related=1) or {}
     if not data.get("slug"):
         return None
     props = {k: (v or {}).get("value") for k, v in (data.get("properties") or {}).items()}
+    # Sefaria keeps empty stubs beside the real records ("rashba" beside
+    # "rashba1"): a topic with nothing in it is not an answer.
+    if not props and not (data.get("description") or {}).get("en"):
+        return None
     lines = ["%s (%s)" % ((data.get("primaryTitle") or {}).get("en") or slug,
                           (data.get("primaryTitle") or {}).get("he") or "")]
     born, died = props.get("birthYear"), props.get("deathYear")
@@ -213,6 +236,11 @@ def _topic(slug):
         about = _wiki(props["enWikiLink"].rsplit("/", 1)[-1])
     if about:
         lines.append(re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", about).replace("*", ""))
+        if born or died or gen:
+            # Sefaria's prose sometimes disagrees with its own dates (the
+            # Penei Yehoshua "early 19th century", born 1680).
+            lines.append("where this description and the years or generation above disagree, "
+                         "the years and generation are right")
     return "; ".join(lines)
 
 
@@ -225,10 +253,11 @@ def _wiki(title):
         return ""
 
 
-def person(name, book=None):
+def person(name, book=None, page=None):
     """Who someone was, as a citable entry. `book` is the index title of their
-    commentary on this page ("Meiri on Berakhot"), when there is one."""
-    key = (name, book)
+    commentary on this page ("Meiri on Berakhot"), when there is one; `page`
+    is the amud, to tell namesakes apart."""
+    key = (name, book, page)
     with _LOCK:
         if key in _PEOPLE:
             return _PEOPLE[key]
@@ -254,7 +283,14 @@ def person(name, book=None):
         else:
             same = [o for o in people if (o.get("title") or "").lower().startswith(name.lower())]
             slugs = [o["key"] for o in same or people][:3]
-        if len(slugs) > 1:
+        # Sefaria ties each passage to the person it means: if exactly one of
+        # the namesakes is tied to this amud, that is him.
+        which, where = on_page(slugs, page) if page and len(slugs) > 1 else (None, None)
+        if which:
+            slugs = [which]
+            parts.append("Several people are called %s; Sefaria ties this page (%s) to the one below."
+                         % (name, where))
+        elif len(slugs) > 1:
             parts.append("Several people are called %s. Decide from the page which one is meant -- "
                          "by who he argues with and the era of the text -- say which, and use only his record:"
                          % name)

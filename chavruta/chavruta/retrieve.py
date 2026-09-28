@@ -417,7 +417,7 @@ def people_plan(pack, route):
                 books.setdefault(name, re.sub(r"\s+\d+[ab]?(:\d+)*(-\d+)?$", "", entry["ref"]))
     jobs = []
     for name in names[:3]:
-        job = ("person", name, books.get(name))
+        job = ("person", name, books.get(name), pack.ref)
         if job not in [j for j, _ in jobs]:
             jobs.append((job, "some background on " + name))
     return jobs

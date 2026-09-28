@@ -166,7 +166,11 @@ TOPICS = {
                        "properties": {"generation": {"value": "T3"}},
                        "description": {"en": "Rabban Gamliel (II) was a tannaitic sage in the first and second centuries CE."},
                        "links": {"learned-from": {"links": [{"topic": "rabban-yochanan-b-zakkai"}]},
-                                 "taught": {"links": [{"topic": "rabbi-yehudah-b-ilai"}]}}},
+                                 "taught": {"links": [{"topic": "rabbi-yehudah-b-ilai"}]}},
+                       # as with_refs=1 answers: the passages Sefaria ties to him
+                       "refs": {"about": {"refs": [{"ref": "Mishnah Rosh Hashanah 2:8-9"},
+                                                   {"ref": "Berakhot 2a:4-5"}]}}},
+    "rashba": {"slug": "rashba", "primaryTitle": {"en": "Rashba", "he": ""}},   # an empty stub
     "rabban-gamliel-hazaken-(i)": {"slug": "rabban-gamliel-hazaken-(i)",
                                    "primaryTitle": {"en": "Rabban Gamliel haZaken (I)", "he": "רבן גמליאל הזקן"},
                                    "properties": {"generation": {"value": "T1"}},
