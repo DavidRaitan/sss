@@ -49,6 +49,12 @@ KINDS = [
      ["Go ahead.", "Go ahead, I'm following."], ["קדימה.", "קדימה, אני איתך."]),
     ("thanks", r"^(ok(ay)?,? )?(thanks|thank you)\b|^תודה",
      ["Sure.", "Of course."], ["בשמחה.", "בכיף."]),
+    ("help", r"\bwhat can (i|you) (say|do)\b|\bwhat do you (do|know how to do)\b|^help\b|\bvoice commands\b|"
+             r"מה אפשר להגיד|מה אתה יודע לעשות|מה אפשר לבקש|^עזרה",
+     ["You can say: faster, slower, answer in Hebrew, bring the Rishonim, leave out the Meiri, test me, "
+      "what did we learn yesterday, remind me of the mishna, today's daf, go to Shabbat 30, enough, or what?"],
+     ["אפשר להגיד: יותר מהר, יותר לאט, תענה באנגלית, תביא ראשונים, בלי המאירי, תבחן אותי, "
+      "מה למדנו אתמול, תזכיר לי את המשנה, הדף היומי, תעבור לשבת ל׳, די, או מה?"]),
     ("hello", r"^(hey|hi|hello|yo|good (morning|evening))\b|\bwhat'?s up\b|\bhow are you\b|\bhow'?s it going\b|"
               r"^(היי|הי|שלום|בוקר טוב|ערב טוב)|מה נשמע|מה קורה|מה שלומך",
      ["Hey! All good — ready when you are.", "Good, thanks. Where are we starting?"],
@@ -116,7 +122,9 @@ def reply(said, language="en", asked=False):
         # Nothing else of substance said: "hey, what's the summary here?" is a question.
         rest = [w for w in re.findall(r"[\w'א-ת]+", text[:hit.start()] + " " + text[hit.end():])
                 if w.lower() not in FILLER]
-        if len(rest) > 2:
+        # "Can you talk a little bit faster?" is still just "faster": in use the
+        # extra words sent it to the model, which could not change the speed.
+        if len(rest) > (6 if kind in ("faster", "slower") else 2):
             return None
         hebrew = language == "he" or (language == "auto" and not EN.search(text))
         if kind == "reading" and asked and re.match(r"^\W*((ok(ay)?|yes|yeah|sure|so)\W+)*go ahead\W*$", text, re.I):

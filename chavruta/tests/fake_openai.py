@@ -42,6 +42,18 @@ def router(said):
     if re.search(r"can you hear|hear me read|go ahead", low):
         return {"kind": "ping", "claim": False, "names": [], "navigate": None, "language": "en",
                 "reply": "Yes, I hear you." if "can you" in low else "Go ahead."}
+    if re.search(r"from now on|turn off your voice|always bring|leave out", low):
+        changes = []
+        if "hebrew" in low:
+            changes.append({"name": "language", "value": "he"})
+        if "english" in low:
+            changes.append({"name": "language", "value": "en"})
+        if "turn off your voice" in low:
+            changes.append({"name": "speak", "value": False})
+        if "leave out the meiri" in low:
+            changes.append({"name": "favor", "value": {"name": "Meiri", "value": -1}})
+        return {"kind": "settings", "claim": False, "names": [], "navigate": None, "language": "en",
+                "reply": None, "settings": changes}
     if re.search(r"remind me|last time|last \w+ pages|what did we learn|refresh", low):
         return {"kind": "review", "claim": False, "names": [], "navigate": None, "language": "en", "reply": None}
     if re.search(r"test me|quiz me|ask me questions", low):
@@ -64,7 +76,7 @@ def partner(system, messages):
         return "%s: the gemara asks when the evening Shema may be read, and brings the three views." \
             % last.split("\n", 1)[0]
     # Only what was fetched for this turn: earlier fetches ride along for a few turns.
-    now = last.split("[fetched from Sefaria just now", 1)[1] if "[fetched from Sefaria just now" in last else ""
+    now = last.split("[fetched from the library just now", 1)[1] if "[fetched from the library just now" in last else ""
     recaps = re.findall(r"\[\[(\w+ \d+[ab])\]\] Recap", now)
     if recaps:
         return " ".join("On %s [[%s]] the gemara asks about the evening Shema." % (r.split()[-1], r)
@@ -86,7 +98,7 @@ def partner(system, messages):
             % site.group(1) if site.group(1).startswith("Halacha") else \
             "The Sha'ar HaTziyun [[%s]] brings the sources." % site.group(1)
     fetched = re.search(r"\[\[(Tur, [^\]]+)\]\]", last)
-    if "fetched from Sefaria just now" in last and fetched:
+    if "fetched from the library just now" in last and fetched:
         return ("The Tur [[%s]] rules like Rabban Gamliel -- «והלכה כר\"ג» -- even "
                 "לכתחלה, until dawn." % fetched.group(1))
     swap = re.search(r"said «([^»]+)» where the page has «([^»]+)»", last)
@@ -145,7 +157,9 @@ class Handler(BaseHTTPRequestHandler):
             STATE["log"].append({"path": "search", "input": body.get("input"),
                                  "domains": [d for t in body.get("tools") or []
                                              for d in (t.get("filters") or {}).get("allowed_domains") or []]})
-            url = "https://halachayomit.co.il/he/ReadHalacha.aspx?HalachaID=4521"
+            domains = [d for t in body.get("tools") or [] for d in (t.get("filters") or {}).get("allowed_domains") or []]
+            url = "https://www.dafyomi.co.il/shabbos/points/sh-ps-002.htm" if "dafyomi.co.il" in domains \
+                else "https://halachayomit.co.il/he/ReadHalacha.aspx?HalachaID=4521"
             return self.reply({
                 "id": "resp_1", "object": "response", "created_at": 0, "status": "completed",
                 "model": body.get("model"), "parallel_tool_calls": True, "tool_choice": "auto", "tools": [],

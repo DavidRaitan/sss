@@ -137,6 +137,20 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             return self.wfile.write(body)
+        if url.path.startswith("/daf/"):
+            # Stands in for a D.A.F. point-by-point outline page (English).
+            page = ("<html><head><title>POINT BY POINT OUTLINE - %s</title></head><body>"
+                    "<div class='nav'>Home | Daf Yomi | Outlines</div>"
+                    "<p>1) THE TIME FOR THE EVENING SHEMA: The Mishnah gives three opinions for the latest time -- "
+                    "R. Eliezer until the end of the first watch, the Chachamim until midnight, R. Gamliel until dawn.</p>"
+                    "<p>2) WHY THE MISHNAH BEGINS WITH THE NIGHT: The Tana relies on the verse \"when you lie down and "
+                    "when you rise\", and follows the order of creation.</p></body></html>") % url.path.rsplit("/", 1)[-1]
+            body = page.encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            return self.wfile.write(body)
         if url.path == "/w/api.php":
             # Stands in for Hebrew Wikisource's MediaWiki API.
             if q.get("action") == ["query"]:

@@ -16,7 +16,7 @@ OAI, OAI_URL = fake_openai.start()
 os.environ.update(CHAVRUTA_SEFARIA_API=SEF_URL, OPENAI_BASE_URL=OAI_URL, OPENAI_API_KEY="sk-test",
                   CHAVRUTA_PACKS=tempfile.mkdtemp(), CHAVRUTA_ZMANIM_API=SEF_URL[:-4] + "/zmanim",
                   CHAVRUTA_WIKISOURCE_API=SEF_URL[:-4] + "/w/api.php",
-                  CHAVRUTA_WEB_REWRITE='{"https://halachayomit.co.il": "%s/hy"}' % SEF_URL[:-4])
+                  CHAVRUTA_WEB_REWRITE='{"https://halachayomit.co.il": "%s/hy", "https://www.dafyomi.co.il": "%s/daf"}' % (SEF_URL[:-4], SEF_URL[:-4]))
 
 from chavruta import sefaria  # noqa: E402
 importlib.reload(sefaria)
@@ -549,7 +549,7 @@ class SixthSitting(unittest.TestCase):
 
             def say(self, system, messages, **k):
                 seen.append(messages[-1]["content"])
-                return "Rabban Gamliel [[About Rabban Gamliel (Sefaria)]] led Yavneh."
+                return "Rabban Gamliel [[About Rabban Gamliel]] led Yavneh."
 
         memory = {}
         p = partner.Partner(self.pack, LLM())
@@ -776,7 +776,7 @@ class Review(unittest.TestCase):
                                         route={"kind": "review", "names": []})
         self.assertTrue(verdict.ok, text)
         self.assertIn("[[Berakhot 2a]]", text)
-        self.assertEqual(trace["fetched"], ["Berakhot 2a"])
+        self.assertEqual(trace["fetched"], ["Berakhot 2a", "D.A.F. outline: Berakhot 2"])
 
     def on_disk(self):
         self.review.ON_DISK = lambda ref: Pack(sefaria.build(ref)) if ref in ("Berakhot 2a", "Berakhot 2b") else None
@@ -820,6 +820,35 @@ class Review(unittest.TestCase):
         self.assertEqual(retrieve.extras(Pack(PACK), 1, {"kind": "quiz", "names": []}, "acharonim"), [])
 
 
+class VoiceSettings(unittest.TestCase):
+    def test_only_real_settings_get_through(self):
+        got = retrieve.settings_changes([
+            {"name": "rate", "value": "faster"}, {"name": "language", "value": "fr"},
+            {"name": "favor", "value": {"name": "meiri", "value": -1}},
+            {"name": "mine", "value": {"masechta": "Shabbat"}}, {"name": "api_key", "value": "x"},
+            {"name": "voices", "value": 9}])
+        self.assertEqual(got, [{"name": "rate", "value": "faster"},
+                               {"name": "favor", "value": {"name": "Meiri", "value": -1}},
+                               {"name": "mine", "value": {"masechta": "Shabbat", "add": True}},
+                               {"name": "voices", "value": 5}])
+
+    def test_the_router_hands_over_the_changes(self):
+        route = retrieve.classify(LLM(), "answer in Hebrew from now on and leave out the Meiri")
+        self.assertEqual(route["kind"], "settings")
+        self.assertEqual([c["name"] for c in route["settings"]], ["language", "favor"])
+
+    def test_speed_however_it_is_said(self):
+        from chavruta import smalltalk
+        for said in ("Can you talk a little bit faster?", "go faster", "תדבר קצת יותר מהר בבקשה"):
+            self.assertEqual(smalltalk.reply(said)[0], "faster", said)
+        self.assertEqual(smalltalk.reply("what can I say?")[0], "help")
+
+    def test_what_they_ask_now_beats_the_settings(self):
+        self.assertIn("What they ask for now beats every setting", partner.CONSTITUTION)
+        self.assertIn("ראשי תיבות", partner.CONSTITUTION)
+        self.assertNotIn("Sefaria", partner.sources_note([], [("Tur", {"ref": "Tur, Orach Chayim 235", "he": "x"})]))
+
+
 class TrustedSites(unittest.TestCase):
     pack = Pack(PACK)
 
@@ -860,6 +889,22 @@ class TrustedSites(unittest.TestCase):
         self.assertEqual(wiki, [("wiki", "שער הציון רלה")])
         found, _, _ = library.gather(wiki)
         self.assertEqual(found[0][1]["ref"], "Wikisource: שער הציון/רלה")
+
+    def test_the_daf_outline_of_any_page(self):
+        from chavruta import web
+        entry = web.outline("Berakhot", 2, lambda q, d: [])
+        self.assertEqual(entry["ref"], "D.A.F. outline: Berakhot 2")
+        self.assertIn("THE TIME FOR THE EVENING SHEMA", entry["he"])
+        self.assertNotIn("Home | Daf Yomi", entry["he"])                       # not the menu
+        self.assertTrue(entry["url"].endswith("/berachos/points/br-ps-002.htm"))
+
+    def test_a_tractate_not_listed_is_learned_once(self):
+        from chavruta import web
+        asked = []
+        find = lambda q, d: asked.append(q) or [("https://www.dafyomi.co.il/shabbos/points/sh-ps-002.htm", "")]
+        self.assertTrue(web.outline("Shabbat", 31, find)["url"].endswith("/shabbos/points/sh-ps-031.htm"))
+        self.assertEqual(web.outline("Shabbat", 32, find)["ref"], "D.A.F. outline: Shabbat 32")
+        self.assertEqual(len(asked), 1)                                        # searched once, then known
 
     def test_rav_ovadia_only_through_the_site(self):
         known = {"Halacha Yomit: זמן קריאת שמע של ערבית"}

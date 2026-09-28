@@ -508,6 +508,16 @@ class Handler(BaseHTTPRequestHandler):
                 record("navigate", session=body.get("session"), ref=ref, said=said, to=target)
                 return self.send_json({"mode": "navigate", "ref": target})
 
+        # "Talk faster", "answer in Hebrew", "leave out the Meiri": the page
+        # changes its own settings. Turning the voice off is asked first.
+        if route["kind"] == "settings" and route.get("settings"):
+            changes = route["settings"]
+            confirm = any(c["name"] == "speak" and c["value"] is False for c in changes)
+            record("answer", session=body.get("session"), ref=ref, line=line, said=said, text="(settings)",
+                   grounded=True, trace={"kind": "settings", "changes": changes, "quick": True, "seconds": 0})
+            return self.send_json({"mode": "settings", "changes": changes, "confirm": confirm,
+                                   "language": route.get("language")})
+
         # Streamed as lines of JSON when the client can take it: a first line
         # to say while Sefaria is asked ("let me pull up the Tur"), then the
         # answer. Silence while fetching sounded like a partner who gave up.

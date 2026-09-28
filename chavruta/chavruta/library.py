@@ -138,6 +138,8 @@ def gather(jobs):
             futures.append((job, POOL.submit(web.wikisource, job[1])))
         elif job[0] == "recap":
             futures.append((job, POOL.submit(review.recap, job[1])))
+        elif job[0] == "outline":
+            futures.append((job, POOL.submit(_outline, job[1], job[2])))
         else:
             futures.append((job, POOL.submit(follow, job[1], job[2])))
     wait([f for _, f in futures], timeout=DEADLINE)
@@ -160,6 +162,8 @@ def gather(jobs):
             found.append(("About " + job[1], result))
         elif job[0] == "recap":
             found.append(("Recap", result))
+        elif job[0] == "outline":
+            found.append(("D.A.F. outline", result))
         elif job[0] in ("site", "wiki"):
             found.extend((web.label(entry["site"]), entry) for entry in result)
         else:
@@ -172,9 +176,14 @@ def _site(domain, query):
     return web.search(domain, query, LLM().find_pages)
 
 
+def _outline(masechta, daf):
+    from .llm import LLM
+    return web.outline(masechta, daf, LLM().find_pages)
+
+
 def cached(job):
     """Whether a job would be answered without going out -- then nothing is announced."""
-    if job[0] in ("site", "wiki"):
+    if job[0] in ("site", "wiki", "outline"):
         return False
     if job[0] == "recap":
         return os.path.exists(review._path(job[1]))
@@ -323,7 +332,7 @@ def person(name, book=None, page=None):
             parts.append(about)
     entry = None
     if parts:
-        entry = {"ref": "About %s (Sefaria)" % name, "he": "\n".join(parts), "dibur": None, "fetched": True}
+        entry = {"ref": "About %s" % name, "he": "\n".join(parts), "dibur": None, "fetched": True}
     with _LOCK:
         _PEOPLE[key] = entry
     return entry
@@ -432,7 +441,7 @@ def zmanim(date, place=None):
         lines = ["%s: %s" % (label, _clock(evening[key_])) for key_, label in EVENING if evening.get(key_)]
         lines += ["%s: %s" % (label, _clock(morning[key_])) for key_, label in MORNING if morning.get(key_)]
         if lines:
-            entry = {"ref": "Zmanim for %s, night of %s (hebcal.com)" % (place or PLACE_NAME, date),
+            entry = {"ref": "Zmanim for %s, night of %s" % (place or PLACE_NAME, date),
                      "he": "; ".join(lines) + ".", "dibur": None, "fetched": True}
     except (urllib.error.URLError, TimeoutError, OSError, ValueError, KeyError):
         entry = None

@@ -463,3 +463,25 @@ and where the page itself points for this passage elsewhere in the Bavli
 (Mesoret HaShas), nearest first, the top two opened. It answers yes or no
 first, then where and when. "Remind me of the mishna" walks back page by page
 to the mishna the gemara is on, brings its text, and recaps the pages since.
+
+**52. The library, settings by voice, one pace, and a summary of every daf.**
+- "The library" (הספרייה), never Sefaria or Hebcal, on screen and in what the
+  partner says: it is a study partner with a shelf, not a wrapper for a site.
+  Sites the learner chose to trust are named, because the words are theirs.
+- Every setting by voice: the router proposes changes, only real settings and
+  real values get through, the page applies them as if tapped and says so in a
+  few words (in the new language, if that was the change). Turning the voice
+  off is asked first. "Talk a little bit faster" is caught at once: in use the
+  extra words sent it to the model, which could not change the speed.
+- What is asked this turn beats the settings: Hebrew when set to English, a
+  commentator left out, the full text, what the abbreviations stand for.
+- One pace: each sentence is voiced separately and the voice's own pace
+  varies (Hebrew often slower); each clip's pace is measured in syllables a
+  second, counted alike in both languages, and played at the usual pace times
+  the chosen speed, within 0.8–1.3. Changing speed applies to the sentence
+  being said. The export shows the paces, to tune from real use.
+- The D.A.F. point-by-point outline (dafyomi.co.il, Kollel Iyun Hadaf) of any
+  daf in Shas joins a review when that site is trusted (on by default) -- the
+  summary for pages learned before this app. Addresses seen for eight
+  tractates; for the rest the first daf is found by a site search and the
+  pattern kept.

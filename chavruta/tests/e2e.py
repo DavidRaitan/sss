@@ -61,7 +61,7 @@ def start_stack():
             f.write(json.dumps({"kind": "heard", "ref": ref, "at": yesterday + " 21:00:00"}) + "\n")
     os.environ.update(CHAVRUTA_SEFARIA_API=sef, OPENAI_BASE_URL=oai, OPENAI_API_KEY="sk-test",
                       CHAVRUTA_PACKS=packs, CHAVRUTA_SESSIONS=sessions, CHAVRUTA_WIKISOURCE_API=sef[:-4] + "/w/api.php",
-                      CHAVRUTA_WEB_REWRITE='{"https://halachayomit.co.il": "%s/hy"}' % sef[:-4])
+                      CHAVRUTA_WEB_REWRITE='{"https://halachayomit.co.il": "%s/hy", "https://www.dafyomi.co.il": "%s/daf"}' % (sef[:-4], sef[:-4]))
     import importlib
     import chavruta.sefaria as sf
     importlib.reload(sf)
@@ -291,6 +291,23 @@ def main():
             page.wait_for_function("/hear you|I'm here/.test(document.querySelector('#turns').textContent)",
                                    timeout=15000)
             check("typing answers in the open transcript", page.locator("#over.open").count() == 1)
+            # Settings by voice: done at once, and said in a few words.
+            page.fill("#panel input", "answer in Hebrew from now on")
+            page.press("#panel input", "Enter")
+            page.wait_for_function("S.settings.language === 'he'", timeout=15000)
+            page.wait_for_function("S.turns.some(t => /מעכשיו בעברית/.test(t.text || ''))", timeout=15000)
+            check("a setting changed by voice", True)
+            # Turning the voice off is asked first.
+            page.fill("#panel input", "turn off your voice")
+            page.press("#panel input", "Enter")
+            page.wait_for_function("S.pendingSettings && S.pendingSettings.length === 1", timeout=15000)
+            check("turning the voice off is asked first", page.evaluate("S.settings.speak") is True)
+            page.fill("#panel input", "no")
+            page.press("#panel input", "Enter")
+            page.wait_for_function("!S.pendingSettings", timeout=15000)
+            check("…and 'no' keeps it", page.evaluate("S.settings.speak") is True)
+            page.evaluate("S.settings.language = 'en'; saveSettings()")
+            page.wait_for_function("!saying && !speechQ.length", timeout=20000)
             # A follow-up said while the first question is still being thought
             # about is answered with it, once. (The model is slowed down here so
             # the first is certainly still thinking.)
@@ -372,6 +389,11 @@ def main():
 
         errors = [e for e in errors if "favicon" not in e and "fonts.g" not in e and "ERR_TUNNEL" not in e
                   and "ERR_CERT" not in e]  # this sandbox's proxy blocks Google Fonts
+        # One pace for every sentence: measured as they are said, in both languages alike.
+        check("each sentence's pace is measured", page.evaluate("PACES.length") >= 2, str(page.evaluate("PACES.length")))
+        check("syllables counted alike in Hebrew and English",
+              page.evaluate("syllables('מאימתי קורין את שמע')") == 9 and page.evaluate("syllables('from when do we read the Shema')") == 8,
+              str(page.evaluate("[syllables('מאימתי קורין את שמע'), syllables('from when do we read the Shema')]")))
         check("no JavaScript errors", not errors, "; ".join(errors[:3]))
         browser.close()
     print("\n%s" % ("ALL PASSED" if not problems else "FAILED: " + ", ".join(problems)))

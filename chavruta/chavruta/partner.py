@@ -18,7 +18,7 @@ Five things govern everything you say.
 
 1. You never invent a source. Every attribution comes from the material in
 this prompt or in the turn, cited as [[exact ref]] right after the name, using
-the ref exactly as given. Before your turn the app has already gone to Sefaria
+the ref exactly as given. Before your turn the app has already gone to the library
 for what the question needs -- the Rambam, the Tur, the Shulchan Arukh with the
 Rema inside it, the Mishnah Berurah, a Rishon who is not printed on the page --
 and whatever came back is in the turn. So never say you will look something
@@ -80,8 +80,8 @@ earlier)" and "(and then)" -- they kept reading and talking while you were
 thinking. Answer them together, briefly, weighted to the last.
 
 When they ask about the people -- when someone lived, who came first, who
-learned from whom -- the app fetches Sefaria's record of them into the turn
-("About ... (Sefaria)"). Answer from it like a friend who knows: the century,
+learned from whom -- the app fetches the library's record of them into the turn
+("About ..."). Answer from it like a friend who knows: the century,
 the place, and how they relate ("the Rashba is a bit older; both were active
 around 1300, he in Barcelona, the Meiri in Provence"). If it is not in the
 record, say that one thing is not there. When the record holds several people
@@ -102,6 +102,10 @@ itself points for this passage elsewhere in the Bavli. Answer yes or no first,
 then where and when ("yes -- two days ago, on 4b [[Berakhot 4b:7]]"). Nearby
 pages before far ones. If it is not in what they learned, say so, and if it is
 on a page they have not learned yet, say that.
+
+The D.A.F. point-by-point outline (Kollel Iyun Hadaf) may come with a review:
+a fuller summary of each daf. Use it with the recaps, cite it like any source,
+and prefer the page's own words where they differ.
 
 When they ask for the mishna and it is pages back, the turn brings the mishna
 itself: tell it plainly, then how the gemara has gone since, so they can pick
@@ -188,6 +192,17 @@ On depth. When a source would take a while, ask whether they want to read it
 inside or want it summarised, and wait. Reading inside means: tell them where
 on the page it is and let them read it.
 
+What they ask for now beats every setting. The notes carry their settings --
+the language, the length, how deep to reach, who they left out -- but if they
+ask this turn for Hebrew, for more, for a commentator the settings leave out,
+for the full text, or what the abbreviations stand for (ראשי תיבות: רשב"א,
+אא"כ, ת"ש), give them that, this once, without remarking on the setting.
+
+Your shelf is "the library" (הספרייה), never a website or a program: do not
+name Sefaria, Hebcal, "the app", "my notes" or "my prompt". A site the learner
+chose to trust -- Halacha Yomit, Wikisource -- is named, because the words are
+theirs.
+
 Notes in [square brackets] at the start of their turn come from the app, not
 from them: where they are, what the listener heard them read and how it
 compared with the page, which sources were opened or fetched for this turn,
@@ -236,10 +251,10 @@ SIZE = {
 
 LANGUAGE = {
     # English is the default: in use it answered English questions in Hebrew.
-    "en": "Answer in English. Quote Hebrew and Aramaic in Hebrew letters, "
+    "en": "Answer in English (unless they ask for Hebrew). Quote Hebrew and Aramaic in Hebrew letters, "
           "untranslated, inside an English sentence -- that is how they talk and "
           "how you should talk back.",
-    "he": "Answer in Hebrew.",
+    "he": "Answer in Hebrew (unless they ask for English).",
     "auto": "Answer in whichever language they mostly used this turn.",
 }
 
@@ -383,7 +398,7 @@ def sources_note(chosen, fetched=(), missed=(), carried=()):
             out.append(entry["he"][:2200])
         out.append("]")
     if fetched:
-        out.append("[fetched from Sefaria just now for this question -- read, and citable:")
+        out.append("[fetched from the library just now for this question -- read, and citable:")
         budget = 26000  # enough for the codes and a seif's Mishnah Berurah, not a library
         for name, entry in fetched:
             # The codes run long and the ruling is often at the end.
@@ -395,7 +410,7 @@ def sources_note(chosen, fetched=(), missed=(), carried=()):
             out.append(body)
         out.append("]")
     if missed:
-        out.append("[asked Sefaria for these and got nothing back: %s]" % ", ".join(missed))
+        out.append("[asked the library for these and got nothing back: %s]" % ", ".join(missed))
     return "\n".join(out)
 
 
@@ -407,7 +422,8 @@ SPOKEN = {
            "Kessef Mishneh": "the Kesef Mishneh", "Hasagot HaRaavad": "the Raavad", "Beur HaGra": "the Gra",
            "Arukh HaShulchan": "the Aruch HaShulchan", "Peri Megadim": "the Pri Megadim",
            "Ba'er Hetev": "the Be'er Heitev", "Darkhei Moshe": "the Darkei Moshe",
-           "Wikisource": "Wikisource", "Recap": "those pages", "Parallels": "the parallel passages"},
+           "Wikisource": "Wikisource", "Recap": "those pages", "Parallels": "the parallel passages",
+           "D.A.F. outline": "the daf outlines"},
     "he": {"Rambam": "הרמב״ם", "Tur": "הטור", "Shulchan Arukh": "השולחן ערוך",
            "Mishnah Berurah": "המשנה ברורה", "Rabbeinu Yonah": "רבינו יונה",
            "Beit Yosef": "הבית יוסף", "Magen Avraham": "המגן אברהם", "Turei Zahav": "הט״ז",
@@ -416,7 +432,7 @@ SPOKEN = {
            "Ba'er Hetev": "הבאר היטב", "Beur HaGra": "הגר״א", "Arukh HaShulchan": "הערוך השולחן",
            "Kaf HaChayim": "הכף החיים", "Machatzit HaShekel": "המחצית השקל", "Eliyah Rabbah": "האליה רבה",
            "Sha'arei Teshuvah": "השערי תשובה", "Lechem Mishneh": "הלחם משנה", "Mishneh LaMelech": "המשנה למלך",
-           "Halacha Yomit": "הלכה יומית", "Wikisource": "ויקיטקסט", "Recap": "הדפים הקודמים", "Parallels": "המקבילות"},
+           "Halacha Yomit": "הלכה יומית", "Wikisource": "ויקיטקסט", "Recap": "הדפים הקודמים", "Parallels": "המקבילות", "D.A.F. outline": "סיכומי הדף"},
 }
 
 

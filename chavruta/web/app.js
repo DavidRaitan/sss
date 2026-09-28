@@ -18,11 +18,15 @@ function el(tag, cls, text) {
 const DEFAULTS = { view: "daf", depth: "daf", language: "en", voice: "natural",
   hearing: "api", speak: true, pause: "normal", nudges: true, checks: true, translate: false, stops: false,
   speakers: false, rate: 1, favor: {}, voices: 3, open: "last", mine: [],
-  sites: ["halachayomit.co.il", "he.wikisource.org"], sites_halacha: true };
+  sites: ["halachayomit.co.il", "he.wikisource.org", "dafyomi.co.il"], sites_halacha: true };
 const PAUSES = { short: 1000, normal: 1500, long: 2400 };
 function loadSettings() {
-  try { return Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem("chavruta.settings") || "{}")); }
-  catch (e) { return Object.assign({}, DEFAULTS); }
+  let s;
+  try { s = Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem("chavruta.settings") || "{}")); }
+  catch (e) { s = Object.assign({}, DEFAULTS); }
+  // Sites added to the defaults after a list was saved join it once.
+  if (!s.sites_seen) { s.sites = [...new Set([...s.sites, ...DEFAULTS.sites])]; s.sites_seen = 1; }
+  return s;
 }
 function saveSettings() {
   try { localStorage.setItem("chavruta.settings", JSON.stringify(S.settings)); } catch (e) {}
@@ -102,7 +106,7 @@ async function checkHealth() {
   }
   const h = S.health;
   if (!h.key) setStatus("warn", "אין מפתח", "הוסף OPENAI_API_KEY לקובץ .env והפעל מחדש");
-  else if (h.sefaria === false) setStatus("warn", "ספריא לא זמינה", "דפים שכבר נפתחו עדיין עובדים");
+  else if (h.sefaria === false) setStatus("warn", "הספרייה לא זמינה", "דפים שכבר נפתחו עדיין עובדים");
   else setStatus("ok", "מוכן", h.heavy + " · " + h.cheap);
 }
 
@@ -177,7 +181,7 @@ async function openToday() {
   const t = await today();
   if (t && t.amudim && t.amudim.length) return turnTo(t.amudim[0]);
   const box = $("loading"); box.hidden = false;
-  box.textContent = t ? "הדף היומי היום (" + t.he + ") לא נמצא בספריא." : "לא הצלחתי לברר מה הדף היומי.";
+  box.textContent = t ? "הדף היומי היום (" + t.he + ") לא נמצא בספרייה." : "לא הצלחתי לברר מה הדף היומי.";
 }
 
 function masechta() { return S.masechtot.find((m) => m.name === $("mas").value) || S.masechtot[0]; }
@@ -249,7 +253,7 @@ async function turnTo(ref, line) {
 function pageError(ref, code) {
   const box = $("loading");
   box.hidden = false; box.replaceChildren();
-  const msg = { sefaria_unreachable: "לא הצלחתי להגיע לספריא. בדוק את החיבור לאינטרנט.",
+  const msg = { sefaria_unreachable: "לא הצלחתי להגיע לספרייה. בדוק את החיבור לאינטרנט.",
     not_available: "הדף הזה עוד לא זמין.", network: "השרת לא עונה — האם ./run.sh עדיין רץ?" }[code]
     || "משהו השתבש בפתיחת הדף.";
   box.append(el("div", null, msg));
@@ -618,6 +622,41 @@ function stopSpeaking() {
 
 const rate = () => +S.settings.rate || 1;
 
+// One pace for every sentence, Hebrew or English. Each sentence is voiced on
+// its own, and the voice's natural pace differs from one to the next -- in use
+// Hebrew often came out slower than English at the same setting. So each
+// clip's pace is measured (syllables a second, counted the same way for both
+// languages), and it plays at the usual pace times the chosen speed; the
+// correction is kept within bounds so a voice never sounds pulled.
+const PACES = [];                     // natural paces heard so far, syllables/second
+function syllables(text) {
+  let n = 0;
+  for (const w of speakable(text).split(/\s+/)) {
+    const he = w.replace(/[^\u05d0-\u05ea]/g, ""), en = w.toLowerCase().replace(/[^a-z]/g, "");
+    if (he) n += Math.max(1, Math.round(he.length / 1.8));
+    else if (en) n += Math.max(1, (en.match(/[aeiouy]+/g) || []).length - (/[^aeiouy]e$/.test(en) ? 1 : 0));
+    else if (/\d/.test(w)) n += 2;
+  }
+  return n;
+}
+function usualPace() {
+  if (PACES.length < 3) return null;
+  const sorted = [...PACES].sort((a, b) => a - b);
+  return sorted[Math.floor(sorted.length / 2)];
+}
+function pace(audio) {
+  if (!audio) return;
+  const d = audio.duration, syl = audio._syl || 0;
+  const natural = isFinite(d) && d > 0.4 && syl ? syl / d : null, usual = usualPace();
+  const fix = natural && usual ? Math.min(1.3, Math.max(0.8, usual / natural)) : 1;
+  audio.playbackRate = rate() * fix;
+  audio._fix = fix;
+}
+function heardPace(audio) {
+  const d = audio && audio.duration, syl = audio && audio._syl;
+  if (isFinite(d) && d > 0.8 && syl >= 4) { PACES.push(syl / d); if (PACES.length > 30) PACES.shift(); }
+}
+
 // ⏸ / ▶ -- stopping it without having to talk over it.
 function pauseSpeaking() {
   if (!speakingDone) return;
@@ -676,9 +715,12 @@ async function speak(text, item) {
       const audio = await prepare(item);
       if (!current()) return done;                           // stopped while it was being made
       player = audio;
-      player.playbackRate = rate();
+      player._syl = syllables(text);
       player.preservesPitch = true;
-      player.onended = () => stopSpeaking();
+      pace(player);
+      // The length is known only once the voice is all here: set the pace then.
+      player.ondurationchange = () => pace(audio);
+      player.onended = () => { heardPace(audio); stopSpeaking(); };
       player.onerror = () => { logVoiceTrouble("playback"); stopSpeaking(); };
       if (!paused) await player.play();                      // ⏸ pressed before the first word
       return done;
@@ -999,7 +1041,7 @@ function failed(err, stage, since) {
 function explain(err) {
   const code = (err && (err.code || err.message)) || "";
   if (/OPENAI_API_KEY|api key|401/i.test(code)) return "המפתח ל-OpenAI לא עובד — בדוק את .env.";
-  if (/sefaria/.test(code)) return "לא הצלחתי להגיע לספריא.";
+  if (/sefaria/.test(code)) return "לא הצלחתי להגיע לספרייה.";
   if (/model/.test(code)) return "המודל לא ענה. נסה שוב בעוד רגע.";
   return "משהו השתבש — נסה שוב.";
 }
@@ -1039,6 +1081,19 @@ async function hearOne(u, g, t0) {
     heard: heard.heard, ms_hear: Math.round(performance.now() - t0), at: new Date().toLocaleTimeString() });
   if (heard.line) selectLine(heard.line, { scroll: "side" });
   markRead(heard.heard);
+  if (S.pendingSettings && heard.mode === "talking") {
+    // The answer to "turn my voice off?"
+    const changes = S.pendingSettings; S.pendingSettings = null;
+    const he = S.settings.language === "he";
+    if (/^\W*(yes|yeah|yep|sure|ok(ay)?|confirm|do it|כן|בטח|אישור|תכבה)\b/i.test(heard.said)) {
+      answered(heard.said, applySettings(changes, he), { kind: "settings" });
+      return;
+    }
+    if (/^\W*(no|nope|cancel|don'?t|never mind|לא|עזוב|בטל)\b/i.test(heard.said)) {
+      answered(heard.said, he ? "בסדר, משאיר את הקול." : "OK, I'll keep talking.", { kind: "settings" });
+      return;
+    }
+  }
   if (heard.ignore) return idleMode();   // "um", "okay": nothing to answer
 
   if (heard.skip) {
@@ -1179,6 +1234,65 @@ function toLatest() {
   renderBar();
 }
 
+// Settings changed by voice. Each change is applied as if tapped in ⚙, and
+// answered in a few words.
+const SAID = {
+  language: { en: ["Sure, English from now on.", "בסדר, מעכשיו באנגלית."], he: ["Sure, Hebrew from now on.", "בסדר, מעכשיו בעברית."],
+              auto: ["I'll answer in whatever language you use.", "אענה בשפה שבה תדבר."] },
+  depth: { daf: ["Just the page from now on.", "מעכשיו רק מה שעל הדף."], rishonim: ["I'll bring the Rishonim in too.", "אביא גם ראשונים."],
+           acharonim: ["I'll bring the Acharonim in too.", "אביא גם אחרונים."] },
+  nudges: { true: ["I'll speak up at the end of a unit.", "אעיר בסוף יחידה."], false: ["I'll stay quiet unless you ask.", "לא אעיר אם לא תשאל."] },
+  checks: { true: ["I'll ask when a word comes out different.", "אשאל כשמילה יוצאת אחרת."], false: ["I won't stop you over words.", "לא אעצור אותך על מילים."] },
+  pause: { short: ["I'll come in sooner.", "אענה מהר יותר."], normal: ["Back to the usual pause.", "חוזר להמתנה הרגילה."],
+           long: ["I'll wait longer before I answer.", "אחכה יותר לפני שאני עונה."] },
+  speak: { true: ["I'll answer out loud.", "אענה בקול."], false: ["Answers on screen only.", "התשובות רק על המסך."] },
+  view: { daf: ["The page as it's printed.", "צורת הדף."], lin: ["The Steinsaltz view.", "תצוגת שטיינזלץ."] },
+  translate: { true: ["Translation on.", "תרגום מופעל."], false: ["Translation off.", "בלי תרגום."] },
+  stops: { true: ["Marking where sentences stop.", "מסמן עצירות."], false: ["Not marking the stops.", "בלי סימון עצירות."] },
+  speakers: { true: ["Speaker mode — I won't listen while I talk.", "מצב רמקול — בזמן שאני מדבר אני לא מקשיב."],
+              false: ["Earbuds mode.", "מצב אוזניות."] },
+  sites_halacha: { true: ["I'll check Halacha Yomit on halacha questions.", "אבדוק גם בהלכה יומית בשאלות הלכה."],
+                   false: ["Only when you ask.", "רק כשתבקש."] },
+  open: { today: ["I'll open on the daf yomi.", "אפתח על הדף היומי."], last: ["I'll open where you stopped.", "אפתח איפה שהפסקת."] },
+};
+function applySettings(changes, he) {
+  const said = [];
+  for (const { name, value } of changes) {
+    if (name === "rate") { said.push(setRate(value === "faster" ? 1 : -1)); continue; }
+    if (name === "voices") {
+      S.settings.voices = value;
+      said.push(he ? "עד " + value + " קולות בתשובה." : "Up to " + value + " voices an answer."); continue;
+    }
+    if (name === "favor") {
+      const f = Object.assign({}, S.settings.favor);
+      if (value.value) f[value.name] = value.value; else delete f[value.name];
+      S.settings.favor = f;
+      said.push(value.value === 1 ? (he ? value.name + " ליד השולחן." : value.name + " is at the table.")
+        : value.value === -1 ? (he ? value.name + " בחוץ, אלא אם תבקש." : value.name + " stays out unless you ask.")
+        : (he ? value.name + " חזר לרגיל." : value.name + " is back to normal."));
+      continue;
+    }
+    if (name === "mine") {
+      const m = S.masechtot.find((x) => x.name === value.masechta);
+      S.settings.mine = value.add ? [...new Set([...S.settings.mine, value.masechta])]
+        : S.settings.mine.filter((x) => x !== value.masechta);
+      fillMasechtot();
+      said.push((m ? m.he : value.masechta) + (value.add ? (he ? " נוספה למסכתות שלך." : " is in your tractates.")
+        : (he ? " הוסרה מהמסכתות שלך." : " is out of your tractates.")));
+      continue;
+    }
+    S.settings[name] = value;
+    const line = (SAID[name] || {})[String(value)];
+    said.push(line ? line[he ? 1 : 0] : (he ? "בסדר." : "Done."));
+    if (name === "view" && S.pack) { render(); selectLine(S.line); }
+    if (["translate", "stops"].includes(name)) applyToggles();
+    if (name === "speak" && !value) stopSpeaking();
+  }
+  saveSettings();
+  if (S.panel === "settings") openSettings();
+  return said.join(" ");
+}
+
 // Speed, from settings or by voice ("a bit faster").
 const RATES = [0.85, 1, 1.15, 1.3, 1.5, 1.75];
 function setRate(step) {
@@ -1187,7 +1301,7 @@ function setRate(step) {
   if (i < 0) i = 1;
   i = Math.max(0, Math.min(RATES.length - 1, i + step));
   S.settings.rate = RATES[i]; saveSettings();
-  if (player) player.playbackRate = RATES[i];
+  pace(player);                        // live: the sentence being said speeds up now
   const he = S.settings.language === "he";
   if (step > 0) return i === RATES.length - 1 ? (he ? "זה הכי מהר שלי." : "That's as fast as I go.") : (he ? "בסדר, יותר מהר." : "Sure — faster.");
   return i === 0 ? (he ? "זה הכי לאט שלי." : "That's as slow as I go.") : (he ? "בסדר, יותר לאט." : "Sure — slower.");
@@ -1278,6 +1392,25 @@ async function respond(batch, g) {
   } finally { aborts.delete(ctl); if (current === mine) current = null; }
   if (g !== S.gen || mine.merged) return;
   if (!answer) { dropTurn(turn); return failed(null, "answer", t1); }
+  if (answer.mode === "settings") {
+    // "Talk faster", "answer in Hebrew": done at once, and said in a word.
+    // Turning the voice off is asked first.
+    // Said in the language just chosen, if that is the change.
+    const lang = (answer.changes.find((c) => c.name === "language") || {}).value;
+    const he = lang ? lang === "he" : (answer.language || S.settings.language) === "he";
+    turn.complete = true;
+    if (answer.confirm) {
+      S.pendingSettings = answer.changes;
+      turn.text = he ? "לכבות את הקול? התשובות יהיו רק על המסך. תגיד ״כן״ לאישור."
+        : "Turn my voice off? Answers would be on screen only. Say yes to confirm.";
+    } else {
+      turn.text = applySettings(answer.changes, he);
+    }
+    logPush({ me: false, text: turn.text, trace: { kind: "settings", quick: true } });
+    say(turn.text, turn);
+    finishTurns(); renderBar();
+    return;
+  }
   if (answer.mode === "navigate") {
     turn.complete = true; turn.text = "עובר ל" + runnerText(answer.ref) + ".";
     finishTurns(); renderBar();
@@ -1526,10 +1659,10 @@ function textLink(ref) {
       body.textContent = data.he;
       body.dataset.done = "1";
       // A page of a trusted site links back to the site itself.
-      const go = el("a", "lnk", data.url ? "באתר המקור ↗" : "בספריא ↗");
+      const go = el("a", "lnk", data.url ? "באתר המקור ↗" : "הטקסט המלא ↗");
       go.href = data.url || sefariaUrl(ref); go.target = "_blank"; go.rel = "noopener";
       body.append(el("br"), go);
-    } catch (e) { body.textContent = "לא הצלחתי להביא את זה מספריא."; }
+    } catch (e) { body.textContent = "לא הצלחתי להביא את זה מהספרייה."; }
   };
   wrap.append(a, body);
   return wrap;
@@ -1604,7 +1737,9 @@ function sessionReport() {
   const h = S.health || {};
   const lines = ["# Chavruta session — " + new Date().toLocaleString(),
     "models: " + (h.heavy || "?") + " / " + (h.cheap || "?"),
-    "settings: " + JSON.stringify(S.settings), ""];
+    "settings: " + JSON.stringify(S.settings),
+    "voice pace: usual " + (usualPace() ? usualPace().toFixed(1) : "?") + " syllables/s over " + PACES.length +
+      " sentences (range " + (PACES.length ? Math.min(...PACES).toFixed(1) + "–" + Math.max(...PACES).toFixed(1) : "?") + ")", ""];
   for (const t of S.log) {
     if (t.me) {
       const hd = t.heard || {};
@@ -1695,7 +1830,8 @@ function learningBox() {
 function sitesBox() {
   const box = el("div", "set sites");
   box.append(el("div", "lbl", "אתרים מהימנים"));
-  box.append(el("div", "help", "למה שאין בספריא: הלכה יומית (פסקי הרב עובדיה), ויקיטקסט (שער הציון, ברכי יוסף, המרדכי). " +
+  box.append(el("div", "help", "למה שאין בספרייה: הלכה יומית (פסקי הרב עובדיה), ויקיטקסט (שער הציון, ברכי יוסף, המרדכי), " +
+    "וסיכום הדף של D.A.F. (dafyomi.co.il) לכל דף בש״ס — לחזרה, גם על דפים שלמדת לפני האפליקציה. " +
     "הוא בודק שם כשתזכיר אותם (״מה אומר הרב עובדיה?״) או כשתגיד ״תבדוק באתרים״, מצטט משפט ונותן קישור."));
   const list = el("div", "opts");
   const draw = () => {
@@ -1779,7 +1915,7 @@ function openSettings() {
         if (key === "view") render(), selectLine(S.line);
         if (["translate", "stops"].includes(key)) applyToggles();
         if (key === "hearing" && S.listening) { stopListening(); startListening(); }
-        if (key === "rate" && player) player.playbackRate = rate();
+        if (key === "rate") pace(player);
       };
       row.append(b);
     }

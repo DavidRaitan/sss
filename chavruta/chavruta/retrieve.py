@@ -36,7 +36,42 @@ LIGHT = {
     "quiz": "asks you to test them or ask them questions on what they learned",
     "recall": "asks whether they already learned something, or where they saw it -- 'did we learn "
               "this yesterday?', 'I think I read this somewhere', 'where did this word come up?'",
+    "settings": "asks you to change how you work -- speak faster or slower, answer in Hebrew or "
+                "English, bring more or fewer commentators, stop speaking up, wait longer, always "
+                "bring or leave out a commentator, open on the daf yomi",
 }
+
+# What can be changed by voice, and to what. Anything else the router says is
+# dropped: a setting is never set to a value the settings screen does not offer.
+SETTINGS = {
+    "rate": ("faster", "slower"), "language": ("en", "he", "auto"),
+    "depth": ("daf", "rishonim", "acharonim"), "voices": (1, 2, 3, 5),
+    "nudges": (True, False), "checks": (True, False), "pause": ("short", "normal", "long"),
+    "speak": (True, False), "view": ("daf", "lin"), "translate": (True, False),
+    "stops": (True, False), "speakers": (True, False), "sites_halacha": (True, False),
+    "open": ("last", "today"),
+}
+
+
+def settings_changes(raw):
+    """The router's proposed changes, kept only where they are real settings."""
+    out = []
+    for change in raw if isinstance(raw, list) else []:
+        if not isinstance(change, dict):
+            continue
+        name, value = change.get("name"), change.get("value")
+        if name in SETTINGS and value in SETTINGS[name]:
+            out.append({"name": name, "value": value})
+        elif name == "voices" and isinstance(value, int):
+            out.append({"name": name, "value": max(1, min(5, value))})
+        elif name == "favor" and isinstance(value, dict) and value.get("name") and value.get("value") in (1, -1, 0):
+            known = [n for _, names in who.TABLE for n, _ in names]
+            match = resolve(str(value["name"]), set(known)) or (value["name"] if value["name"] in known else None)
+            if match in known:
+                out.append({"name": "favor", "value": {"name": match, "value": value["value"]}})
+        elif name == "mine" and isinstance(value, dict) and value.get("masechta") in {m["name"] for m in who.MASECHTOT}:
+            out.append({"name": "mine", "value": {"masechta": value["masechta"], "add": value.get("add") is not False}})
+    return out[:4]
 KINDS = list(who.ROUTES) + list(LIGHT) + ["reading", "navigate"]
 
 # Depth: how far past the printed page to reach without being asked.
@@ -59,6 +94,16 @@ study partner. Reply with JSON only:
              if they named one, spelled exactly as in this list: %s -- else null}
              if they asked to go to a page; {"daf_yomi": true} if they asked
              for today's daf ("the daf yomi", "הדף היומי"); else null,
+ "settings": only when kind is "settings": the changes, as [{"name": ..., "value": ...}]
+             with name one of rate ("faster"/"slower"), language ("en"/"he"/"auto"),
+             depth ("daf"/"rishonim"/"acharonim"), voices (1-5, how many commentators),
+             nudges (true/false, speaking up unasked), checks (true/false, asking about
+             misread words), pause ("short"/"normal"/"long", how long to wait),
+             speak (true/false, answering aloud), view ("daf"/"lin"), translate,
+             stops, speakers (true/false), sites_halacha (true/false, checking Halacha
+             Yomit on halacha questions), open ("last"/"today"), favor ({"name":
+             commentator, "value": 1 always / -1 leave out / 0 normal}), mine
+             ({"masechta": tractate, "add": true/false}); else [],
  "language": "he" if they spoke mostly Hebrew, "en" if mostly English,
  "reply": only when kind is "ping": the few words a study partner across the
           table would say back to exactly this, in their language. "Yes, I
@@ -83,7 +128,7 @@ def classify(llm, said):
         out = llm.json(ROUTER_SYSTEM, [{"role": "user", "content": said}], heavy=False)
     except Exception:
         return {"kind": "other", "claim": False, "names": [], "navigate": None, "language": None,
-                "reply": None}
+                "reply": None, "settings": []}
     kind = out.get("kind")
     nav = out.get("navigate")
     names = {m["name"] for m in who.MASECHTOT}
@@ -101,6 +146,7 @@ def classify(llm, said):
         "navigate": nav,
         "language": out.get("language") if out.get("language") in ("he", "en") else None,
         "reply": str(out["reply"])[:160] if kind == "ping" and out.get("reply") else None,
+        "settings": settings_changes(out.get("settings")) if kind == "settings" else [],
     }
 
 
@@ -211,7 +257,7 @@ RULING = re.compile(r"^.{0,40}?(פסק|הלכה|הלכתא|נמצא|לענין �
 
 # Small exchanges and page-turns open nothing: a mic check does not need the Meiri.
 # Questions about people open no commentary either; they fetch the people.
-QUIET = ("ping", "reading", "navigate", "people", "review", "quiz", "recall")
+QUIET = ("ping", "reading", "navigate", "people", "review", "quiz", "recall", "settings")
 
 
 def extras(pack, n, route, depth="daf", budget=7):
@@ -352,8 +398,18 @@ def plan(pack, n, route):
     if kind == "people":
         return people_plan(pack, route)
     if kind in ("review", "recall"):
-        return [(("recap", ref), "Recap") for ref in route.get("pages") or []] + \
+        jobs = [(("recap", ref), "Recap") for ref in route.get("pages") or []] + \
             [(("text", ref), "Parallels") for ref in route.get("parallels") or []]
+        # The D.A.F. outline of those dafim, when that site is trusted: a second,
+        # fuller summary, and one written for pages learned before this app.
+        if web.DAF_SITE in (route.get("sites") or []):
+            dafim = []
+            for ref in route.get("pages") or []:
+                m = re.match(r"^(.+) (\d+)[ab]$", ref)
+                if m and (m.group(1), int(m.group(2))) not in dafim:
+                    dafim.append((m.group(1), int(m.group(2))))
+            jobs += [(("outline", m, d), "D.A.F. outline") for m, d in dafim[-3:]]
+        return jobs
     if kind in QUIET or kind == "check_reading":
         return []
     present = set(pack.commentators())

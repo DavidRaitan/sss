@@ -21,8 +21,9 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-LABELS = {"halachayomit.co.il": "Halacha Yomit", "he.wikisource.org": "Wikisource"}
-DEFAULT_SITES = ["halachayomit.co.il", "he.wikisource.org"]
+LABELS = {"halachayomit.co.il": "Halacha Yomit", "he.wikisource.org": "Wikisource",
+          "dafyomi.co.il": "D.A.F. outline"}
+DEFAULT_SITES = ["halachayomit.co.il", "he.wikisource.org", "dafyomi.co.il"]
 WIKISOURCE_API = os.environ.get("CHAVRUTA_WIKISOURCE_API", "https://he.wikisource.org/w/api.php")
 # For tests: {"https://halachayomit.co.il": "http://127.0.0.1:port/hy"}.
 REWRITE = json.loads(os.environ.get("CHAVRUTA_WEB_REWRITE") or "{}")
@@ -64,18 +65,23 @@ BLOCK = re.compile(r"</?(p|div|br|li|h[1-6]|td|tr|section|article|blockquote)\b[
 
 
 def text_of(page):
-    """The body of a page as plain text: the blocks that are mostly Hebrew prose,
-    not menus, footers or scripts."""
+    """The body of a page as plain text: its prose blocks, not menus, footers or
+    scripts. On a Hebrew page, the blocks that are mostly Hebrew; on an English
+    one (the D.A.F. outlines), the blocks of real sentences."""
     page = re.sub(r"(?is)<(script|style|nav|header|footer|form|noscript)\b.*?</\1>", " ", page)
-    blocks = BLOCK.split(page)
-    out = []
-    for block in blocks:
+    blocks = []
+    for block in BLOCK.split(page):
         if not block or len(block) < 2:
             continue
-        plain = html.unescape(re.sub(r"<[^>]+>", " ", block))
-        plain = re.sub(r"\s+", " ", plain).strip()
-        letters = sum(ch.isalpha() for ch in plain) or 1
-        if len(plain) >= 40 and len(HEBREW.findall(plain)) / letters > 0.5:
+        plain = re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", block))).strip()
+        if len(plain) >= 40:
+            blocks.append(plain)
+    letters = sum(ch.isalpha() for b in blocks for ch in b) or 1
+    hebrew_page = sum(len(HEBREW.findall(b)) for b in blocks) / letters > 0.3
+    out = []
+    for plain in blocks:
+        share = len(HEBREW.findall(plain)) / (sum(ch.isalpha() for ch in plain) or 1)
+        if (share > 0.5) if hebrew_page else (len(plain.split()) >= 6):
             out.append(plain)
     return "\n".join(out)
 
@@ -169,3 +175,60 @@ WORKS = [
 ]
 ANY_SITE = re.compile(r"\b(search|check|look) (it )?(up )?(online|the web|the internet|your sites|trusted sites)\b|"
                       r"תחפש באינטרנט|תבדוק באתרים|באתרים", re.I)
+
+
+# -- the D.A.F. point-by-point outline of every daf (Kollel Iyun Hadaf) --------
+#
+# dafyomi.co.il/<folder>/points/<abbr>-ps-<daf>.htm, one page per daf, in
+# English, for all of Shas. The folders and abbreviations below were seen in
+# its own addresses; for a tractate not listed, the first daf is found by a
+# search limited to the site, and the pattern is learned from the address and
+# kept, so every later daf is a single page read.
+DAF_SITE = "dafyomi.co.il"
+DAF_KNOWN = {"Berakhot": ("berachos", "br"), "Taanit": ("taanis", "tn"), "Sotah": ("sotah", "so"),
+             "Yevamot": ("yevamos", "ye"), "Kiddushin": ("kidushin", "kd"), "Bava Metzia": ("bmetzia", "bm"),
+             "Zevachim": ("zevachim", "zv"), "Menachot": ("menachos", "mn")}
+DAF_URL = re.compile(r"dafyomi\.co\.il/([a-z_]+)/points/([a-z]+)-ps-\d+\.htm", re.I)
+
+
+def _learned_path():
+    return os.path.join(os.environ.get("CHAVRUTA_PACKS") or os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "packs"), "_dafyomi_sites.json")
+
+
+def _pattern(masechta, find):
+    if masechta in DAF_KNOWN:
+        return DAF_KNOWN[masechta]
+    try:
+        with open(_learned_path(), encoding="utf-8") as handle:
+            learned = json.load(handle)
+    except (OSError, ValueError):
+        learned = {}
+    if masechta in learned:
+        return tuple(learned[masechta])
+    for url, _ in find("POINT BY POINT OUTLINE %s 2 dafyomi.co.il points" % masechta, [DAF_SITE]):
+        m = DAF_URL.search(url)
+        if m:
+            learned[masechta] = [m.group(1).lower(), m.group(2).lower()]
+            try:
+                with open(_learned_path(), "w", encoding="utf-8") as handle:
+                    json.dump(learned, handle)
+            except OSError:
+                pass
+            return tuple(learned[masechta])
+    return None
+
+
+def outline(masechta, daf, find):
+    """The D.A.F. point-by-point outline of one daf, as a citable entry, or None."""
+    pattern = _pattern(masechta, find)
+    if not pattern:
+        return None
+    folder, abbr = pattern
+    url = "https://www.dafyomi.co.il/%s/points/%s-ps-%03d.htm" % (folder, abbr, int(daf))
+    entry = page(url, DAF_SITE)
+    if entry:
+        entry = dict(entry, ref="D.A.F. outline: %s %s" % (masechta, daf))
+        with _LOCK:
+            _PAGES[url] = entry
+    return entry
