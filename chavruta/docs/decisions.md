@@ -353,3 +353,34 @@ turn: the bar shows the turn being answered — its question and its answer,
 growing as it is spoken — and the others wait below it as a queue (⏳ still
 thinking, ✓ ready), with ⏭ to skip the current answer and ⏩ to go straight to
 the latest question. "Enough" / "skip" / "די" by voice does the same as ⏭.
+
+**45. What the sixth sitting showed.** A good sitting, with its own mistakes:
+- *Times are fetched, never remembered.* "How long till sunset?" got "I need
+  your location", and "say in Tel Aviv" got a sunset the model made up. Now
+  sunset, dawn, nightfall and "how long till" fetch the times; a named city
+  (a list of common ones, in English and Hebrew) is looked up at Hebcal by its
+  coordinates and remembered for the sitting, and the time now comes with it.
+- *The right Rabban Gamliel.* The name search took the first match, the Elder,
+  a generation before the Mishnah's Rabban Gamliel of Yavneh. When Sefaria
+  names no exact match, everyone of that name goes in, and the partner decides
+  from the page which is meant.
+- *What was fetched stays on the table* for the next few turns. The answer
+  after "who came first?" was rejected for citing the biographies fetched one
+  turn earlier, and came back saying they were "not in the sources".
+- *"Let's continue" is about the reading,* not "answer it": it had the last,
+  already-answered question answered again. "Go on" asks for an answer only
+  when the last answer was a stub; "let's continue" gets "Go ahead."
+- *"Um" and "okay" get nothing back* ("Yes, I hear you." to "Okay." was the
+  worst of it) -- unless the partner had just asked something, when "okay" is
+  a yes and goes to the partner.
+- *The gate reads the paragraph.* "Tosafot challenges Rashi: ... [[Tosafot]]"
+  was sent back three times for naming Rashi. A name is covered when its
+  paragraph cites a source that itself quotes him, and "no Tosafot here" names
+  no one. While streaming, such a sentence waits for the end of its paragraph.
+- *"Did we skip a Rashi or Tosafot?"* is answered from a list of the Rashi and
+  Tosafot on the lines so far, marked by whether they have come up. It had
+  named one already discussed and missed the Tosafot on the first line.
+- *"Can you read it for me?"* reads it, in full.
+- *Never "Yes" before a correction* ("ותו" is not "that's all").
+- *A follow-up said while the first question is still being thought about* is
+  asked together with it, once. Two answers came, the second repeating the first.

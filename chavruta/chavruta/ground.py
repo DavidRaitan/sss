@@ -64,6 +64,20 @@ def _pattern(english, hebrew):
 PATTERNS = {name: _pattern(en, he) for name, (en, he, _) in NAMES.items()}
 
 
+def _loose(english, hebrew, extra=()):
+    """The name anywhere inside a source's own text, prefixes and all:
+    Tosafot writes פירש"י and "הקונטרס" for Rashi."""
+    parts = [r"\b%s\b" % re.escape(e) for e in english]
+    parts += [QUOTE_MARK.join(re.escape(p) for p in h.split("~")) for h in list(hebrew) + list(extra)]
+    return re.compile("|".join(parts))
+
+
+MENTIONED = {name: _loose(en, he, ["קונטרס"] if name == "Rashi" else [])
+             for name, (en, he, _) in NAMES.items()}
+# "No Tosafot here" names no one's view; there is nothing to cite.
+NEGATED = re.compile(r"(\b(no|not|isn'?t|aren'?t|without|nothing from)\s+(a |any |the )?|(אין|בלי|לא)\s+)$", re.I)
+
+
 class Verdict:
     def __init__(self, text, unknown, uncited):
         self.text = text
@@ -89,26 +103,47 @@ class Verdict:
         return " ".join(parts)
 
 
-def check(text, known_refs):
-    cited = [c.strip() for c in CITE.findall(text)]
-    unknown = {c for c in cited if c not in known_refs}
-    bare = CITE.sub(" ", text)
-    uncited = set()
+def _floats(name, pattern, sentence, paragraph, known_refs, texts):
+    """Whether this sentence names him with nothing behind it."""
+    plain = CITE.sub(" ", sentence)
+    hits = [m for m in pattern.finditer(plain) if not NEGATED.search(plain[:m.start()])]
+    if not hits:
+        return False
     # A name reported through a cited source is covered by that citation:
     # "the Tur [[Tur, OC 235]] brings Rashi's view against Rabbeinu Tam" stands
     # on the Tur. In use, the check threw out exactly that answer and sent a
     # useless fallback instead.
-    sentences = [s for s in SENTENCE.split(text) if s.strip()]
+    if any(c.strip() in known_refs for c in CITE.findall(sentence)):
+        return False
+    # So is one reported in a paragraph that ends on the source reporting him:
+    # "Tosafot challenges Rashi: ... [[Tosafot on Berakhot 2a:1:1]]", when that
+    # Tosafot does quote Rashi. In use, three good answers in a row were sent
+    # back to be written again for exactly this.
+    for ref in CITE.findall(paragraph):
+        body = (texts or {}).get(ref.strip())
+        if ref.strip() in known_refs and body and MENTIONED[name].search(body):
+            return False
+    return True
+
+
+def check(text, known_refs, texts=None):
+    """`texts` maps refs to their text, for names reported through a source."""
+    cited = [c.strip() for c in CITE.findall(text)]
+    unknown = {c for c in cited if c not in known_refs}
+    bare = CITE.sub(" ", text)
+    uncited = set()
+    paragraphs = [p for p in re.split(r"\n+", text) if p.strip()] or [text]
     for name, pattern in PATTERNS.items():
         if not pattern.search(bare):
             continue
         looks_like = NAMES[name][2]
         if any(any(mark in c for mark in looks_like) for c in cited):
             continue
-        floating = [s for s in sentences if pattern.search(CITE.sub(" ", s))
-                    and not any(c.strip() in known_refs for c in CITE.findall(s))]
-        if floating:
-            uncited.add(name)
+        for paragraph in paragraphs:
+            sentences = [s for s in SENTENCE.split(paragraph) if s.strip()]
+            if any(_floats(name, pattern, s, paragraph, known_refs, texts) for s in sentences):
+                uncited.add(name)
+                break
     # "Tosafot HaRosh" also matches "Tosafot"; if the longer name is cited,
     # the shorter one is not a separate floating claim.
     if "Tosafot" in uncited and any("Tosafot HaRosh" in c for c in cited) \

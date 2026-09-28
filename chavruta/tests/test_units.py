@@ -477,7 +477,7 @@ class Streaming(unittest.TestCase):
     def test_what_is_held_back_is_said_at_the_end(self):
         p = partner.Partner(self.pack, LLM())
         p.llm = type("L", (), {"say_stream": lambda self_, *a, **k: iter(
-            ["The night has three watches. ", "Rashi says a third. ", "Tosafot [[Tosafot on Berakhot 2a:1:1]] asks. ",
+            ["The night has three watches. ", "Rashi says a third.\n", "Tosafot [[Tosafot on Berakhot 2a:1:1]] asks. ",
              "Rashi [[Rashi on Berakhot 2a:1:2]] answers."])})()
         parts = []
         text, spoken = p.stream([], None, None, self.pack.refs(), parts.append)
@@ -491,6 +491,120 @@ class Streaming(unittest.TestCase):
         self.assertIsNone(smalltalk.reply("why is he faster than the other"))
         self.assertEqual(smalltalk.reply("Okay, enough.")[0], "skip")
         self.assertEqual(smalltalk.reply("די")[0], "skip")
+
+
+class SixthSitting(unittest.TestCase):
+    pack = Pack(PACK)
+
+    def test_sunset_in_a_named_place_is_fetched_not_guessed(self):
+        self.assertEqual(library.place_in("Let's say in Tel Aviv."), "Tel Aviv")
+        self.assertEqual(library.place_in("ומה בבני ברק?"), "Bnei Brak")
+        self.assertIsNone(library.place_in("Rabbi Eliezer says until the first watch"))
+        jobs = [j for j, _ in retrieve.plan(self.pack, 1, {"kind": "other", "names": [],
+                                                          "said": "How long till sunset?"})]
+        self.assertEqual([j[0] for j in jobs], ["zmanim"])
+        jobs = [j for j, _ in retrieve.plan(self.pack, 1, {"kind": "other", "names": [], "place": "Tel Aviv",
+                                                          "said": "Let's say in Tel Aviv."})]
+        self.assertEqual(jobs[0][2], "Tel Aviv")
+        found, missed, _ = library.gather(jobs)
+        self.assertIn("Zmanim for Tel Aviv", found[0][1]["ref"])
+        self.assertIn("sunset", found[0][1]["he"])
+
+    def test_the_place_is_remembered(self):
+        memory = {}
+        p = partner.Partner(self.pack, LLM())
+        p.ask(1, [], "Let's say in Tel Aviv.", route={"kind": "other", "names": []}, memory=memory)
+        self.assertEqual(memory["place"], "Tel Aviv")
+        self.assertIn("Zmanim for Tel Aviv", memory["fetched"][0][1]["ref"])
+
+    def test_a_name_many_people_share_brings_all_of_them(self):
+        entry = library.person("Rabban Gamliel")
+        self.assertIn("Several people are called Rabban Gamliel", entry["he"])
+        self.assertIn("Rabban Gamliel haZaken (I)", entry["he"])
+        self.assertIn("Rabban Gamliel of Yavneh (II)", entry["he"])
+        self.assertNotIn("Shimon", entry["he"])
+        one = library.person("Rabbi Eliezer")
+        self.assertNotIn("Several", one["he"])
+        self.assertIn("Hyrcanus", one["he"])
+
+    def test_what_was_fetched_a_turn_ago_is_still_citable(self):
+        seen = []
+
+        class Model:
+            effort = None
+
+            def say(self, system, messages, **k):
+                seen.append(messages[-1]["content"])
+                return "Rabban Gamliel [[About Rabban Gamliel (Sefaria)]] led Yavneh."
+
+        memory = {}
+        p = partner.Partner(self.pack, LLM())
+        p.llm = Model()
+        p.ask(1, [], "when did Rabban Gamliel live?", route={"kind": "people", "names": ["Rabban Gamliel"]},
+              memory=memory)
+        _, verdict, _, trace = p.ask(1, [], "so which came first?", route={"kind": "other", "names": []},
+                                     memory=memory)
+        self.assertTrue(verdict.ok, trace.get("first_try"))
+        self.assertIn("fetched earlier in this conversation", seen[-1])
+
+    def test_lets_continue_is_not_answer_it(self):
+        history = [{"role": "user", "content": "[note]\nHow about the time they lived, maybe it's chronological?"},
+                   {"role": "assistant", "content": "No -- the order is not their ages. Rabban Gamliel was of "
+                                                    "Yavneh and Rabbi Eliezer his contemporary and brother-in-law."}]
+        self.assertIsNone(partner.pending_question(history, "Okay, so let's continue."))
+        self.assertIsNone(partner.pending_question(history, "continue"))
+        stub = history[:1] + [{"role": "assistant", "content": "Good question."}]
+        self.assertIn("time they lived", partner.pending_question(stub, "continue"))
+        self.assertIn("time they lived", partner.pending_question(history, "you didn't answer my question"))
+
+    def test_um_and_okay_get_no_reply(self):
+        from chavruta import smalltalk
+        self.assertEqual(smalltalk.reply("Um."), ("filler", ""))
+        self.assertEqual(smalltalk.reply("Okay."), ("filler", ""))
+        self.assertEqual(smalltalk.reply("אוקיי"), ("filler", ""))
+        self.assertIsNone(smalltalk.reply("Okay.", asked=True))          # a yes to "want it?"
+        self.assertIsNone(smalltalk.reply("Go ahead.", asked=True))
+        self.assertEqual(smalltalk.reply("Okay, so let's continue.")[0], "reading")
+        self.assertEqual(smalltalk.reply("Can you hear me?")[0], "hear_me")
+        self.assertIsNone(smalltalk.reply("Okay, now I have a different question."))
+
+    def test_saying_there_is_no_tosafot_needs_no_citation(self):
+        known = self.pack.refs()
+        self.assertTrue(ground.check("Right -- no Tosafot here.", known).ok)
+        self.assertFalse(ground.check("Tosafot says it is the synagogue Shema.", known).ok)
+
+    def test_rashi_reported_inside_the_tosafot_that_quotes_him(self):
+        known = self.pack.refs()
+        p = partner.Partner(self.pack, LLM())
+        text = ("Tosafot challenges Rashi: then people should say all three paragraphs at bedtime. "
+                "Rabbeinu Tam says the synagogue Shema is primary. [[Tosafot on Berakhot 2a:1:1]]")
+        self.assertFalse(ground.check(text, known).ok)
+        self.assertTrue(ground.check(text, known, p.texts).ok)
+        # ...but not across a paragraph.
+        self.assertFalse(ground.check("Rashi says it is bedtime.\n\nTosafot [[Tosafot on Berakhot 2a:1:1]] asks.",
+                                      known, p.texts).ok)
+
+    def test_a_sentence_waits_for_the_citation_at_the_end_of_its_paragraph(self):
+        p = partner.Partner(self.pack, LLM())
+        p.llm = type("L", (), {"say_stream": lambda self_, *a, **k: iter(
+            ["Tosafot challenges Rashi: why only one paragraph at bedtime? ",
+             "Rabbeinu Tam says the synagogue Shema is primary. ", "[[Tosafot on Berakhot 2a:1:1]]"])})()
+        parts = []
+        text, spoken = p.stream([], None, None, self.pack.refs(), parts.append, p.texts)
+        self.assertEqual(len(parts), 1)
+        self.assertEqual(p.unsaid, "")
+
+    def test_what_we_have_not_come_to_yet(self):
+        note = partner.covered_note(self.pack, 5, [
+            {"role": "assistant", "content": "Rashi [[Rashi on Berakhot 2a:1:2]] says a third."}])
+        self.assertIn("Rashi on Berakhot 2a:1:2]] (cited in this conversation)", note)
+        self.assertIn("Tosafot on Berakhot 2a:1:1]] (not cited yet)", note)
+        self.assertTrue(partner.SO_FAR.search("is there a Rashi or Tosfot until now that we didn't read?"))
+
+    def test_read_it_for_me(self):
+        self.assertTrue(partner.READ_TO_ME.search("Can you read it for me?"))
+        self.assertTrue(partner.READ_TO_ME.search("תקרא לי את השורה"))
+        self.assertFalse(partner.READ_TO_ME.search("I'm gonna read the Mishnah"))
 
 
 class Server(unittest.TestCase):

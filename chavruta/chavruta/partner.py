@@ -46,7 +46,9 @@ to it.
 When their explanation does not hold, say so plainly and show the words that
 make it wrong: "that can't be right -- two lines down it says the opposite."
 Do not soften it into a question and do not open with what they got right. A
-partner who affirms a misreading certifies the error.
+partner who affirms a misreading certifies the error. So never begin with
+"Yes" or "Right" when what follows corrects them: "Not quite -- «ותו» is 'and
+furthermore', not 'that's all'."
 
 5. You listen to their reading the way a chavruta does. Speech recognition
 cannot hear accent, vocalisation or havara, and those are none of your
@@ -77,14 +79,22 @@ learned from whom -- the app fetches Sefaria's record of them into the turn
 ("About ... (Sefaria)"). Answer from it like a friend who knows: the century,
 the place, and how they relate ("the Rashba is a bit older; both were active
 around 1300, he in Barcelona, the Meiri in Provence"). If it is not in the
-record, say that one thing is not there.
+record, say that one thing is not there. When the record holds several people
+of one name -- Rabban Gamliel the Elder, of Yavneh, the son of Rabbi -- work out
+from the page which one is meant (whom he argues with, which layer of the text
+he is in), say so, and use his record only.
 
 When they tell you to answer, go on, or repeat ("so answer", "answer the
 question I asked"), look back at what they asked and answer it in full, now.
 Never reply that you will answer, or restate their question instead of
 answering it. When they ask for real numbers -- clock times, dates -- give them
 from the material if it is there; if a time depends on the date and place,
-work an example through with the times given in the turn.
+work an example through with the times given in the turn. Never state a clock
+time that is not in the turn: a sunset "about 18:25" from memory is an invented
+source. The app fetches the times for the place they name (and for Jerusalem
+until they name one), with the time now; say which place the times are for,
+and if the place they asked about did not come back, say you have them for
+the place that did.
 
 How you sound. Confident when the source is in front of you: say what it says,
 without "roughly", "it's blurred", "not exact", "it seems". Some play is good --
@@ -101,7 +111,8 @@ let it go.
 On pointing. Quote the gemara or a commentary in «», exactly as it appears,
 short -- up to five or six words. Quotes are lit on the page and spoken aloud,
 so a sentence can lean on them: "Rashi reads «עד סוף האשמורה הראשונה» as a third
-of the night." Never quote a whole line back to them: they read, you point.
+of the night." Never quote a whole line back to them: they read, you point -- unless they ask
+you to read it to them, and then read it, in full.
 
 On citations. [[ref]] is a marker that follows a name; it is never a word in
 the sentence. "The Tur [[Tur, Orach Chayim 235]] rules like Rabban Gamliel," not
@@ -298,10 +309,16 @@ def elsewhere_note(hits):
     return "\n".join(out) + "]"
 
 
-def sources_note(chosen, fetched=(), missed=()):
-    if not chosen and not fetched and not missed:
+def sources_note(chosen, fetched=(), missed=(), carried=()):
+    if not chosen and not fetched and not missed and not carried:
         return ""
     out = []
+    if carried:
+        out.append("[fetched earlier in this conversation -- still read, still citable:")
+        for name, entry in carried:
+            out.append("[[%s]] %s" % (entry["ref"], name))
+            out.append(entry["he"][:1800])
+        out.append("]")
     if chosen:
         out.append("[opened for this turn, from the page's own links:")
         for name, entry in chosen:
@@ -372,6 +389,8 @@ class Partner:
         self.known = pack.refs()
         self.ref_names = {e["ref"]: name for seg in pack.segments
                           for name, entries in seg["commentaries"].items() for e in entries}
+        self.texts = {e["ref"]: e.get("he") or "" for seg in self.pack.segments
+                      for entries in seg["commentaries"].values() for e in entries}
         self.system = CONSTITUTION + "\n\n" + amud_context(pack)
 
     def speaks(self, route):
@@ -380,7 +399,7 @@ class Partner:
         return self.language
 
     def ask(self, n, history, said, heard=None, route=None, recent=None, spoke=None, announce=None,
-            on_part=None):
+            on_part=None, memory=None):
         """One turn: route cheaply, reach for what it needs, answer carefully,
         check before it ships.
 
@@ -388,8 +407,10 @@ class Partner:
         the short listener note, not the opened sources, so it stays small and
         every earlier turn stays a cacheable prefix. `announce` is called with a
         sentence to say aloud while Sefaria is being asked, so the learner hears
-        "let me pull up the Tur" instead of silence.
+        "let me pull up the Tur" instead of silence. `memory` is the sitting's
+        own: the place they named, and what was fetched in the last turns.
         """
+        memory = memory if memory is not None else {}
         route = route or retrieve.classify(self.llm, said)
         kind = route.get("kind")
         lang = self.speaks(route)
@@ -412,7 +433,10 @@ class Partner:
 
         # Who it leaned on in the last two answers goes to the back of the line.
         recent = [m["content"] for m in history if m["role"] == "assistant"][-2:]
-        route = dict(route, said=said, avoid=sorted({
+        # "Let's say in Tel Aviv" holds for the rest of the sitting.
+        if library.place_in(said):
+            memory["place"] = library.place_in(said)
+        route = dict(route, said=said, place=memory.get("place"), avoid=sorted({
             self.ref_names[r.strip()] for text in recent for r in ground.CITE.findall(text)
             if r.strip() in self.ref_names}))
         chosen = retrieve.extras(self.pack, n, route, self.depth)
@@ -424,6 +448,27 @@ class Partner:
             fetched, missed_jobs, waited = library.gather([job for job, _ in jobs])
             got = {label for job, label in jobs if job not in missed_jobs}
             missed = sorted({label for job, label in jobs if job in missed_jobs} - got)
+        if any(job[0] == "zmanim" for job, _ in jobs):
+            import time
+            note += " [the time now, on their clock: %s]" % time.strftime("%Y-%m-%d %H:%M")
+        # What was fetched a turn or two ago is still on the table. In use, the
+        # answer after "who came first?" was rejected for citing the biographies
+        # fetched one turn before, and came back saying they were "not in the
+        # sources" -- contradicting what it had just said.
+        now_refs = {e["ref"] for _, e in fetched}
+        carried = [(name, entry) for name, entry, _ in memory.get("fetched", []) if entry["ref"] not in now_refs]
+        memory["fetched"] = [(name, entry, 3) for name, entry in fetched] + [
+            (name, entry, left - 1) for name, entry, left in memory.get("fetched", [])
+            if left > 1 and entry["ref"] not in now_refs]
+        # "Did we skip a Rashi or Tosafot?" -- answered from what has actually
+        # come up. In use it named a Rashi already discussed and missed the
+        # Tosafot on the first line.
+        if kind == "on_commentary" or SO_FAR.search(said):
+            note += " " + covered_note(self.pack, n, history)
+        # "Can you read it for me?" -- then it reads, in full.
+        if READ_TO_ME.search(said):
+            note += (" [they asked you to read it to them: quote the line or lines they mean, in full, "
+                     "in «», and nothing more]")
         # "Didn't we see this ten pages back" is a question about the tractate.
         # Matched on the whole unit, not the line: a single line is mostly
         # structural wording, and matching that finds pages shaped the same
@@ -434,24 +479,25 @@ class Partner:
             lines = range(sec["from"], sec["to"] + 1) if sec else [n]
             unit = " ".join(self.pack.segment(i)["he_plain"] for i in lines)
             elsewhere = self.index.related(unit, exclude=self.pack.ref) or []
-        known = self.known | {hit["ref"] for hit in elsewhere} | {e["ref"] for _, e in fetched}
+        known = self.known | {hit["ref"] for hit in elsewhere} | {e["ref"] for _, e in fetched + carried}
+        texts = dict(self.texts, **{e["ref"]: e.get("he") or "" for _, e in chosen + fetched + carried})
         size = "whatever that earlier question needs, up to about 100 words" if pending \
             else SIZE.get(kind, SIZE["other"])
         note += " [%s Depth: %s. Length: %s.]" % (LANGUAGE[self.language], retrieve.DEPTHS[self.depth], size)
 
         kept = {"role": "user", "content": note + "\n" + said}
         now = {"role": "user", "content": "\n".join(
-            p for p in (note, sources_note(chosen, fetched, missed), elsewhere_note(elsewhere), said) if p)}
+            p for p in (note, sources_note(chosen, fetched, missed, carried), elsewhere_note(elsewhere), said) if p)}
         cache_key = "chavruta:%s" % self.pack.ref
 
         # Simple questions get quick thinking; halacha and machlokes get more.
         effort = EFFORT.get(kind)
         spoken = 0
         if on_part:
-            text, spoken = self.stream(history + [now], cache_key, effort, known, on_part)
+            text, spoken = self.stream(history + [now], cache_key, effort, known, on_part, texts)
         else:
             text = self.llm.say(self.system, history + [now], heavy=True, cache_key=cache_key, effort=effort)
-        verdict = ground.check(text, known)
+        verdict = ground.check(text, known, texts)
         first_try = None
         if not verdict.ok:
             first_try = {"text": text, "problem": verdict.complaint()}
@@ -460,7 +506,7 @@ class Partner:
                                {"role": "user", "content": "[from the app, not the learner: " +
                                 verdict.complaint() + " Answer again.]"}]
             text = self.llm.say(self.system, retry, heavy=True, cache_key=cache_key)
-            verdict = ground.check(text, known)
+            verdict = ground.check(text, known, texts)
             if not verdict.ok and verdict.unknown:
                 if not first_verdict.unknown:
                     # The first try only named someone loosely; the retry cited
@@ -472,7 +518,7 @@ class Partner:
                     # as unsourced -- in use the fallback replaced good answers
                     # with "none of them says that outright".
                     text = fallback(chosen + fetched, lang)
-                    verdict = ground.check(text, known)
+                    verdict = ground.check(text, known, texts)
 
         history = history + [kept, {"role": "assistant", "content": text}]
         trace = {"kind": kind, "claim": route.get("claim"),
@@ -488,17 +534,19 @@ class Partner:
                  "unsaid": "" if first_try else getattr(self, "unsaid", "")}
         return text, verdict, history[-24:], trace
 
-    def stream(self, messages, cache_key, effort, known, on_part):
+    def stream(self, messages, cache_key, effort, known, on_part, texts=None):
         """Write the answer, handing each finished sentence on to be spoken.
 
         A sentence is released only when the next has begun -- a citation often
-        follows the full stop -- and only if it passes the grounding check on
-        its own. The first that does not stops the speaking; the whole answer
-        is still checked, and retried if need be, as before.
+        follows the full stop -- and only if it passes the grounding check. A
+        sentence that names someone whose citation has not come yet is held
+        until the end of its paragraph ("Tosafot asks on Rashi: ... [[Tosafot
+        on ...]]"); anything that still fails stops the speaking, and the whole
+        answer is still checked, and retried if need be, as before.
         """
         # Units are (text, start, end) positions in the whole answer, so that
         # whatever was not said aloud can be handed back to be said at the end.
-        state = {"pending": None, "table": [], "spoiled": False, "spoken": 0, "said_to": 0}
+        state = {"pending": None, "table": [], "spoiled": False, "spoken": 0, "said_to": 0, "held": []}
         whole = ""
         at = 0   # where the unconsumed part of the answer begins
 
@@ -506,12 +554,18 @@ class Partner:
             text, start, end = unit
             if state["spoiled"] or not text.strip():
                 return
-            if not ground.check(text, known).ok:
+            held = state["held"] + [unit]
+            joined = " ".join(u[0].strip() for u in held)
+            verdict = ground.check(joined, known, texts)
+            if verdict.ok:
+                on_part(joined)
+                state["spoken"] += 1
+                state["said_to"] = end
+                state["held"] = []
+            elif verdict.unknown or "\n" in text or len(held) >= 4:
                 state["spoiled"] = True
-                return
-            on_part(text.strip())
-            state["spoken"] += 1
-            state["said_to"] = end
+            else:
+                state["held"] = held
 
         def push(text, start, end):
             lead = LEADING_CITES.match(text)
@@ -554,6 +608,8 @@ class Partner:
         push(whole[at:], at, len(whole))
         if state["pending"] is not None:
             release(state["pending"])
+        if state["held"]:
+            state["spoiled"] = True
         # What was held back after a sentence failed its own check, to be said
         # once the whole answer has passed.
         self.unsaid = whole[state["said_to"]:].strip() if state["spoiled"] else ""
@@ -570,6 +626,11 @@ EFFORT = {"meaning": "minimal", "people": "minimal", "other": "minimal", "check_
 
 ANSWER_IT = re.compile(r"\b(answer|go on|continue|you didn'?t answer|what was my question|"
                        r"my (last|previous) question|the question i asked)\b|תענה|תמשיך|לא ענית|מה שאלתי", re.I)
+# "Go on" / "continue" is about the answer only when the answer was a stub.
+# "Okay, so let's continue" is about the reading: in use it had the last
+# question -- already answered -- answered all over again.
+GO_ON = re.compile(r"\b(go on|continue)\b|תמשיך", re.I)
+LETS_GO_ON = re.compile(r"\blet'?s (continue|go on|keep going|move on)\b|נמשיך|בוא נמשיך", re.I)
 
 
 def pending_question(history, said):
@@ -579,8 +640,13 @@ def pending_question(history, said):
     correctly, then "answer it" got "answer what?" -- the request came with no
     thread back to the question. This finds the thread.
     """
-    if not ANSWER_IT.search(said) or len(said.split()) > 18:
+    if not ANSWER_IT.search(said) or len(said.split()) > 18 or LETS_GO_ON.search(said):
         return None
+    strong = ANSWER_IT.search(GO_ON.sub(" ", said))
+    if not strong:
+        last = next((m["content"] for m in reversed(history) if m["role"] == "assistant"), "")
+        if len(last.split()) > 12:
+            return None
     for message in reversed(history):
         if message["role"] != "user":
             continue
@@ -588,6 +654,32 @@ def pending_question(history, said):
         if len(asked.split()) >= 5 and not ANSWER_IT.search(asked):
             return asked[:400]
     return None
+
+
+SO_FAR = re.compile(r"\b(so far|until now|up to (here|now)|(did|have) we (miss|skip)|(didn'?t|did not|haven'?t) "
+                    r"(read|see|cover|learn|do)|missed|anything (else|left)|left to read)\b|"
+                    r"עד עכשיו|עד כאן|פספסנו|דילגנו|לא קראנו|נשאר", re.I)
+READ_TO_ME = re.compile(r"\b(read|say) (it|that|this|the (line|lines|mishna|mishnah|gemara|sentence|words?))"
+                        r"( out| aloud)? (for|to) me\b|\bcan you read\b|\bread (it|that) (out|aloud)\b|"
+                        r"תקרא לי|תקריא|תקרא את זה", re.I)
+
+
+def covered_note(pack, n, history):
+    """Rashi and Tosafot on the lines so far, and which have come up."""
+    cited = {c.strip() for m in history if m["role"] == "assistant" for c in ground.CITE.findall(m["content"])}
+    items = []
+    for seg in pack.segments:
+        if seg["n"] > n:
+            continue
+        for name in ("Rashi", "Tosafot"):
+            for entry in seg["commentaries"].get(name, []):
+                dibur = " ".join((entry.get("dibur") or "").split()[:6])
+                items.append("line %d %s%s [[%s]]%s" % (
+                    seg["n"], name, " on «%s»" % dibur if dibur else "", entry["ref"],
+                    " (cited in this conversation)" if entry["ref"] in cited else " (not cited yet)"))
+    if not items:
+        return "[there is no Rashi or Tosafot on the lines up to here]"
+    return "[Rashi and Tosafot on the lines up to here: " + "; ".join(items) + "]"
 
 
 def fallback(sources, lang):

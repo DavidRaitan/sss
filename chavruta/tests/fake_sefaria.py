@@ -142,8 +142,8 @@ class Handler(BaseHTTPRequestHandler):
             if slug in TOPICS:
                 return self.reply(TOPICS[slug])
         if path.startswith("/api/name/"):
-            query = path[len("/api/name/"):]
-            return self.reply({"completion_objects": [o for o in NAMES if query.lower() in o["title"].lower()]})
+            query = urllib.parse.unquote(path[len("/api/name/"):]).lower()
+            return self.reply(NAMES.get(query, {"completion_objects": []}))
         return self.reply({"error": "not recorded: %s" % url.path}, 404)
 
 
@@ -167,8 +167,23 @@ TOPICS = {
                        "description": {"en": "Rabban Gamliel (II) was a tannaitic sage in the first and second centuries CE."},
                        "links": {"learned-from": {"links": [{"topic": "rabban-yochanan-b-zakkai"}]},
                                  "taught": {"links": [{"topic": "rabbi-yehudah-b-ilai"}]}}},
+    "rabban-gamliel-hazaken-(i)": {"slug": "rabban-gamliel-hazaken-(i)",
+                                   "primaryTitle": {"en": "Rabban Gamliel haZaken (I)", "he": "רבן גמליאל הזקן"},
+                                   "properties": {"generation": {"value": "T1"}},
+                                   "description": {"en": "Rabban Gamliel the Elder led the Sanhedrin in the first century CE."}},
+    "rabbi-eliezer-b-hyrcanus": {"slug": "rabbi-eliezer-b-hyrcanus",
+                                 "primaryTitle": {"en": "Rabbi Eliezer b. Hyrcanus", "he": "רבי אליעזר בן הורקנוס"},
+                                 "properties": {"generation": {"value": "T3"}}},
 }
-NAMES = [{"title": "Rabban Gamliel of Yavneh (II)", "type": "PersonTopic", "key": "rabban-gamliel"}]
+# As Sefaria answers: an ambiguous name lists everyone who has it; an exact one
+# also names its match at the top level.
+NAMES = {"rabban gamliel": {"completion_objects": [
+             {"title": "Rabban Gamliel haZaken (I)", "type": "PersonTopic", "key": "rabban-gamliel-hazaken-(i)"},
+             {"title": "Rabban Gamliel of Yavneh (II)", "type": "PersonTopic", "key": "rabban-gamliel"},
+             {"title": "Rabban Shimon ben Gamliel (II)", "type": "PersonTopic", "key": "rabban-shimon-b-gamliel-(ii)"}]},
+         "rabbi eliezer": {"type": "PersonTopic", "key": "rabbi-eliezer-b-hyrcanus", "completion_objects": [
+             {"title": "Rabbi Eliezer b. Hyrcanus", "type": "PersonTopic", "key": "rabbi-eliezer-b-hyrcanus"},
+             {"title": "Rabbi Eliezer b. Yose", "type": "PersonTopic", "key": "rabbi-elazar-b-yose"}]}}
 
 
 def start(port=0):

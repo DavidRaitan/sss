@@ -125,7 +125,7 @@ def gather(jobs):
         if job[0] == "text":
             futures.append((job, POOL.submit(text, job[1])))
         elif job[0] == "zmanim":
-            futures.append((job, POOL.submit(zmanim, job[1])))
+            futures.append((job, POOL.submit(zmanim, *job[1:])))
         elif job[0] == "person":
             futures.append((job, POOL.submit(person, job[1], job[2])))
         else:
@@ -157,7 +157,8 @@ def cached(job):
     """Whether a job would be answered without going out -- then nothing is announced."""
     with _LOCK:
         if job[0] == "zmanim":
-            return job[1] in _ZMANIM
+            place = job[2] if len(job) > 2 and (job[2] in PLACES or job[2] == "Jerusalem") else None
+            return (job[1], place) in _ZMANIM
         if job[0] == "person":
             return (job[1], job[2]) in _PEOPLE
         return (job[1] in _TEXTS) if job[0] == "text" else (job[1] in _LINKS)
@@ -240,10 +241,24 @@ def person(name, book=None):
             parts.append("%s%s: %s" % (book, " written" + when if when else "",
                                        index.get("enDesc") or ""))
     if not slugs:
-        found = sefaria.get("name/%s" % name, soft=True, limit=5) or {}
-        slugs = [o["key"] for o in found.get("completion_objects") or []
-                 if o.get("type") in ("AuthorTopic", "PersonTopic") and o.get("key")][:1]
-    for slug in slugs[:2]:
+        # "Rabban Gamliel" is three people. Taking the first match answered a
+        # question about the Mishnah's Rabban Gamliel of Yavneh with his
+        # grandfather the Elder, a generation too early. When Sefaria names one
+        # exact match, that is him; otherwise every one of that name goes in,
+        # and the partner decides from the page which is meant.
+        found = sefaria.get("name/%s" % name, soft=True, limit=8) or {}
+        people = [o for o in found.get("completion_objects") or []
+                  if o.get("type") in ("AuthorTopic", "PersonTopic") and o.get("key")]
+        if found.get("key") and found.get("type") in ("AuthorTopic", "PersonTopic"):
+            slugs = [found["key"]]
+        else:
+            same = [o for o in people if (o.get("title") or "").lower().startswith(name.lower())]
+            slugs = [o["key"] for o in same or people][:3]
+        if len(slugs) > 1:
+            parts.append("Several people are called %s. Decide from the page which one is meant -- "
+                         "by who he argues with and the era of the text -- say which, and use only his record:"
+                         % name)
+    for slug in slugs[:3]:
         about = _topic(slug)
         if about:
             parts.append(about)
@@ -272,8 +287,64 @@ EVENING = [("sunset", "sunset (shkiah)"), ("tzeit7083deg", "nightfall, three sta
 MORNING = [("alotHaShachar", "dawn (alot hashachar)"), ("sunrise", "sunrise (netz)")]
 
 
-def _hebcal(date):
-    url = "%s?%s" % (ZMANIM_API, urllib.parse.urlencode({"cfg": "json", "geonameid": PLACE, "date": date}))
+# Where else they might be. "How long till sunset? -- say in Tel Aviv" was
+# answered with a sunset the model made up; now the place is looked up like any
+# other source. (latitude, longitude, time zone), for Hebcal.
+IL = "Asia/Jerusalem"
+PLACES = {
+    "Tel Aviv": (32.0853, 34.7818, IL), "Bnei Brak": (32.0807, 34.8338, IL),
+    "Haifa": (32.7940, 34.9896, IL), "Beit Shemesh": (31.7470, 34.9881, IL),
+    "Modiin": (31.8980, 35.0104, IL), "Petah Tikva": (32.0840, 34.8878, IL),
+    "Netanya": (32.3215, 34.8532, IL), "Raanana": (32.1848, 34.8713, IL),
+    "Efrat": (31.6537, 35.1500, IL), "Beersheba": (31.2518, 34.7913, IL),
+    "Tzfat": (32.9646, 35.4960, IL), "Ashdod": (31.8014, 34.6435, IL),
+    "Rehovot": (31.8928, 34.8113, IL), "Herzliya": (32.1624, 34.8447, IL),
+    "New York": (40.7128, -74.0060, "America/New_York"), "Brooklyn": (40.6782, -73.9442, "America/New_York"),
+    "Lakewood": (40.0821, -74.2097, "America/New_York"), "Teaneck": (40.8976, -74.0160, "America/New_York"),
+    "Baltimore": (39.2904, -76.6122, "America/New_York"), "Boston": (42.3601, -71.0589, "America/New_York"),
+    "Miami": (25.7617, -80.1918, "America/New_York"), "Chicago": (41.8781, -87.6298, "America/Chicago"),
+    "Los Angeles": (34.0522, -118.2437, "America/Los_Angeles"),
+    "Toronto": (43.6532, -79.3832, "America/Toronto"), "Montreal": (45.5017, -73.5673, "America/Toronto"),
+    "London": (51.5074, -0.1278, "Europe/London"), "Manchester": (53.4808, -2.2426, "Europe/London"),
+    "Paris": (48.8566, 2.3522, "Europe/Paris"), "Antwerp": (51.2194, 4.4025, "Europe/Brussels"),
+    "Johannesburg": (-26.2041, 28.0473, "Africa/Johannesburg"),
+    "Melbourne": (-37.8136, 144.9631, "Australia/Melbourne"), "Sydney": (-33.8688, 151.2093, "Australia/Sydney"),
+}
+# How people say them.
+PLACE_NAMES = {
+    "jerusalem": "Jerusalem", "ירושלים": "Jerusalem", "tel aviv": "Tel Aviv", "תל אביב": "Tel Aviv",
+    "bnei brak": "Bnei Brak", "bnai brak": "Bnei Brak", "בני ברק": "Bnei Brak", "haifa": "Haifa", "חיפה": "Haifa",
+    "beit shemesh": "Beit Shemesh", "bet shemesh": "Beit Shemesh", "בית שמש": "Beit Shemesh",
+    "modiin": "Modiin", "modi'in": "Modiin", "מודיעין": "Modiin", "petah tikva": "Petah Tikva",
+    "petach tikva": "Petah Tikva", "פתח תקווה": "Petah Tikva", "פתח תקוה": "Petah Tikva",
+    "netanya": "Netanya", "נתניה": "Netanya", "raanana": "Raanana", "ra'anana": "Raanana", "רעננה": "Raanana",
+    "efrat": "Efrat", "אפרת": "Efrat", "beersheba": "Beersheba", "beer sheva": "Beersheba",
+    "באר שבע": "Beersheba", "tzfat": "Tzfat", "safed": "Tzfat", "צפת": "Tzfat", "ashdod": "Ashdod",
+    "אשדוד": "Ashdod", "rehovot": "Rehovot", "רחובות": "Rehovot", "herzliya": "Herzliya", "הרצליה": "Herzliya",
+    "new york": "New York", "ניו יורק": "New York", "brooklyn": "Brooklyn", "ברוקלין": "Brooklyn",
+    "lakewood": "Lakewood", "לייקווד": "Lakewood", "teaneck": "Teaneck", "baltimore": "Baltimore",
+    "boston": "Boston", "miami": "Miami", "chicago": "Chicago", "los angeles": "Los Angeles", "l.a.": "Los Angeles",
+    "toronto": "Toronto", "טורונטו": "Toronto", "montreal": "Montreal", "london": "London", "לונדון": "London",
+    "manchester": "Manchester", "paris": "Paris", "פריז": "Paris", "antwerp": "Antwerp", "אנטוורפן": "Antwerp",
+    "johannesburg": "Johannesburg", "melbourne": "Melbourne", "sydney": "Sydney",
+}
+# Hebrew sits its prepositions on the name: בתל אביב, לבני ברק.
+_PLACE_RE = re.compile(r"(?<![\wא-ת])(?:[ובלמה]{1,2}(?=[א-ת]))?(%s)(?![\wא-ת])" % "|".join(
+    re.escape(k) for k in sorted(PLACE_NAMES, key=len, reverse=True)), re.I)
+
+
+def place_in(said):
+    """The place named in what they said ("say in Tel Aviv"), or None."""
+    hit = _PLACE_RE.search(said or "")
+    return PLACE_NAMES[hit.group(1).lower()] if hit else None
+
+
+def _hebcal(date, place=None):
+    where = {"geonameid": "281184" if place == "Jerusalem" else PLACE}
+    if place in PLACES:
+        lat, lon, tz = PLACES[place]
+        where = {"latitude": lat, "longitude": lon, "tzid": tz}
+    url = "%s?%s" % (ZMANIM_API, urllib.parse.urlencode(dict(cfg="json", date=date, **where)))
     request = urllib.request.Request(url, headers={"User-Agent": "chavruta/0.3"})
     with urllib.request.urlopen(request, timeout=8) as response:
         return json.load(response).get("times") or {}
@@ -285,24 +356,27 @@ def _clock(value):
     return value[:10] + " " + value[11:16] if len(value) >= 16 else value
 
 
-def zmanim(date):
-    """The times of the night beginning on the evening of `date` (YYYY-MM-DD), at PLACE."""
+def zmanim(date, place=None):
+    """The times of the night beginning on the evening of `date` (YYYY-MM-DD),
+    at `place` (a name in PLACES, or Jerusalem) or else the configured PLACE."""
+    place = place if place in PLACES or place == "Jerusalem" else None
+    key = (date, place)
     with _LOCK:
-        if date in _ZMANIM:
-            return _ZMANIM[date]
+        if key in _ZMANIM:
+            return _ZMANIM[key]
     entry = None
     try:
         import datetime
-        evening = _hebcal(date)
+        evening = _hebcal(date, place)
         following = (datetime.date.fromisoformat(date) + datetime.timedelta(days=1)).isoformat()
-        morning = _hebcal(following)
-        lines = ["%s: %s" % (label, _clock(evening[key])) for key, label in EVENING if evening.get(key)]
-        lines += ["%s: %s" % (label, _clock(morning[key])) for key, label in MORNING if morning.get(key)]
+        morning = _hebcal(following, place)
+        lines = ["%s: %s" % (label, _clock(evening[key_])) for key_, label in EVENING if evening.get(key_)]
+        lines += ["%s: %s" % (label, _clock(morning[key_])) for key_, label in MORNING if morning.get(key_)]
         if lines:
-            entry = {"ref": "Zmanim for %s, night of %s (hebcal.com)" % (PLACE_NAME, date),
+            entry = {"ref": "Zmanim for %s, night of %s (hebcal.com)" % (place or PLACE_NAME, date),
                      "he": "; ".join(lines) + ".", "dibur": None, "fetched": True}
     except (urllib.error.URLError, TimeoutError, OSError, ValueError, KeyError):
         entry = None
     with _LOCK:
-        _ZMANIM[date] = entry
+        _ZMANIM[key] = entry
     return entry

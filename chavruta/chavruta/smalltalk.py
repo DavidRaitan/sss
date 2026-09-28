@@ -44,7 +44,8 @@ KINDS = [
     ("time", r"\bwhat time is it\b|\bwhat'?s the time\b|מה השעה",
      None, None),
     ("reading", r"\b(i'?m )?(gonna|going to) read\b|\blet me read\b|\bhear me read\b|\blisten to me read\b|"
-                r"^go ahead\b|אני (קורא|אקרא|הולך לקרוא)|תקשיב לי|בוא נקרא",
+                r"^go ahead\b|אני (קורא|אקרא|הולך לקרוא)|תקשיב לי|בוא נקרא|"
+                r"\blet'?s (continue|keep going|go on|move on)\b|נמשיך|בוא נמשיך",
      ["Go ahead.", "Go ahead, I'm following."], ["קדימה.", "קדימה, אני איתך."]),
     ("thanks", r"^(ok(ay)?,? )?(thanks|thank you)\b|^תודה",
      ["Sure.", "Of course."], ["בשמחה.", "בכיף."]),
@@ -68,15 +69,45 @@ REQUEST = re.compile(r"\b(answer|explain|tell|repeat|continue|summari[sz]e|quest
                      r"תענה|ענה|תסביר|תגיד לי|שאלה|למה|איך|מי |מתי|איפה", re.I)
 
 
-def reply(said, language="en"):
-    """(kind, text) for small talk, or None. `language` is the setting.
+# "Um." and "Okay." are not turns. In use "Okay." got "Yes, I hear you." and
+# "Um." got a second reply on top of "Go for it."
+HESITATION = {"um", "umm", "uh", "uhh", "hmm", "hm", "mm", "mmm", "mhm", "erm", "er", "ah", "אמ", "אממ",
+              "אה", "אהה", "הממ", "ממ"}
+ACK = {"ok", "okay", "right", "yes", "yeah", "yep", "sure", "cool", "great", "nice", "alright", "good",
+       "got", "see", "i", "it", "so", "go", "ahead","אוקיי", "טוב", "נכון", "כן", "סבבה", "יפה", "הבנתי", "אז"}
 
-    kind "again" has no text: the client says its last answer once more.
+
+def words(said):
+    return [w.lower() for w in re.findall(r"[\w'א-ת]+", said or "")]
+
+
+def hesitation(said):
+    """Only a sound while thinking: no reply at all."""
+    w = words(said)
+    return bool(w) and all(x in HESITATION for x in w)
+
+
+def acknowledges(said):
+    """"Okay", "right", "got it", "yes" -- and nothing else."""
+    w = words(said)
+    return bool(w) and len(w) <= 4 and all(x in ACK or x in HESITATION for x in w)
+
+
+def reply(said, language="en", asked=False):
+    """(kind, text) for small talk, or None. `language` is the setting;
+    `asked` is whether the partner's last words were a question -- then "okay"
+    is an answer to it, for the partner.
+
+    kind "again" has no text: the client says its last answer once more; kind
+    "filler" has none either, and nothing is said back.
     """
     text = said.strip()
     if not text or len(text.split()) > 9:
         return None
-    if REQUEST.search(text) and not re.search(r"what time|מה השעה|say (that|it) again|repeat (that|it)", text, re.I):
+    if hesitation(text) or (acknowledges(text) and not asked):
+        return "filler", ""
+    if REQUEST.search(text) and not re.search(r"what time|מה השעה|say (that|it) again|repeat (that|it)|"
+                                              r"let'?s (continue|keep going|go on|move on)", text, re.I):
         return None
     for kind, pattern, en, he in KINDS:
         hit = pattern.search(text)
@@ -88,6 +119,8 @@ def reply(said, language="en"):
         if len(rest) > 2:
             return None
         hebrew = language == "he" or (language == "auto" and not EN.search(text))
+        if kind == "reading" and asked and re.match(r"^\W*((ok(ay)?|yes|yeah|sure|so)\W+)*go ahead\W*$", text, re.I):
+            return None     # "go ahead" after "want it?" is a yes, for the partner
         if kind in ("again", "faster", "slower", "skip"):
             return kind, ""
         if kind == "time":

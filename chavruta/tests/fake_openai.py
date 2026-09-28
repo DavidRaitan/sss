@@ -111,6 +111,9 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/control/transcript":
             STATE["transcripts"].append(json.loads(raw)["text"])
             return self.reply({"queued": len(STATE["transcripts"])})
+        if path == "/control/latency":
+            STATE["latency"] = float(json.loads(raw)["seconds"])
+            return self.reply({"ok": True})
         if path == "/control/reset":
             STATE.update(transcripts=[], log=[])
             return self.reply({"ok": True})

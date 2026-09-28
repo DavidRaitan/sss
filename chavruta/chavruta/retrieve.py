@@ -54,8 +54,10 @@ study partner. Reply with JSON only:
              page, else null,
  "language": "he" if they spoke mostly Hebrew, "en" if mostly English,
  "reply": only when kind is "ping": the few words a study partner across the
-          table would say back, in their language ("Yes, I hear you.", "Go
-          ahead.", "כן, שומע אותך.", "יאללה, קדימה."), else null}
+          table would say back to exactly this, in their language. "Yes, I
+          hear you." only if they asked whether you hear them; "we have some
+          time then" gets "Plenty -- let's learn."; "let's start from the
+          gemara" gets "Go ahead."; "כן, שומע אותך.", "יאללה, קדימה.". Else null}
 
 The kinds:
 %s
@@ -328,14 +330,17 @@ def plan(pack, n, route):
 
     # "Give me numbers": tonight's real times, and a summer and a winter night
     # when they ask about the seasons.
+    # A place named on its own ("let's say in Tel Aviv") is about the clock too:
+    # in use that turn was answered with a sunset the model made up.
     said = route.get("said") or ""
-    if CLOCK.search(said) and kind in ("halacha", "meaning", "other", "logic"):
+    place = route.get("place")
+    if (CLOCK.search(said) or library.place_in(said)) and kind in ("halacha", "meaning", "other", "logic"):
         import datetime
         today = datetime.date.today()
-        add(("zmanim", today.isoformat()), "Zmanim")
+        add(("zmanim", today.isoformat(), place), "Zmanim")
         if SEASONS.search(said):
-            add(("zmanim", "%d-06-21" % today.year), "Zmanim")
-            add(("zmanim", "%d-12-21" % today.year), "Zmanim")
+            add(("zmanim", "%d-06-21" % today.year, place), "Zmanim")
+            add(("zmanim", "%d-12-21" % today.year, place), "Zmanim")
     return jobs
 
 
@@ -361,5 +366,7 @@ def people_plan(pack, route):
 
 
 CLOCK = re.compile(r"\b(what time|clock|o'?clock|numbers?|real[- ]world time|tonight|today|p\.?m\.?|a\.?m\.?|"
-                   r"summer|winter|latest|last time)\b|מה השעה|באיזו שעה|עד איזו שעה|הלילה|היום|קיץ|חורף", re.I)
+                   r"summer|winter|latest|last time|sunset|sundown|sunrise|dawn|nightfall|dark|stars come out|"
+                   r"how long (till|until|to|before))\b|מה השעה|באיזו שעה|עד איזו שעה|הלילה|היום|קיץ|חורף|"
+                   r"שקיעה|השקיעה|זריחה|הזריחה|צאת הכוכבים|עלות השחר|מתי מחשיך|כמה זמן עד", re.I)
 SEASONS = re.compile(r"\b(summer|winter|seasons?)\b|קיץ|חורף", re.I)

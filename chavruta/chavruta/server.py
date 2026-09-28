@@ -37,7 +37,7 @@ from .commentators import MASECHTOT
 from .llm import LLM, VOICE_DIRECTION, ModelError, speakable
 from .masechta_index import Index
 from .pack import Pack
-from .partner import Partner, unit_nudge
+from .partner import READ_TO_ME, Partner, unit_nudge
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WEB = os.path.join(ROOT, "web")
@@ -184,12 +184,14 @@ def session(sid):
     with SESSION_LOCK:
         return SESSIONS.setdefault(sid or "default", {
             "history": [], "ref": None, "line": 1, "nudged": set(), "language": "auto",
-            "recent": [], "spoke": None})
+            "recent": [], "spoke": None, "memory": {}})
 
 
 def fresh_page(state, ref):
     if state.get("ref") != ref:
-        state.update(history=[], ref=ref, nudged=set(), recent=[], spoke=None)
+        # The place they named stays; what was fetched for the last page goes.
+        memory = {"place": state.get("memory", {}).get("place")}
+        state.update(history=[], ref=ref, nudged=set(), recent=[], spoke=None, memory=memory)
 
 
 def worth_asking(heard):
@@ -387,7 +389,15 @@ class Handler(BaseHTTPRequestHandler):
 
         # "Hey", "can you hear me?", "go ahead": answered from the words alone,
         # with no model, before anything else happens.
-        quick = smalltalk.reply(said, language) if heard["mode"] == "talking" else None
+        last = state.get("spoke") or next(
+            (m["content"] for m in reversed(state["history"]) if m["role"] == "assistant"), "")
+        asked = last.rstrip().endswith("?")
+        quick = smalltalk.reply(said, language, asked) if heard["mode"] == "talking" else None
+        if quick and quick[0] == "filler":
+            # "Um", "okay": heard, shown, and let be.
+            record("heard_filler", session=sid, ref=ref, said=said)
+            reply["ignore"] = True
+            return self.send_json(reply)
         if quick and quick[0] == "skip":
             reply["skip"] = True
             return self.send_json(reply)
@@ -452,6 +462,12 @@ class Handler(BaseHTTPRequestHandler):
             route = {"kind": "check_reading", "claim": False, "names": [], "navigate": None,
                      "language": "he" if (heard or {}).get("hebrew", 0) > 0.5 else None, "reply": None}
             recent = state["recent"][:-1]  # the last one is this reading itself
+        elif smalltalk.acknowledges(said):
+            # "Okay" / "yes" to something it offered: a request to go on, and
+            # the router, which sees only these words, would call it a ping.
+            route = {"kind": "other", "claim": False, "names": [], "navigate": None, "language": None,
+                     "reply": None}
+            recent = state["recent"]
         else:
             route = retrieve.classify(llm, said)
             recent = state["recent"]
@@ -487,18 +503,30 @@ class Handler(BaseHTTPRequestHandler):
         partner = Partner(pack, llm, depth=body.get("depth") or "daf",
                           language=body.get("language") or "en",
                           index=index_for(pack.data.get("masechta", "")))
+        # "Can you read it for me?" -- the page's words may be spoken in full.
+        read_out = bool(READ_TO_ME.search(said))
+        if read_out and stream:
+            emit({"mode": "read"})
         started = time.time()
         try:
             text, verdict, state["history"], trace = partner.ask(
                 line, state["history"], said, heard=heard, route=route,
                 recent=recent, spoke=state.get("spoke"), announce=announce,
                 # Each sentence as it is written, to be spoken while the rest is.
-                on_part=(lambda text: emit({"mode": "part", "text": text})) if stream else None)
+                on_part=(lambda text: emit({"mode": "part", "text": text})) if stream else None,
+                memory=state.setdefault("memory", {}))
+        except (BrokenPipeError, ConnectionResetError):
+            # The page asked again, together with what was said next.
+            log.info("say: the page stopped waiting for this answer")
+            return
         except Exception as exc:
             if not stream:
                 raise
             log.error("say: %s\n%s", exc, traceback.format_exc())
-            emit({"error": "model: %s" % exc if isinstance(exc, ModelError) else "internal"})
+            try:
+                emit({"error": "model: %s" % exc if isinstance(exc, ModelError) else "internal"})
+            except OSError:
+                pass
             return
         trace["seconds"] = round(time.time() - started, 1)
         trace["interim"] = interim[0] if interim else None
@@ -506,16 +534,20 @@ class Handler(BaseHTTPRequestHandler):
                depth=body.get("depth"), language=body.get("language"), text=text,
                grounded=verdict.ok, trace=trace, models=[llm.heavy, llm.cheap])
         state.update(heard=None, recent=[], spoke=None)
-        payload = {"mode": "answer", "text": text, "grounded": verdict.ok,
+        payload = {"mode": "answer", "text": text, "grounded": verdict.ok, "read": read_out,
                    "problem": None if verdict.ok else verdict.complaint(), "trace": trace}
         if stream:
-            return emit(payload)
+            try:
+                emit(payload)
+            except OSError:
+                pass
+            return
         return self.send_json(payload)
 
     def spoken_text(self, body):
         text = speakable((body.get("text") or "").strip())
         ref = (body.get("ref") or "").strip()
-        if ref and allowed(ref):
+        if ref and allowed(ref) and not body.get("whole"):
             # The net under the «» marks: whatever the model did, no long
             # stretch of the page itself reaches the voice.
             text = align.unspeak(text, page_of(load_pack(ref)))

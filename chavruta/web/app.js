@@ -581,7 +581,7 @@ function prepare(item) {
   if (item.ready) return item.ready;
   item.ready = (async () => {
     const r = await fetch("/api/voice", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: item.text, ref: S.pack && S.pack.ref }) });
+      body: JSON.stringify({ text: item.text, ref: S.pack && S.pack.ref, whole: !!(item.turn && item.turn.whole) }) });
     if (!r.ok) throw new Error("voice_" + r.status);
     const { id } = await r.json();
     const audio = new Audio("/api/voice/" + id);
@@ -820,6 +820,7 @@ let ears = null;
 let hearChain = Promise.resolve();
 const asks = [];           // what is waiting for an answer
 let answering = false;
+let current = null;        // the question being thought about now
 S.gen = 0;                 // bumped on mic-off: everything older is dropped
 const aborts = new Set();
 
@@ -914,7 +915,7 @@ async function postStream(path, body, onLine, signal) {
     if (!line.trim()) return;
     const msg = JSON.parse(line);
     if (msg.error) throw Object.assign(new Error(msg.error), { code: msg.error });
-    if (msg.mode === "interim" || msg.mode === "part") onLine(msg); else last = msg;
+    if (msg.mode === "interim" || msg.mode === "part" || msg.mode === "read") onLine(msg); else last = msg;
   };
   for (;;) {
     const { value, done } = await reader.read();
@@ -978,6 +979,7 @@ async function hearOne(u, g, t0) {
     heard: heard.heard, ms_hear: Math.round(performance.now() - t0), at: new Date().toLocaleTimeString() });
   if (heard.line) selectLine(heard.line, { scroll: "side" });
   markRead(heard.heard);
+  if (heard.ignore) return idleMode();   // "um", "okay": nothing to answer
 
   if (heard.skip) {
     // "Enough" / "skip" -- talking already stopped the voice; drop the rest.
@@ -1133,6 +1135,17 @@ function setRate(step) {
 
 function ask(q) {
   q.turn = newTurn(q.heard.said, "waiting");
+  // Said while the last question is still being thought about, with nothing
+  // of its answer out yet: ask again, both together. In use, a question and
+  // its follow-up five seconds later got two answers, the second repeating
+  // the first.
+  const c = current;
+  if (c && !c.merged && c.turn.status === "thinking" && !c.turn.text && !c.turn.interim &&
+      !q.extra && !c.batch.some((x) => x.extra)) {
+    c.merged = true;
+    c.ctl.abort();
+    asks.unshift(...c.batch);
+  }
   asks.push(q);
   if (!answering) runAnswers(S.gen);
 }
@@ -1169,12 +1182,18 @@ async function respond(batch, g) {
   let lead = !moved ? "" : S.settings.language === "he" ? "לגבי מה ששאלת קודם — " : "Back to what you asked — ";
   let first = null;
   const ctl = new AbortController(); aborts.add(ctl);
+  const mine = current = { batch, ctl, turn, merged: false };
   let answer;
   try {
     answer = await postStream("/api/say", Object.assign({ ref: S.pack.ref, line: last.line || S.line, session: S.session,
       said, heard: last.heard.heard, depth: S.settings.depth, language: S.settings.language }, extra),
       (msg) => {
         if (g !== S.gen) return;
+        if (msg.mode === "read") {
+          // "Can you read it for me?" -- the page's words are spoken whole.
+          turn.whole = true;
+          return;
+        }
         if (msg.mode === "interim") {
           // "Let me pull up the Tur" -- said while Sefaria is asked.
           turn.interim = msg.text;
@@ -1190,9 +1209,12 @@ async function respond(batch, g) {
         }
         renderBar();
       }, ctl.signal);
-  } catch (e) { if (g === S.gen) { dropTurn(turn); failed(e, "answer", t1); } return; }
-  finally { aborts.delete(ctl); }
-  if (g !== S.gen) return;
+  } catch (e) {
+    if (mine.merged) return;     // asked again, together with what came after
+    if (g === S.gen) { dropTurn(turn); failed(e, "answer", t1); }
+    return;
+  } finally { aborts.delete(ctl); if (current === mine) current = null; }
+  if (g !== S.gen || mine.merged) return;
   if (!answer) { dropTurn(turn); return failed(null, "answer", t1); }
   if (answer.mode === "navigate") {
     turn.complete = true; turn.text = "עובר ל" + runnerText(answer.ref) + ".";
