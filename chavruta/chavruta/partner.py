@@ -68,6 +68,13 @@ Sometimes their turn holds several things said in a row, marked "(a moment
 earlier)" and "(and then)" -- they kept reading and talking while you were
 thinking. Answer them together, briefly, weighted to the last.
 
+When they tell you to answer, go on, or repeat ("so answer", "answer the
+question I asked"), look back at what they asked and answer it in full, now.
+Never reply that you will answer, or restate their question instead of
+answering it. When they ask for real numbers -- clock times, dates -- give them
+from the material if it is there; if a time depends on the date and place,
+work an example through with the times given in the turn.
+
 How you sound. Confident when the source is in front of you: say what it says,
 without "roughly", "it's blurred", "not exact", "it seems". Some play is good --
 surprise, a joke, "ooh, this is a good one" -- as long as every claim stands on
@@ -94,6 +101,13 @@ On a Tosafot with several voices. The argument line of each comment marks who
 speaks (by רש״י, by ר״ת, by ר״י). A Tosafot is often three voices -- Rashi's
 reading, the questions on it, Rabbeinu Tam's answer, the Ri's -- keep them apart
 when you describe it, and say which is which.
+
+On the bench. The page's own voices come first: the gemara, Rashi, Tosafot.
+The commentaries opened for a turn are a bench to reach for when they add
+something the page does not -- not a default to cite. Name at most one or two
+of them in an answer, and not the same one turn after turn: if you leaned on
+the Meiri last time, answer from Rashi or the gemara, or reach for someone
+else, unless the Meiri is the one who actually says the thing asked.
 
 On volunteering. When the unit they just finished holds a real machlokes or a
 Tosafot that turns the sugya, say so in one sentence and stop -- "this is where
@@ -303,11 +317,11 @@ SPOKEN = {
     "en": {"Rambam": "the Rambam", "Tur": "the Tur", "Shulchan Arukh": "the Shulchan Aruch",
            "Mishnah Berurah": "the Mishnah Berurah", "Rabbeinu Yonah": "Rabbeinu Yonah",
            "Beit Yosef": "the Beit Yosef", "Magen Avraham": "the Magen Avraham",
-           "Turei Zahav": "the Taz", "Bach": "the Bach"},
+           "Turei Zahav": "the Taz", "Bach": "the Bach", "Zmanim": "tonight's times"},
     "he": {"Rambam": "הרמב״ם", "Tur": "הטור", "Shulchan Arukh": "השולחן ערוך",
            "Mishnah Berurah": "המשנה ברורה", "Rabbeinu Yonah": "רבינו יונה",
            "Beit Yosef": "הבית יוסף", "Magen Avraham": "המגן אברהם", "Turei Zahav": "הט״ז",
-           "Bach": "הב״ח"},
+           "Bach": "הב״ח", "Zmanim": "הזמנים של הלילה"},
 }
 
 
@@ -341,6 +355,8 @@ class Partner:
         self.depth = depth if depth in retrieve.DEPTHS else "daf"
         self.language = language if language in LANGUAGE else "en"
         self.known = pack.refs()
+        self.ref_names = {e["ref"]: name for seg in pack.segments
+                          for name, entries in seg["commentaries"].items() for e in entries}
         self.system = CONSTITUTION + "\n\n" + amud_context(pack)
 
     def speaks(self, route):
@@ -373,6 +389,11 @@ class Partner:
                      "first_try": None, "quick": True}
             return text, ground.check(text, self.known), history[-24:], trace
 
+        # Who it leaned on in the last two answers goes to the back of the line.
+        recent = [m["content"] for m in history if m["role"] == "assistant"][-2:]
+        route = dict(route, said=said, avoid=sorted({
+            self.ref_names[r.strip()] for text in recent for r in ground.CITE.findall(text)
+            if r.strip() in self.ref_names}))
         chosen = retrieve.extras(self.pack, n, route, self.depth)
         jobs = retrieve.plan(self.pack, n, route)
         fetched, missed, waited = [], [], 0.0
@@ -406,14 +427,24 @@ class Partner:
         first_try = None
         if not verdict.ok:
             first_try = {"text": text, "problem": verdict.complaint()}
+            first_verdict = verdict
             retry = history + [now, {"role": "assistant", "content": text},
                                {"role": "user", "content": "[from the app, not the learner: " +
                                 verdict.complaint() + " Answer again.]"}]
             text = self.llm.say(self.system, retry, heavy=True, cache_key=cache_key)
             verdict = ground.check(text, known)
-            if not verdict.ok:
-                text = fallback(chosen + fetched, lang)
-                verdict = ground.check(text, known)
+            if not verdict.ok and verdict.unknown:
+                if not first_verdict.unknown:
+                    # The first try only named someone loosely; the retry cited
+                    # something that does not exist. The first is the honest one.
+                    text, verdict = first_try["text"], first_verdict
+                else:
+                    # Only an invented reference forces the fallback. A name
+                    # mentioned without its citation ships, marked on screen
+                    # as unsourced -- in use the fallback replaced good answers
+                    # with "none of them says that outright".
+                    text = fallback(chosen + fetched, lang)
+                    verdict = ground.check(text, known)
 
         history = history + [kept, {"role": "assistant", "content": text}]
         trace = {"kind": kind, "claim": route.get("claim"),

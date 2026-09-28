@@ -388,6 +388,12 @@ class Handler(BaseHTTPRequestHandler):
         # "Hey", "can you hear me?", "go ahead": answered from the words alone,
         # with no model, before anything else happens.
         quick = smalltalk.reply(said, language) if heard["mode"] == "talking" else None
+        if quick and quick[0] == "again":
+            # "What?" -- the page says its last answer again.
+            record("answer", session=sid, ref=ref, line=line, said=said, text="(said again)",
+                   grounded=True, trace={"kind": "small talk: again", "quick": True, "seconds": 0})
+            reply["again"] = True
+            return self.send_json(reply)
         if quick:
             kind, text = quick
             state["history"] = (state["history"] + [{"role": "user", "content": said},

@@ -14,7 +14,7 @@ from tests import fake_openai, fake_sefaria  # noqa: E402
 SEF, SEF_URL = fake_sefaria.start()
 OAI, OAI_URL = fake_openai.start()
 os.environ.update(CHAVRUTA_SEFARIA_API=SEF_URL, OPENAI_BASE_URL=OAI_URL, OPENAI_API_KEY="sk-test",
-                  CHAVRUTA_PACKS=tempfile.mkdtemp())
+                  CHAVRUTA_PACKS=tempfile.mkdtemp(), CHAVRUTA_ZMANIM_API=SEF_URL[:-4] + "/zmanim")
 
 from chavruta import sefaria  # noqa: E402
 importlib.reload(sefaria)
@@ -382,6 +382,43 @@ class Voice(unittest.TestCase):
         self.assertNotIn("alloy", inspect.getsource(llm.LLM.speak_stream))
         self.assertNotIn("alloy", inspect.getsource(llm.LLM.speak))
         self.assertIn("never two speakers", llm.VOICE_DIRECTION)
+
+
+class FourthSitting(unittest.TestCase):
+    pack = Pack(PACK)
+
+    def test_the_meiri_is_one_voice_not_the_default(self):
+        got = retrieve.extras(self.pack, 1, {"kind": "meaning", "names": []}, "acharonim")
+        names = [n for n, _ in got]
+        self.assertLessEqual(len(got), 3)
+        self.assertLessEqual(names.count("Meiri"), 1)
+        halacha = [n for n, _ in retrieve.extras(self.pack, 1, {"kind": "halacha", "names": []}, "acharonim")]
+        self.assertEqual(halacha.count("Meiri"), 1)
+
+    def test_who_was_just_cited_goes_to_the_back(self):
+        got = [n for n, _ in retrieve.extras(self.pack, 1, {"kind": "meaning", "names": [], "avoid": ["Meiri"]}, "rishonim")]
+        self.assertNotIn("Meiri", got)
+
+    def test_asking_it_to_answer_is_not_small_talk(self):
+        from chavruta import smalltalk
+        for said in ("So go ahead and answer.", "Answer the question I asked you.", "Yeah, so answer."):
+            self.assertIsNone(smalltalk.reply(said), said)
+        self.assertEqual(smalltalk.reply("What?")[0], "again")
+        self.assertEqual(smalltalk.reply("No, I didn't hear you.")[0], "again")
+
+    def test_a_name_reported_through_a_cited_source_is_covered(self):
+        known = {"Tur, Orach Chayim 235"}
+        text = "The Tur [[Tur, Orach Chayim 235]] brings Rashi's view against Rabbeinu Tam's defense."
+        self.assertTrue(ground.check(text, known).ok)
+        self.assertFalse(ground.check("Rashi says so. The Tur [[Tur, Orach Chayim 235]] agrees.", known).ok)
+
+    def test_tonight_in_real_numbers(self):
+        jobs = [j for j, _ in retrieve.plan(self.pack, 1, {"kind": "halacha", "names": [],
+                                                          "said": "give me numbers, summer and winter"})]
+        self.assertEqual(sum(1 for j in jobs if j[0] == "zmanim"), 3)
+        entry = library.zmanim("2026-09-28")
+        self.assertIn("midnight (chatzot halayla): 2026-09-28 23:51", entry["he"])
+        self.assertIn("dawn (alot hashachar): 2026-09-29 05:04", entry["he"])
 
 
 class Server(unittest.TestCase):

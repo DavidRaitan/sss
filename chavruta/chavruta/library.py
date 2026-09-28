@@ -14,8 +14,13 @@ grounding gate treats it like anything else in the pack: citable because it was
 actually read, and only then.
 """
 
+import json
+import os
 import threading
 import time
+import urllib.error
+import urllib.parse
+import urllib.request
 from concurrent.futures import ThreadPoolExecutor, wait
 
 from . import sefaria
@@ -49,6 +54,10 @@ def text(ref):
     with _LOCK:
         if ref in _TEXTS:
             return _TEXTS[ref]
+        # A cited night's times open in the panel like any other source.
+        for entry in _ZMANIM.values():
+            if entry and entry["ref"] == ref:
+                return entry
     data = sefaria.get("v3/texts/%s" % ref, soft=True, version="source")
     entry = None
     for version in (data or {}).get("versions", []):
@@ -114,6 +123,8 @@ def gather(jobs):
     for job in jobs:
         if job[0] == "text":
             futures.append((job, POOL.submit(text, job[1])))
+        elif job[0] == "zmanim":
+            futures.append((job, POOL.submit(zmanim, job[1])))
         else:
             futures.append((job, POOL.submit(follow, job[1], job[2])))
     wait([f for _, f in futures], timeout=DEADLINE)
@@ -130,6 +141,8 @@ def gather(jobs):
             missed.append(job)
         elif job[0] == "text":
             found.append((name_of(result["ref"]), result))
+        elif job[0] == "zmanim":
+            found.append(("Zmanim", result))
         else:
             found.extend(result)
     return found, missed, round(time.time() - started, 1)
@@ -138,4 +151,59 @@ def gather(jobs):
 def cached(job):
     """Whether a job would be answered without going out -- then nothing is announced."""
     with _LOCK:
+        if job[0] == "zmanim":
+            return job[1] in _ZMANIM
         return (job[1] in _TEXTS) if job[0] == "text" else (job[1] in _LINKS)
+
+
+# -- the clock: real times for a real night --------------------------------------
+
+# "Give me numbers -- when is the last time, in summer and in winter?" is a
+# question about tonight in a real place. Hebcal publishes the zmanim for any
+# date and place, free; Jerusalem unless set otherwise.
+ZMANIM_API = os.environ.get("CHAVRUTA_ZMANIM_API", "https://www.hebcal.com/zmanim")
+PLACE = os.environ.get("CHAVRUTA_GEONAMEID", "281184")          # Jerusalem
+PLACE_NAME = os.environ.get("CHAVRUTA_PLACE", "Jerusalem")
+_ZMANIM = {}
+# The night that begins on the evening of the date: its start from that day's
+# times, its dawn from the next morning's.
+EVENING = [("sunset", "sunset (shkiah)"), ("tzeit7083deg", "nightfall, three stars (tzeit, 7.08°)"),
+           ("tzeit85deg", "nightfall, stricter (tzeit, 8.5°)"),
+           ("tzeit72min", "nightfall per Rabbeinu Tam (72 min)"), ("chatzotNight", "midnight (chatzot halayla)")]
+MORNING = [("alotHaShachar", "dawn (alot hashachar)"), ("sunrise", "sunrise (netz)")]
+
+
+def _hebcal(date):
+    url = "%s?%s" % (ZMANIM_API, urllib.parse.urlencode({"cfg": "json", "geonameid": PLACE, "date": date}))
+    request = urllib.request.Request(url, headers={"User-Agent": "chavruta/0.3"})
+    with urllib.request.urlopen(request, timeout=8) as response:
+        return json.load(response).get("times") or {}
+
+
+def _clock(value):
+    # "2026-09-28T18:21:00+03:00" -> "2026-09-28 18:21": the day is kept, since
+    # midnight and dawn belong to the next one.
+    return value[:10] + " " + value[11:16] if len(value) >= 16 else value
+
+
+def zmanim(date):
+    """The times of the night beginning on the evening of `date` (YYYY-MM-DD), at PLACE."""
+    with _LOCK:
+        if date in _ZMANIM:
+            return _ZMANIM[date]
+    entry = None
+    try:
+        import datetime
+        evening = _hebcal(date)
+        following = (datetime.date.fromisoformat(date) + datetime.timedelta(days=1)).isoformat()
+        morning = _hebcal(following)
+        lines = ["%s: %s" % (label, _clock(evening[key])) for key, label in EVENING if evening.get(key)]
+        lines += ["%s: %s" % (label, _clock(morning[key])) for key, label in MORNING if morning.get(key)]
+        if lines:
+            entry = {"ref": "Zmanim for %s, night of %s (hebcal.com)" % (PLACE_NAME, date),
+                     "he": "; ".join(lines) + ".", "dibur": None, "fetched": True}
+    except (urllib.error.URLError, TimeoutError, OSError, ValueError, KeyError):
+        entry = None
+    with _LOCK:
+        _ZMANIM[date] = entry
+    return entry

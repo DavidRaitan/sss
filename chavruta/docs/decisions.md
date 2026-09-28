@@ -272,3 +272,39 @@ silence, not an error; anything heard while it was talking that matches what
 it just said is recognised as itself and ignored; and after hearing itself
 twice it switches to speaker mode — it doesn't listen while it talks, and ⏸ is
 how to stop it. Settings has אוזניות / רמקול.
+
+## After the fourth sitting
+
+**32. Answers were cutting themselves off.** Most answers "spoke" for 15–40 ms
+until 🔊 was pressed. The microphone's measure of how long the learner had
+been speaking was never cleared when they stopped, so after a long question it
+was still "loud" when the answer began, counted as the learner talking over it,
+and stopped the answer. It is now cleared at the end of every utterance and
+when the partner starts speaking, and capped.
+
+**33. Why it loved the Meiri.** Depth "+ Acharonim" opened up to six
+commentaries a turn; the Meiri comments on nearly every line of this amud, so
+he was in every one of them; halacha questions opened four Meiri paragraphs;
+and the partner was told to use what was opened. Now: at most three unasked
+voices, one comment each; halacha takes one ruling per Rishon; whoever was
+cited in the last two answers sits the next turn out; and the partner is told
+the page's own voices come first and the bench is for what they don't say.
+
+**34. "Answer it" is not small talk.** "So go ahead and answer" got "Go
+ahead."; "What?" got "Yes, I hear you." Requests are never small talk now,
+"what?" / "I didn't hear you" says the last answer again, and the router is
+told that asking it to answer means answering.
+
+**35. The check stopped throwing out good answers.** A name reported through a
+cited source ("the Tur [[…]] brings Rashi's view") is covered by that citation.
+Only an invented reference forces the fallback; a name mentioned without its
+citation ships marked "unsourced" on screen.
+
+**36. Real numbers.** Asked for clock times, it fetches the night's zmanim for
+Jerusalem from hebcal.com — tonight, and a summer and winter night when asked —
+and works the answer through them. Set CHAVRUTA_GEONAMEID / CHAVRUTA_PLACE for
+another city.
+
+**37. Panels: ✕ always in reach, and resizable.** The close button sits
+outside the scrolling panel; the panel's edge is a handle to drag it wider or
+narrower (taller or shorter on a phone), remembered.

@@ -700,7 +700,15 @@ class Ears {
     // While it is talking, only a clearly louder voice counts as the learner.
     const threshold = Math.max(0.012, this.floor * 3) * (this.guard ? 2.6 : 1);
     level(Math.min(1, rms / (threshold * 3)));
-    if (rms > threshold) { this.loud += 40; this.quiet = 0; } else { this.quiet += 40; this.loud = Math.max(0, this.loud - 20); }
+    // `loud` is how long they have been audibly speaking just now. Capped, and
+    // cleared when an utterance ends and when the partner starts to talk: in
+    // use it was never cleared, so after a long question it was still "loud"
+    // when the answer began, counted as the learner talking over it, and cut
+    // the answer off after 20 ms -- until 🔊 was pressed.
+    if (this.guard && !this.wasGuard) this.loud = 0;
+    this.wasGuard = this.guard;
+    if (rms > threshold) { this.loud = Math.min(1500, this.loud + 40); this.quiet = 0; }
+    else { this.quiet += 40; this.loud = Math.max(0, this.loud - 20); }
 
     // Speaker mode (no earbuds): while it talks, and a moment after, it does
     // not listen -- its own voice would be heard as the learner's. ⏸ stops it.
@@ -722,6 +730,7 @@ class Ears {
     const pause = PAUSES[S.settings.pause] || 1500;
     if (this.talking && (this.quiet >= pause || now - this.startedAt > 45000)) {
       this.talking = false; this.lastSpeech = now - this.startedAt - this.quiet;
+      this.loud = 0;
       this.stopRec();
     } else if (!this.talking && this.quiet >= 600 && now - this.recAt > 4000 && live) {
       // Nothing said for a few seconds: start a fresh recording, so what is
@@ -946,6 +955,14 @@ async function hearOne(u, g, t0) {
   if (heard.line) selectLine(heard.line, { scroll: "side" });
   markRead(heard.heard);
 
+  if (heard.again) {
+    // "What?" / "I didn't hear you": say the last answer again.
+    const last = S.lastSaid || (S.settings.language === "he" ? "עוד לא אמרתי כלום." : "I haven't said anything yet.");
+    showReply(last);
+    logPush({ me: false, text: last, trace: { kind: "said again", quick: true }, ms_answer: 0 });
+    say(last);
+    return;
+  }
   if (heard.quick) {
     // "Hey", "can you hear me?", "go ahead": answered at once, no thinking.
     showReply(heard.quick);
@@ -1020,6 +1037,7 @@ async function respond(batch, g) {
   const moved = Math.abs(S.line - (batch[0].line || S.line)) >= 2;
   const lead = !moved ? "" : S.settings.language === "he" ? "לגבי מה ששאלת קודם — " : "Back to what you asked — ";
   const t2 = performance.now();
+  S.lastSaid = answer.text;
   say(lead + answer.text).then(() => { entry.ms_spoken = Math.round(performance.now() - t2); });
 }
 
@@ -1052,8 +1070,8 @@ $("hold").onclick = pauseSpeaking;
 // you read Rashi, ask, or look at the transcript.
 function openPanel(build, kind) {
   const panel = $("panel"); panel.replaceChildren();
-  const x = el("button", "btn x", "✕"); x.setAttribute("aria-label", "סגור"); x.onclick = closePanel;
-  panel.append(x); build(panel);
+  build(panel);
+  panel.scrollTop = 0;
   S.panel = kind || "other";
   $("over").classList.add("open");
   document.body.classList.add("docked");
@@ -1063,6 +1081,41 @@ function closePanel() {
   $("over").classList.remove("open");
   document.body.classList.remove("docked");
 }
+// ✕ sits outside the scrolling panel, so it is always in reach.
+$("close-panel").onclick = closePanel;
+
+// Drag the panel's edge to give it more or less of the screen; remembered.
+// Beside the page it is a width, on a phone (a sheet from below) a height.
+(function sizePanel() {
+  const narrow = () => window.matchMedia("(max-width: 760px)").matches;
+  const apply = (px) => {
+    const root = document.documentElement.style;
+    if (narrow()) root.setProperty("--sheet", Math.round(Math.min(Math.max(px, 160), innerHeight * 0.9)) + "px");
+    else root.setProperty("--side", Math.round(Math.min(Math.max(px, 260), innerWidth * 0.75)) + "px");
+  };
+  const saved = +(recall(narrow() ? "sheet" : "side") || 0);
+  if (saved) apply(saved);
+  const grip = $("grip");
+  grip.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    grip.setPointerCapture(e.pointerId);
+    document.body.classList.add("resizing");
+    const rtl = getComputedStyle(document.body).direction === "rtl";
+    const move = (ev) => {
+      const px = narrow() ? innerHeight - ev.clientY : rtl ? innerWidth - ev.clientX : ev.clientX;
+      apply(px);
+    };
+    const up = () => {
+      grip.removeEventListener("pointermove", move);
+      document.body.classList.remove("resizing");
+      const v = getComputedStyle(document.documentElement).getPropertyValue(narrow() ? "--sheet" : "--side");
+      remember(narrow() ? "sheet" : "side", parseInt(v, 10) || "");
+    };
+    grip.addEventListener("pointermove", move);
+    grip.addEventListener("pointerup", up, { once: true });
+    grip.addEventListener("pointercancel", up, { once: true });
+  });
+})();
 
 function tier(name) {
   const w = (S.pack.weights || {})[name] || 20;

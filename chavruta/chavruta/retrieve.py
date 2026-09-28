@@ -21,12 +21,16 @@ from . import library
 # Beyond the question kinds: the small exchanges of sitting together, which
 # want a few words back and not a lecture.
 LIGHT = {
-    "ping": "checking you can hear them, telling you to go ahead or listen while "
-            "they read, thanks, hello, a joke -- anything that needs a few words back",
+    "ping": "checking you can hear them, telling you they are about to read, thanks, "
+            "hello, a joke -- anything that needs only a few words back. NOT a request: "
+            "'answer it', 'so answer', 'go on', 'what did you say', 'answer my question' "
+            "want the real answer, so they are 'other'",
+    "other": "anything else -- including asking you to answer, continue, or repeat what "
+             "you said, which you then do in full",
     "check_reading": "asking whether they read it right, or whether they missed or "
                      "swapped a word",
 }
-KINDS = list(who.ROUTES) + list(LIGHT) + ["reading", "navigate", "other"]
+KINDS = list(who.ROUTES) + list(LIGHT) + ["reading", "navigate"]
 
 # Depth: how far past the printed page to reach without being asked.
 DEPTHS = {
@@ -55,7 +59,6 @@ The kinds:
 %s
 - reading: they are reading the text aloud, not saying anything about it
 - navigate: they asked to go to another page ("go to daf 5", "תעבור לדף ה׳ עמוד ב")
-- other: anything else
 
 Hebrew numerals for pages: ב=2, י=10, יא=11, טו=15, כ=20, ל=30, מ=40, נ=50, ס=60.
 "עמוד א" is a, "עמוד ב" is b. If no amud is said, use a.""" % (
@@ -195,13 +198,20 @@ def extras(pack, n, route, depth="daf", budget=7):
             if len(chosen) == before:
                 take([match], 99, per=2)
 
+    named = len(chosen)
     if kind == "halacha":
-        # Where the Rishonim on this amud say how it is ruled, wherever it sits.
+        # Where the Rishonim on this amud say how it is ruled, wherever it
+        # sits -- one ruling each, not four paragraphs of the same Meiri.
+        ruled = set()
         for segment in pack.segments:
-            for name in ("Meiri", "Rosh", "Rif", "Tosafot HaRosh", "Rashba"):
+            for name in ("Rosh", "Rif", "Meiri", "Rashba", "Tosafot HaRosh"):
+                if name in ruled:
+                    continue
                 for entry in segment["commentaries"].get(name, []):
-                    if RULING.search(entry["he"]) and len(chosen) < 4:
+                    if RULING.search(entry["he"]):
                         add((name, entry))
+                        ruled.add(name)
+                        break
         take(["Rif", "Rosh"], 99, per=1)
     elif kind in ("logic", "conflict"):
         take(who.wide_for(masechta, [kind])[:3], 1, per=1)
@@ -210,15 +220,34 @@ def extras(pack, n, route, depth="daf", budget=7):
     elif kind == "structure":
         take(["Meiri"], 1, per=1)
 
-    # Depth widens questions about the page, not chat: "what time is it?"
-    # opened six commentaries and paid for reading them.
-    if kind in who.ROUTES:
-        if depth in ("rishonim", "acharonim"):
-            take(who.wide_for(masechta)[:5], 1, per=1)
-        if depth == "acharonim":
-            take(ACHARONIM, 1, per=1)
+    # Depth widens questions about the page, not chat. It offers a few voices,
+    # not everyone: in use it opened six a turn, and because the Meiri has a
+    # comment on nearly every line he was in every one of them, and in almost
+    # every answer. So: at most three, one comment each, and whoever was cited
+    # in the last answers goes to the back of the line.
+    if kind in who.ROUTES and depth in ("rishonim", "acharonim"):
+        pool = who.wide_for(masechta)[:6] + (ACHARONIM if depth == "acharonim" else [])
+        avoid = set(route.get("avoid") or [])
+        fresh = [x for x in pool if x not in avoid]     # the just-cited sit this one out
+        room = 3
+        for name in fresh:
+            if room <= 0:
+                break
+            if name in backbone or name not in present or any(nm == name for nm, _ in chosen):
+                continue
+            got = _near(pack, n, name, 1)[:1]
+            if got:
+                add(got[0])
+                room -= 1
 
-    return chosen[:budget]
+    # One comment per commentator unless the learner asked for him by name.
+    out, seen = [], set()
+    for i, (name, entry) in enumerate(chosen):
+        if i >= named and name in seen:
+            continue
+        seen.add(name)
+        out.append((name, entry))
+    return out[:budget]
 
 
 def _line_refs(pack, n, reach=0):
@@ -291,4 +320,20 @@ def plan(pack, n, route):
         mine = re.compile(r"^%s \d+[ab]:\d+(-\d+)?$" % re.escape(pack.data.get("masechta", "")))
         for ref in [r for r in seg.get("xrefs", []) if mine.match(r)][:2]:
             add(("text", ref), ref)
+
+    # "Give me numbers": tonight's real times, and a summer and a winter night
+    # when they ask about the seasons.
+    said = route.get("said") or ""
+    if CLOCK.search(said) and kind in ("halacha", "meaning", "other", "logic"):
+        import datetime
+        today = datetime.date.today()
+        add(("zmanim", today.isoformat()), "Zmanim")
+        if SEASONS.search(said):
+            add(("zmanim", "%d-06-21" % today.year), "Zmanim")
+            add(("zmanim", "%d-12-21" % today.year), "Zmanim")
     return jobs
+
+
+CLOCK = re.compile(r"\b(what time|clock|o'?clock|numbers?|real[- ]world time|tonight|today|p\.?m\.?|a\.?m\.?|"
+                   r"summer|winter|latest|last time)\b|מה השעה|באיזו שעה|עד איזו שעה|הלילה|היום|קיץ|חורף", re.I)
+SEASONS = re.compile(r"\b(summer|winter|seasons?)\b|קיץ|חורף", re.I)

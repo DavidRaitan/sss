@@ -269,7 +269,22 @@ def main():
                                 " return [g.left, g.right, p.left, p.right]; })()")
             check("the gemara stays in view beside the panel", box[1] <= box[2] + 1 or box[0] >= box[3] - 1, str(box))
             shot("07-docked")
-            page.keyboard.press("Escape")
+            # ✕ is always in reach, however far down the panel is scrolled.
+            page.evaluate("document.querySelector('#panel').scrollTo({top: 99999})")
+            close = page.evaluate("(() => { const r = document.querySelector('#close-panel').getBoundingClientRect();"
+                                  " return r.top >= 0 && r.bottom <= innerHeight; })()")
+            check("✕ stays in reach when the panel is scrolled", close)
+            # Drag the edge: the panel takes more of the screen, and it is remembered.
+            before = page.evaluate("document.querySelector('#over').getBoundingClientRect().width")
+            g = page.locator("#grip").bounding_box()
+            page.mouse.move(g["x"] + 5, g["y"] + g["height"] / 2)
+            page.mouse.down()
+            page.mouse.move(g["x"] - 200, g["y"] + g["height"] / 2, steps=8)
+            page.mouse.up()
+            after = page.evaluate("document.querySelector('#over').getBoundingClientRect().width")
+            check("dragging the edge resizes the panel", after > before + 100, "%d -> %d" % (before, after))
+            page.click("#close-panel")
+            check("✕ closes it", page.locator("#over.open").count() == 0)
 
         page.click("#open-settings")
         check("settings open", page.locator(".set").count() >= 8)

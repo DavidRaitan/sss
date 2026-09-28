@@ -123,6 +123,14 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(texts(_ref(url.path, "/api/v3/texts/"), q.get("version", [])))
         if url.path.startswith("/api/links/"):
             return self.reply(links(_ref(url.path, "/api/links/")))
+        if url.path == "/zmanim":
+            # Stands in for hebcal.com's zmanim, same shape.
+            day = q.get("date", ["2026-09-28"])[0]
+            return self.reply({"date": day, "location": {"title": "Jerusalem"}, "times": {
+                "sunset": day + "T18:21:00+03:00", "tzeit7083deg": day + "T18:44:00+03:00",
+                "tzeit85deg": day + "T18:50:00+03:00", "tzeit72min": day + "T19:33:00+03:00",
+                "chatzotNight": day + "T23:51:00+03:00", "alotHaShachar": day + "T05:04:00+03:00",
+                "sunrise": day + "T06:30:00+03:00"}})
         return self.reply({"error": "not recorded: %s" % url.path}, 404)
 
 

@@ -14,6 +14,8 @@ it and pass -- the gate was blind in the language the learner speaks.
 import re
 
 CITE = re.compile(r"\[\[([^\]]+)\]\]")
+# Sentence ends, keeping a citation that follows the full stop with its sentence.
+SENTENCE = re.compile(r"(?<=[.!?:;])\s+(?!\[\[)|\n+")
 QUOTE_MARK = "[\"'״׳’]"
 # Hebrew prefixes -- ו ב ל כ ש מ ה ד -- sit directly on a name, and they stack:
 # "והרשב״א" is ו + ה + רשב״א.
@@ -92,11 +94,20 @@ def check(text, known_refs):
     unknown = {c for c in cited if c not in known_refs}
     bare = CITE.sub(" ", text)
     uncited = set()
+    # A name reported through a cited source is covered by that citation:
+    # "the Tur [[Tur, OC 235]] brings Rashi's view against Rabbeinu Tam" stands
+    # on the Tur. In use, the check threw out exactly that answer and sent a
+    # useless fallback instead.
+    sentences = [s for s in SENTENCE.split(text) if s.strip()]
     for name, pattern in PATTERNS.items():
         if not pattern.search(bare):
             continue
         looks_like = NAMES[name][2]
-        if not any(any(mark in c for mark in looks_like) for c in cited):
+        if any(any(mark in c for mark in looks_like) for c in cited):
+            continue
+        floating = [s for s in sentences if pattern.search(CITE.sub(" ", s))
+                    and not any(c.strip() in known_refs for c in CITE.findall(s))]
+        if floating:
             uncited.add(name)
     # "Tosafot HaRosh" also matches "Tosafot"; if the longer name is cited,
     # the shorter one is not a separate floating claim.
