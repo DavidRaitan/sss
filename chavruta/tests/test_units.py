@@ -728,12 +728,41 @@ class Table(unittest.TestCase):
 
 
 class Server(unittest.TestCase):
-    def test_only_berakhot(self):
+    def test_all_of_shas_and_nothing_else(self):
         from chavruta import server
         self.assertTrue(server.allowed("Berakhot 64a"))
         self.assertFalse(server.allowed("Berakhot 64b"))
-        self.assertFalse(server.allowed("Shabbat 2a"))
+        self.assertTrue(server.allowed("Shabbat 2a"))
+        self.assertTrue(server.allowed("Bava Batra 176b"))
+        self.assertFalse(server.allowed("Shabbat 158a"))
+        self.assertTrue(server.allowed("Tamid 25b"))
+        self.assertFalse(server.allowed("Tamid 25a"))       # Tamid opens on 25b
+        self.assertFalse(server.allowed("Nazir 33b"))       # Sefaria has no 33b
         self.assertFalse(server.allowed("../../etc/passwd"))
+        self.assertEqual(len(sefaria.amudim("Shabbat")), 312)
+
+    def test_todays_daf(self):
+        import datetime
+        from chavruta import daily
+        found = daily.daf_yomi(datetime.date(2026, 9, 28))
+        self.assertEqual(found["ref"], "Berakhot 2")
+        self.assertEqual(found["amudim"], ["Berakhot 2a", "Berakhot 2b"])
+        self.assertEqual(found["he"], "ברכות ב׳")
+
+    def test_preparing_a_tractate_builds_what_is_missing(self):
+        import threading
+        from chavruta import daily
+        built, done = [], threading.Event()
+        have = {"Horayot 2a", "Horayot 2b"}
+        p = daily.Preparer(build=lambda ref: (built.append(ref), have.add(ref)), exists=lambda ref: ref in have,
+                           finish=lambda m: done.set(), pause=0)
+        self.assertTrue(p.start("Horayot"))
+        self.assertTrue(done.wait(5))
+        self.assertNotIn("Horayot 2a", built)
+        self.assertEqual(built[0], "Horayot 3a")
+        s = p.status("Horayot")
+        self.assertEqual((s["done"], s["total"]), (25, 25))
+        self.assertFalse(p.start("Shekalim"))                 # not on Sefaria's Bavli
 
     def test_packs_from_older_code_are_rebuilt(self):
         import json

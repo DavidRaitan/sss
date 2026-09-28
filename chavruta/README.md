@@ -17,7 +17,14 @@ The first run sets itself up and creates `.env`. Put your OpenAI key in it
 ## Using it
 
 **Turn to a page** with the three menus at the top — מסכת, דף, עמוד — or the ‹ ›
-arrows, the ← → keys, or a swipe. Berakhot for now, 2a to 64a.
+arrows, the ← → keys, or a swipe. All of Shas as Sefaria has it (37 tractates;
+not Shekalim, Kinnim or Middot). **📅** opens today's Daf Yomi, and each tractate
+opens where you left it. By voice: "go to Shabbat 30", "today's daf".
+
+**What you are learning** (⚙): open on today's daf or where you stopped; pick your
+tractates (they come first in the menu); and "להכין מראש" builds every page of one
+in the background, so each opens instantly. Today's daf and tomorrow's are built
+every morning while the app is open.
 
 **Press the microphone** (or the space bar) once. It stays open; this is a
 conversation, not a chat.
@@ -84,10 +91,11 @@ pays full price for the page about once. Hearing and speaking cost a fraction of
 cent a turn. The page itself — text, Rashi, Tosafot, Rishonim, Steinsaltz — comes
 free from Sefaria, and is cached after the first time.
 
-To open every page of Berakhot now, so each opens instantly and works offline,
-and to build the whole-masechta index behind "didn't we learn this elsewhere":
+To build every page of a tractate now (or use "להכין מראש" in settings), so each
+opens instantly and works offline, with the whole-tractate index behind "didn't we
+learn this elsewhere":
 
-    ./run.sh prefetch
+    ./run.sh prefetch Shabbat
 
 ## How it is built
 

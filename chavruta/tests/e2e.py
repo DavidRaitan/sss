@@ -325,6 +325,17 @@ def main():
         page.click(".seat[title='Ritva']")
         page.click(".seat[title='Meiri']")
         page.click(".seat[title='Meiri']")
+        # What I'm learning: Berakhot goes to the top of the picker.
+        page.click(".learning .btn[data-masechta='Berakhot']")
+        page.wait_for_selector(".prepline", timeout=8000)
+        check("my tractates come first in the picker",
+              page.evaluate("document.querySelector('#mas optgroup').label") == "שלי"
+              and page.evaluate("document.querySelectorAll('#mas option').length") >= 37,
+              page.inner_text(".prep")[:60])
+        # 📅 goes to today's daf (the fake calendar says Berakhot 2).
+        page.click("#today")
+        page.wait_for_function("S.pack && S.pack.ref === 'Berakhot 2a'", timeout=15000)
+        check("📅 opens today's daf", "ברכות" in page.inner_text("#today"), page.inner_text("#today"))
         check("who sits at the table is chosen in settings",
               page.evaluate("JSON.stringify(S.settings.favor)") == '{"Ritva":1,"Meiri":-1}',
               page.inner_text(".seats")[:80])

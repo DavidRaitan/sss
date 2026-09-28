@@ -18,6 +18,7 @@ disk and the neighbouring amudim are built in the background, so turning the
 page is instant.
 """
 
+import datetime
 import errno
 import hashlib
 import io
@@ -32,7 +33,7 @@ import traceback
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from . import align, commentators, library, retrieve, sefaria, smalltalk
+from . import align, commentators, daily, library, retrieve, sefaria, smalltalk
 from .commentators import MASECHTOT
 from .llm import LLM, VOICE_DIRECTION, ModelError, speakable
 from .masechta_index import Index
@@ -118,7 +119,7 @@ def pack_path(ref):
 
 
 def allowed(ref):
-    """Only masechtot we have judged the routing for. See commentators.py."""
+    """A real amud of a tractate we can open (commentators.MASECHTOT)."""
     return any(ref.startswith(m["name"] + " ") for m in MASECHTOT) and \
         ref in set(sefaria.amudim(ref.rsplit(" ", 1)[0]))
 
@@ -281,6 +282,11 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json({"masechtot": MASECHTOT})
         if url.path == "/api/table":
             return self.send_json({"table": commentators.table()})
+        if url.path == "/api/today":
+            found = daily.daf_yomi()
+            return self.send_json(found) if found else self.fail(502, "no_daf_yomi")
+        if url.path == "/api/prepare":
+            return self.send_json(PREPARER.status(arg("masechta")))
         if url.path == "/api/daf":
             ref = arg("ref")
             if not allowed(ref):
@@ -319,6 +325,11 @@ class Handler(BaseHTTPRequestHandler):
                 return self.speak()
             if route == "/api/voice":
                 return self.prepare_voice()
+            if route == "/api/prepare":
+                masechta = (self.body_json().get("masechta") or "").strip()
+                if not PREPARER.start(masechta):
+                    return self.fail(400, "no_such_masechta")
+                return self.send_json(PREPARER.status(masechta))
         except ModelError as exc:
             return self.fail(502, "model: %s" % exc, exc)
         except sefaria.SefariaError as exc:
@@ -475,9 +486,12 @@ class Handler(BaseHTTPRequestHandler):
             recent = state["recent"]
         nav = route.get("navigate")
         if route["kind"] == "navigate" and nav:
-            masechta = pack.data.get("masechta", "Berakhot")
-            target = "%s %d%s" % (masechta, nav["daf"], nav["amud"])
-            if allowed(target):
+            if nav.get("daf_yomi"):
+                target = ((daily.daf_yomi() or {}).get("amudim") or [None])[0]
+            else:
+                masechta = nav.get("masechta") or pack.data.get("masechta", "Berakhot")
+                target = "%s %d%s" % (masechta, nav["daf"], nav["amud"])
+            if target and allowed(target):
                 record("navigate", session=body.get("session"), ref=ref, said=said, to=target)
                 return self.send_json({"mode": "navigate", "ref": target})
 
@@ -661,6 +675,41 @@ def prewarm():
             return
 
 
+def build_index(masechta):
+    """The whole-tractate index, once every page of it is on disk."""
+    import importlib.util
+    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "pack", "build_index.py")
+    try:
+        spec = importlib.util.spec_from_file_location("build_index", path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        mod.main([masechta])
+        INDEXES.pop(masechta, None)
+    except Exception as exc:
+        log.info("index %s: %s", masechta, exc)
+
+
+PREPARER = daily.Preparer(build=load_pack, exists=lambda ref: os.path.exists(pack_path(ref)),
+                          finish=build_index)
+
+
+def morning():
+    """While the app is open: today's daf and tomorrow's, built before they are
+    opened, and again when the date turns over."""
+    seen = None
+    while True:
+        today = datetime.date.today()
+        if today != seen:
+            refs = []
+            for day in (today, today + datetime.timedelta(days=1)):
+                found = daily.daf_yomi(day)
+                refs += (found or {}).get("amudim", [])
+            if refs:
+                prefetch(*refs)
+                seen = today
+        time.sleep(1800)
+
+
 def serve(port=8765, open_browser=True, host="127.0.0.1"):
     os.makedirs(PACKS, exist_ok=True)
     logging.basicConfig(filename=LOG_PATH, level=logging.INFO,
@@ -683,7 +732,8 @@ def serve(port=8765, open_browser=True, host="127.0.0.1"):
         raise SystemExit("no free port between %d and %d" % (port, port + 9))
     port = httpd.server_address[1]
     threading.Thread(target=prewarm, daemon=True).start()
-    url = "http://127.0.0.1:%d/" % port
+    threading.Thread(target=morning, daemon=True).start()
+    url ="http://127.0.0.1:%d/" % port
     print("chavruta -> %s   (ctrl-c to stop; problems are written to chavruta.log)" % url)
     if open_browser:
         try:

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """python3 -m chavruta             open the app
    python3 -m chavruta doctor      check that everything it needs works, and say what does not
-   python3 -m chavruta prefetch    build every page of Berakhot now, so each opens instantly
+   python3 -m chavruta prefetch    build every page of a tractate now (prefetch Shabbat)
 """
 
 import argparse

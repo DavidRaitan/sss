@@ -20,11 +20,38 @@ BACKBONE loads with the page. Everything else is fetched only when the
 conversation actually reaches for it -- see retrieve.py.
 """
 
-# What you can open. One masechta for now, deliberately: the routing judgement
-# below is per-tractate and unverified everywhere else, and offering a page we
-# route badly is worse than not offering it.
+# What you can open: all of the Bavli as Sefaria has it (checked against its
+# /api/shape/Bavli: the first and last amud of each, and the amudim it lacks).
+# Sefaria has no Bavli Shekalim, nor Kinnim or Middot. The routing judgement
+# below was tuned on Berakhot; elsewhere it is a first draft, and real sittings
+# correct it.
+def _m(name, he, seder, last, last_amud, first=2, first_amud="a", missing=()):
+    return {"name": name, "he": he, "seder": seder, "first": first, "first_amud": first_amud,
+            "last": last, "last_amud": last_amud, "missing": list(missing)}
+
+
 MASECHTOT = [
-    {"name": "Berakhot", "he": "ברכות", "first": 2, "last": 64, "last_amud": "a"},
+    _m("Berakhot", "ברכות", "זרעים", 64, "a"),
+    _m("Shabbat", "שבת", "מועד", 157, "b"), _m("Eruvin", "עירובין", "מועד", 105, "a"),
+    _m("Pesachim", "פסחים", "מועד", 121, "b"), _m("Yoma", "יומא", "מועד", 88, "a"),
+    _m("Sukkah", "סוכה", "מועד", 56, "b"), _m("Beitzah", "ביצה", "מועד", 40, "b"),
+    _m("Rosh Hashanah", "ראש השנה", "מועד", 35, "a"), _m("Taanit", "תענית", "מועד", 31, "a"),
+    _m("Megillah", "מגילה", "מועד", 32, "a"), _m("Moed Katan", "מועד קטן", "מועד", 29, "a"),
+    _m("Chagigah", "חגיגה", "מועד", 27, "a"),
+    _m("Yevamot", "יבמות", "נשים", 122, "b"), _m("Ketubot", "כתובות", "נשים", 112, "b"),
+    _m("Nedarim", "נדרים", "נשים", 91, "b"), _m("Nazir", "נזיר", "נשים", 66, "b", missing=["33b"]),
+    _m("Sotah", "סוטה", "נשים", 49, "b"), _m("Gittin", "גיטין", "נשים", 90, "b"),
+    _m("Kiddushin", "קידושין", "נשים", 82, "b"),
+    _m("Bava Kamma", "בבא קמא", "נזיקין", 119, "b"), _m("Bava Metzia", "בבא מציעא", "נזיקין", 119, "a"),
+    _m("Bava Batra", "בבא בתרא", "נזיקין", 176, "b"), _m("Sanhedrin", "סנהדרין", "נזיקין", 113, "b"),
+    _m("Makkot", "מכות", "נזיקין", 24, "b"), _m("Shevuot", "שבועות", "נזיקין", 49, "b"),
+    _m("Avodah Zarah", "עבודה זרה", "נזיקין", 76, "b"), _m("Horayot", "הוריות", "נזיקין", 14, "a"),
+    _m("Zevachim", "זבחים", "קדשים", 120, "b"), _m("Menachot", "מנחות", "קדשים", 110, "a"),
+    _m("Chullin", "חולין", "קדשים", 142, "a"), _m("Bekhorot", "בכורות", "קדשים", 61, "a"),
+    _m("Arakhin", "ערכין", "קדשים", 34, "a"), _m("Temurah", "תמורה", "קדשים", 34, "a"),
+    _m("Keritot", "כריתות", "קדשים", 28, "b"), _m("Meilah", "מעילה", "קדשים", 22, "a"),
+    _m("Tamid", "תמיד", "קדשים", 33, "b", first=25, first_amud="b"),
+    _m("Niddah", "נדה", "טהרות", 73, "a"),
 ]
 
 

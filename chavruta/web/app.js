@@ -17,7 +17,7 @@ function el(tag, cls, text) {
 
 const DEFAULTS = { view: "daf", depth: "daf", language: "en", voice: "natural",
   hearing: "api", speak: true, pause: "normal", nudges: true, checks: true, translate: false, stops: false,
-  speakers: false, rate: 1, favor: {}, voices: 3 };
+  speakers: false, rate: 1, favor: {}, voices: 3, open: "last", mine: [] };
 const PAUSES = { short: 1000, normal: 1500, long: 2400 };
 function loadSettings() {
   try { return Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem("chavruta.settings") || "{}")); }
@@ -112,15 +112,53 @@ async function buildPickers() {
     const r = await fetch("/api/masechtot");
     S.masechtot = (await r.json()).masechtot || [];
   } catch (e) { S.masechtot = []; }
-  const mas = $("mas");
-  mas.replaceChildren(...S.masechtot.map((m) => { const o = el("option", null, m.he); o.value = m.name; return o; }));
+  fillMasechtot();
   fillDapim();
-  mas.onchange = () => { fillDapim(); turnTo(pickedRef()); };
+  // A tractate opens where you left it, not at its first page.
+  $("mas").onchange = () => {
+    const back = recall("pos." + $("mas").value);
+    if (back) return turnTo(back);
+    fillDapim(); turnTo(pickedRef());
+  };
+  $("today").onclick = openToday;
   $("daf").onchange = () => turnTo(pickedRef());
   $("am-a").onclick = () => { setAmud("a"); turnTo(pickedRef()); };
   $("am-b").onclick = () => { setAmud("b"); turnTo(pickedRef()); };
   $("prev").onclick = () => flip(-1);
   $("next").onclick = () => flip(1);
+}
+
+// The tractates you are learning first, then all of Shas by seder.
+function fillMasechtot() {
+  const mas = $("mas"), keep = mas.value;
+  const option = (m) => { const o = el("option", null, m.he); o.value = m.name; return o; };
+  const groups = [];
+  const mine = S.masechtot.filter((m) => (S.settings.mine || []).includes(m.name));
+  if (mine.length) { const g = el("optgroup"); g.label = "שלי"; g.append(...mine.map(option)); groups.push(g); }
+  for (const seder of [...new Set(S.masechtot.map((m) => m.seder))]) {
+    const g = el("optgroup"); g.label = "סדר " + seder;
+    g.append(...S.masechtot.filter((m) => m.seder === seder).map(option));
+    groups.push(g);
+  }
+  mas.replaceChildren(...groups);
+  if (keep) mas.value = keep;
+}
+
+// Today's daf, from Sefaria's calendar.
+async function today() {
+  if (S.today && S.today.date === new Date().toISOString().slice(0, 10)) return S.today;
+  try {
+    const r = await fetch("/api/today");
+    if (r.ok) S.today = await r.json();
+  } catch (e) {}
+  if (S.today) $("today-label").textContent = S.today.he;
+  return S.today;
+}
+async function openToday() {
+  const t = await today();
+  if (t && t.amudim && t.amudim.length) return turnTo(t.amudim[0]);
+  const box = $("loading"); box.hidden = false;
+  box.textContent = t ? "הדף היומי היום (" + t.he + ") לא נמצא בספריא." : "לא הצלחתי לברר מה הדף היומי.";
 }
 
 function masechta() { return S.masechtot.find((m) => m.name === $("mas").value) || S.masechtot[0]; }
@@ -140,6 +178,7 @@ function setAmud(a) {
   $("am-b").setAttribute("aria-pressed", String(a === "b"));
   const m = masechta(), last = m && +$("daf").value === m.last && m.last_amud === "a";
   $("am-b").disabled = !!last;
+  $("am-a").disabled = !!(m && +$("daf").value === m.first && m.first_amud === "b");   // Tamid opens on 25b
 }
 const pickedAmud = () => ($("am-b").getAttribute("aria-pressed") === "true" ? "b" : "a");
 
@@ -147,6 +186,7 @@ function pickedRef() {
   const m = masechta(); if (!m) return null;
   let amud = pickedAmud();
   if (+$("daf").value === m.last && m.last_amud === "a") amud = "a";
+  if (+$("daf").value === m.first && m.first_amud === "b") amud = "b";
   return m.name + " " + $("daf").value + amud;
 }
 
@@ -179,6 +219,7 @@ async function turnTo(ref, line) {
     if (!r.ok) return pageError(ref, data.error);
     S.pack = data;
     remember("ref", ref);
+    remember("pos." + data.masechta, ref);
     render();
     selectLine(line || 1, { scroll: "top" });
   } catch (e) {
@@ -1574,6 +1615,59 @@ function sessionReport() {
   return lines.join("\n");
 }
 
+// What you are learning: your tractates (first in the picker), and each one
+// prepared ahead -- every page built in the background -- so it opens at once.
+function learningBox() {
+  const box = el("div", "set learning");
+  box.append(el("div", "lbl", "המסכתות שלי"));
+  box.append(el("div", "help", "בחר מה אתה לומד — הן יופיעו ראשונות, וכל מסכת נפתחת איפה שהפסקת. " +
+    "״להכין מראש״ בונה את כל הדפים ברקע (כמה דקות למסכת), ואז כל דף נפתח מיד."));
+  const row = el("div", "opts");
+  const prep = el("div", "prep");
+  const drawPrep = async () => {
+    prep.replaceChildren();
+    for (const name of S.settings.mine) {
+      const m = S.masechtot.find((x) => x.name === name); if (!m) continue;
+      const line = el("div", "prepline");
+      const label = el("span", null, m.he + ": …");
+      line.append(label);
+      prep.append(line);
+      try {
+        const s = await (await fetch("/api/prepare?masechta=" + encodeURIComponent(name))).json();
+        const ready = s.done >= s.total;
+        label.textContent = m.he + ": " + (ready ? "מוכנה ✓" : s.done + " / " + s.total + " דפים" + (s.running ? " — מכין…" : ""));
+        if (!ready && !s.running) {
+          const go = el("button", "btn", "להכין מראש");
+          go.onclick = async () => {
+            await fetch("/api/prepare", { method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ masechta: name }) });
+            drawPrep();
+          };
+          line.append(go);
+        }
+        if (s.running) setTimeout(() => { if (S.panel === "settings") drawPrep(); }, 4000);
+      } catch (e) { label.textContent = m.he; }
+    }
+  };
+  for (const m of S.masechtot) {
+    const b = el("button", "btn", m.he);
+    b.dataset.masechta = m.name;
+    b.setAttribute("aria-pressed", String(S.settings.mine.includes(m.name)));
+    b.onclick = () => {
+      const on = !S.settings.mine.includes(m.name);
+      S.settings.mine = on ? [...S.settings.mine, m.name] : S.settings.mine.filter((x) => x !== m.name);
+      saveSettings();
+      b.setAttribute("aria-pressed", String(on));
+      fillMasechtot();
+      drawPrep();
+    };
+    row.append(b);
+  }
+  box.append(row, prep);
+  drawPrep();
+  return box;
+}
+
 // Who sits at the table: tap a name once to always want him (★), again to
 // leave him out (⊘), again for neither. Rashi and Tosafot are the page itself.
 function seatsBox() {
@@ -1640,6 +1734,9 @@ function openSettings() {
   openPanel((panel) => {
     panel.append(el("h2", null, "הגדרות"), el("div", "sub", "נשמר בדפדפן הזה"));
     panel.append(
+      choice("open", "בפתיחה", [["last", "איפה שהפסקתי"], ["today", "הדף היומי"]],
+        "📅 למעלה תמיד מביא לדף היומי. הוא נבנה מראש כל בוקר (וגם של מחר) כל עוד האפליקציה פתוחה."),
+      learningBox(),
       choice("depth", "עומק", [["daf", "הדף — רש״י ותוספות"], ["rishonim", "+ ראשונים"], ["acharonim", "+ אחרונים"]],
         "מה החברותא מביא בעצמו. אם תשאל על מפרש מסוים, הוא יביא אותו בכל מקרה."),
       choice("voices", "כמה קולות בתשובה", [[1, "אחד"], [2, "שניים"], [3, "שלושה"], [5, "רחב"]],
@@ -1668,7 +1765,7 @@ function openSettings() {
     keys.innerHTML = "<kbd>רווח</kbd> מיקרופון · <kbd>←</kbd> <kbd>→</kbd> עמוד הבא / הקודם · " +
       "<kbd>↑</kbd> <kbd>↓</kbd> שורה · <kbd>Esc</kbd> סגור";
     k.append(keys); panel.append(k);
-  });
+  }, "settings");
 }
 
 $("open-sources").onclick = () => openSources(S.line);
@@ -1708,5 +1805,7 @@ document.addEventListener("touchend", (e) => {
   setInterval(checkHealth, 60000);
   const last = recall("ref");
   const valid = last && parseRef(last) && S.masechtot.some((m) => m.name === parseRef(last).masechta);
+  today();                // the 📅 button shows today's daf by name
+  if (S.settings.open === "today" && (await today())) return openToday();
   turnTo(valid ? last : pickedRef());
 })();

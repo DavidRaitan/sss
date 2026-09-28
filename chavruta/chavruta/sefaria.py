@@ -296,7 +296,11 @@ def amudim(masechta):
         return []
     out = []
     for n in range(m["first"], m["last"] + 1):
-        out.append("%s %da" % (masechta, n))
-        if n < m["last"] or m.get("last_amud", "b") == "b":
-            out.append("%s %db" % (masechta, n))
+        for amud in "ab":
+            if n == m["first"] and amud == "a" and m.get("first_amud") == "b":
+                continue
+            if n == m["last"] and amud == "b" and m.get("last_amud", "b") == "a":
+                continue
+            if "%d%s" % (n, amud) not in m.get("missing", ()):
+                out.append("%s %d%s" % (masechta, n, amud))
     return out

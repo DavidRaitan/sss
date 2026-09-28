@@ -50,8 +50,10 @@ study partner. Reply with JSON only:
  "claim": true if they are asserting what the text means (not asking),
  "names": commentators they mentioned by name, in English spelling
           (e.g. "Rashi", "Tosafot", "Rashba", "Rambam", "Meiri"), else [],
- "navigate": {"daf": number, "amud": "a" or "b"} if they asked to go to a
-             page, else null,
+ "navigate": {"daf": number, "amud": "a" or "b", "masechta": the tractate
+             if they named one, spelled exactly as in this list: %s -- else null}
+             if they asked to go to a page; {"daf_yomi": true} if they asked
+             for today's daf ("the daf yomi", "הדף היומי"); else null,
  "language": "he" if they spoke mostly Hebrew, "en" if mostly English,
  "reply": only when kind is "ping": the few words a study partner across the
           table would say back to exactly this, in their language. "Yes, I
@@ -66,7 +68,8 @@ The kinds:
 
 Hebrew numerals for pages: ב=2, י=10, יא=11, טו=15, כ=20, ל=30, מ=40, נ=50, ס=60.
 "עמוד א" is a, "עמוד ב" is b. If no amud is said, use a.""" % (
-    KINDS, "\n".join("- %s: %s" % (k, v) for k, v in list(who.ROUTES.items()) + list(LIGHT.items())))
+    KINDS, ", ".join("%s (%s)" % (m["name"], m["he"]) for m in who.MASECHTOT),
+    "\n".join("- %s: %s" % (k, v) for k, v in list(who.ROUTES.items()) + list(LIGHT.items())))
 
 
 def classify(llm, said):
@@ -78,10 +81,14 @@ def classify(llm, said):
                 "reply": None}
     kind = out.get("kind")
     nav = out.get("navigate")
-    if not (isinstance(nav, dict) and str(nav.get("daf", "")).isdigit()):
+    names = {m["name"] for m in who.MASECHTOT}
+    if isinstance(nav, dict) and nav.get("daf_yomi"):
+        nav = {"daf_yomi": True}
+    elif not (isinstance(nav, dict) and str(nav.get("daf", "")).isdigit()):
         nav = None
     else:
-        nav = {"daf": int(nav["daf"]), "amud": "b" if str(nav.get("amud")).lower() == "b" else "a"}
+        nav = {"daf": int(nav["daf"]), "amud": "b" if str(nav.get("amud")).lower() == "b" else "a",
+               "masechta": nav.get("masechta") if nav.get("masechta") in names else None}
     return {
         "kind": kind if kind in KINDS else "other",
         "claim": bool(out.get("claim")),

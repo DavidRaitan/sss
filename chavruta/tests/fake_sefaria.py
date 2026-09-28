@@ -123,6 +123,12 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(texts(_ref(url.path, "/api/v3/texts/"), q.get("version", [])))
         if url.path.startswith("/api/links/"):
             return self.reply(links(_ref(url.path, "/api/links/")))
+        if url.path == "/api/calendars":
+            # Same shape as Sefaria's; today's daf pinned to a recorded page.
+            return self.reply({"date": "2026-09-28", "timezone": q.get("timezone", ["UTC"])[0], "calendar_items": [
+                {"title": {"en": "Parashat Hashavua", "he": "פרשת השבוע"}, "ref": "Deuteronomy 32:1-52"},
+                {"title": {"en": "Daf Yomi", "he": "דף יומי"}, "ref": "Berakhot 2",
+                 "displayValue": {"en": "Berakhot 2", "he": "ברכות ב׳"}}]})
         if url.path == "/zmanim":
             # Stands in for hebcal.com's zmanim, same shape.
             day = q.get("date", ["2026-09-28"])[0]

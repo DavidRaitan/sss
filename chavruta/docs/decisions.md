@@ -427,3 +427,14 @@ marked verified or not. What came of them:
   LeTzion, Encyclopedia Talmudit and the rest of the modern shelf. Text
   elsewhere but untested from here: Hebrew Wikisource (Sha'ar HaTziyun,
   Birkei Yosef, the Mordechai on Berakhot, Chazon Ish).
+
+**49. All of Shas, Daf Yomi, and the tractates you learn.** Every tractate
+Sefaria has (37; its shape API gives each first and last amud, Tamid from
+25b, Nazir without 33b). A page is still built the first time it is opened
+(two Sefaria requests, then kept on disk) with its neighbours built behind it;
+"prepare" builds a whole tractate in the background, gently, then its index.
+📅 is today's daf from Sefaria's calendar (asked in Israel time); today's and
+tomorrow's are built each morning while the app runs. Settings: open on
+today's daf or where you stopped; "my tractates" first in the menu, each
+remembering its place. By voice: "go to Shabbat 30", "the daf yomi". The
+routing judgement was tuned on Berakhot; elsewhere it is a first draft.
