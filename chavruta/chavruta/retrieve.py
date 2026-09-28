@@ -132,15 +132,45 @@ ALIASES = {
     "taz": "Turei Zahav", "טז": "Turei Zahav", "beityosef": "Beit Yosef", "ביתיוסף": "Beit Yosef",
     "bach": "Bach", "arukhhashulchan": "Arukh HaShulchan", "kafhachayim": "Kaf HaChayim",
     "shiltei hagiborim": "Shiltei HaGiborim", "shilteihagiborim": "Shiltei HaGiborim",
+    "kesefmishneh": "Kessef Mishneh", "kessefmishneh": "Kessef Mishneh", "כסףמשנה": "Kessef Mishneh",
+    "raavad": "Hasagot HaRaavad", "haraavad": "Hasagot HaRaavad", "ראבד": "Hasagot HaRaavad",
+    "השגותהראבד": "Hasagot HaRaavad", "lechemmishneh": "Lechem Mishneh", "לחםמשנה": "Lechem Mishneh",
+    "mishnehlamelech": "Mishneh LaMelech", "משנהלמלך": "Mishneh LaMelech",
+    "darkheimoshe": "Darkhei Moshe", "darkeimoshe": "Darkhei Moshe", "דרכימשה": "Darkhei Moshe",
+    "prisha": "Prisha", "פרישה": "Prisha", "machatzithashekel": "Machatzit HaShekel",
+    "מחציתהשקל": "Machatzit HaShekel", "perimegadim": "Peri Megadim", "primegadim": "Peri Megadim",
+    "pri megadim": "Peri Megadim", "פרימגדים": "Peri Megadim", "shaareiteshuvah": "Sha'arei Teshuvah",
+    "שערית שובה": "Sha'arei Teshuvah", "שעריתשובה": "Sha'arei Teshuvah",
+    "eliyahrabbah": "Eliyah Rabbah", "אליהרבה": "Eliyah Rabbah",
+    "beurhagra": "Beur HaGra", "biurhagra": "Beur HaGra", "gra": "Beur HaGra", "הגרא": "Beur HaGra",
+    "beerheitev": "Ba'er Hetev", "baerhetev": "Ba'er Hetev", "בארהיטב": "Ba'er Hetev",
+    "magenavraham": "Magen Avraham", "מגןאברהם": "Magen Avraham", "kafhachaim": "Kaf HaChayim",
+    "כףהחיים": "Kaf HaChayim", "aruchhashulchan": "Arukh HaShulchan", "ערוךהשולחן": "Arukh HaShulchan",
+    "biurhalacha": "Biur Halacha", "beurhalacha": "Biur Halacha", "ביאורהלכה": "Biur Halacha",
+    "maharshal": "Maharshal", "מהרשל": "Maharshal", "chokhmatshlomo": "Maharshal",
+    "maharam": "Maharam", "maharamlublin": "Maharam", "מהרם": "Maharam",
+    "yaavetz": "Ya'avetz", "yavetz": "Ya'avetz", "יעבץ": "Ya'avetz",
+    "tzlach": "Tzelach", "tzelach": "Tzelach", "raah": "Ra'ah", "ראה": "Ra'ah",
+    "baalhamaor": "Ba'al HaMaor", "hamaor": "Ba'al HaMaor", "בעלהמאור": "Ba'al HaMaor",
+    "benyehoyada": "Ben Yehoyada", "בןיהוידע": "Ben Yehoyada", "petacheinayim": "Petach Einayim",
+    "פני יהושע": "Penei Yehoshua", "פנייהושע": "Penei Yehoshua",
 }
 
 # The codes, and where each hangs: the Rema is inside the Shulchan Arukh's
 # text; the later poskim are comments on its seif, or on the Tur's siman.
+#
+# Names as Sefaria's links call them (checked against its links on Shulchan
+# Arukh OC 235:1 and 58:1, Tur OC 235:1 and Mishneh Torah, Reading the Shema
+# 1:9 -- see docs/research/halacha.md).
 CODES = ("Rambam", "Tur", "Shulchan Arukh")
 ON_THE_SEIF = ("Mishnah Berurah", "Magen Avraham", "Turei Zahav", "Kaf HaChayim",
-               "Beur HaGra", "Biur Halacha", "Ba'er Hetev")
-ON_THE_TUR = ("Beit Yosef", "Bach", "Prisha")
+               "Beur HaGra", "Biur Halacha", "Ba'er Hetev", "Machatzit HaShekel", "Peri Megadim",
+               "Sha'arei Teshuvah", "Eliyah Rabbah")
+ON_THE_TUR = ("Beit Yosef", "Bach", "Darkhei Moshe", "Prisha")
 ON_THE_RIF = ("Rabbeinu Yonah", "Shiltei HaGiborim", "Ra'ah")
+ON_THE_RAMBAM = ("Kessef Mishneh", "Hasagot HaRaavad", "Lechem Mishneh", "Mishneh LaMelech")
+# Not linked to the seif on Sefaria, but numbered by the Shulchan Arukh's simanim.
+BY_SIMAN = {"Arukh HaShulchan": "Arukh HaShulchan, Orach Chaim %s"}
 
 
 def _key(name):
@@ -345,7 +375,8 @@ def plan(pack, n, route):
     # question; one they left out comes only when named.
     prefer = [x for x in route.get("prefer") or () if x not in named]
     mute = {x for x in route.get("mute") or () if x not in named}
-    wants_codes = kind == "halacha" or any(x in CODES + ("Rema",) + ON_THE_SEIF + ON_THE_TUR for x in named)
+    wants_codes = kind == "halacha" or any(
+        x in CODES + ("Rema",) + ON_THE_SEIF + ON_THE_TUR + ON_THE_RAMBAM + tuple(BY_SIMAN) for x in named)
     if wants_codes:
         for book in CODES:
             if book in mute:
@@ -366,6 +397,22 @@ def plan(pack, n, route):
         for book in on_tur:
             if tur:
                 add(("follow", tur, book), book)
+        # The Rambam's own commentators hang off his halacha.
+        rambam = codes.get("Rambam") if "Rambam" not in mute else None
+        on_rambam = [x for x in named if x in ON_THE_RAMBAM]
+        if kind == "halacha":
+            on_rambam += [p for p in prefer if p in ON_THE_RAMBAM and p not in on_rambam]
+        for book in on_rambam:
+            if rambam:
+                add(("follow", rambam, book), book)
+        # Numbered by siman though Sefaria does not link them to it.
+        wanted = [x for x in named if x in BY_SIMAN] + \
+            ([p for p in prefer if p in BY_SIMAN] if kind == "halacha" else [])
+        seif = (found.get("Shulchan Arukh") or [None])[0]
+        siman = re.search(r"(\d+)(?::\d+)?$", seif or "")
+        for book in dict.fromkeys(wanted):
+            if siman and seif.startswith("Shulchan Arukh, Orach Chayim"):
+                add(("text", BY_SIMAN[book] % siman.group(1)), book)
 
     # A Rishon who is not on this page but hangs off the Rif. On Berakhot the
     # Rif is read with Talmidei Rabbeinu Yonah as a matter of course, so a

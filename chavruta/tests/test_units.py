@@ -693,6 +693,23 @@ class Table(unittest.TestCase):
         self.assertIn(("follow", "Shulchan Arukh, Orach Chayim 235:1", "Magen Avraham"), jobs)
         self.assertFalse(any(j[0] == "text" and j[1].startswith("Mishneh Torah") for j in jobs))
 
+    def test_the_whole_halachic_shelf_is_reachable(self):
+        jobs = [j for j, _ in retrieve.plan(self.pack, 1, self.route(
+            "halacha", {"Kessef Mishneh": 1, "Darkhei Moshe": 1, "Peri Megadim": 1, "Arukh HaShulchan": 1}))]
+        self.assertIn(("follow", "Mishneh Torah, Reading the Shema 1:9", "Kessef Mishneh"), jobs)
+        self.assertIn(("follow", "Tur, Orach Chayim 235", "Darkhei Moshe"), jobs)
+        self.assertIn(("follow", "Shulchan Arukh, Orach Chayim 235:1", "Peri Megadim"), jobs)
+        self.assertIn(("text", "Arukh HaShulchan, Orach Chaim 235"), jobs)
+        # Named, not seated: "what does the Raavad say?" reaches him too.
+        jobs = [j for j, _ in retrieve.plan(self.pack, 1, self.route("meaning", names=["Raavad"]))]
+        self.assertIn(("follow", "Mishneh Torah, Reading the Shema 1:9", "Hasagot HaRaavad"), jobs)
+
+    def test_sefarias_other_names_are_matched(self):
+        from chavruta import commentators as who
+        self.assertEqual(who.filed("Maharshal", {"Chokhmat Shlomo"}), ["Chokhmat Shlomo"])
+        self.assertEqual(who.filed("Tzelach", {"Tziyyun LeNefesh Chayyah"}), ["Tziyyun LeNefesh Chayyah"])
+        self.assertIn("the Ritva", who.note_for("Berakhot"))
+
     def test_the_partner_is_told(self):
         seen = []
 

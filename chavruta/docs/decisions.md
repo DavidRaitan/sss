@@ -407,3 +407,23 @@ Avraham is followed from the seif beside the Mishnah Berurah); ⊘ ones are not
 fetched. "How many voices" caps what a turn opens unasked (1, 2, 3, broad; a
 halacha chain gets two more). The partner is told the table too. Rashi and
 Tosafot are the page and always there.
+
+**48. The shelf, mapped against what actually exists** (`docs/research/`).
+Three research passes (halacha, gemara, people and infrastructure), each fact
+marked verified or not. What came of them:
+- Halacha past the Mishnah Berurah, all public domain on Sefaria: from the
+  seif, Magen Avraham, Taz, Machatzit HaShekel, Pri Megadim, Be'er Heitev,
+  Sha'arei Teshuvah, Eliyah Rabbah, the Gra, Kaf HaChayim; from the Tur,
+  Beit Yosef, Bach, Darkhei Moshe, Prisha; from the Rambam, Kesef Mishneh,
+  the Raavad, Lechem Mishneh, Mishneh LaMelech; the Aruch HaShulchan, which
+  Sefaria does not link, by siman number. Reached when named or seated (★).
+- Sefaria's own names: the Maharshal is "Chokhmat Shlomo", the Tzlach
+  "Tziyyun LeNefesh Chayyah", the Ramban "Chiddushei Ramban", and so on.
+  "Shita Mekubetzet on Berakhot" is, by Sefaria's own description, the Ritva.
+- Namesakes: Sefaria ties passages to people (Berakhot 2a:4-5 -> Rabban
+  Gamliel of Yavneh); the lookup uses that. Empty stub topics are skipped;
+  dates are trusted over prose.
+- Link only (copyrighted): Yalkut Yosef, Piskei Teshuvot, Yabia Omer, Or
+  LeTzion, Encyclopedia Talmudit and the rest of the modern shelf. Text
+  elsewhere but untested from here: Hebrew Wikisource (Sha'ar HaTziyun,
+  Birkei Yosef, the Mordechai on Berakhot, Chazon Ish).

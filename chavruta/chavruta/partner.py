@@ -366,11 +366,18 @@ SPOKEN = {
     "en": {"Rambam": "the Rambam", "Tur": "the Tur", "Shulchan Arukh": "the Shulchan Aruch",
            "Mishnah Berurah": "the Mishnah Berurah", "Rabbeinu Yonah": "Rabbeinu Yonah",
            "Beit Yosef": "the Beit Yosef", "Magen Avraham": "the Magen Avraham",
-           "Turei Zahav": "the Taz", "Bach": "the Bach", "Zmanim": "tonight's times"},
+           "Turei Zahav": "the Taz", "Bach": "the Bach", "Zmanim": "tonight's times",
+           "Kessef Mishneh": "the Kesef Mishneh", "Hasagot HaRaavad": "the Raavad", "Beur HaGra": "the Gra",
+           "Arukh HaShulchan": "the Aruch HaShulchan", "Peri Megadim": "the Pri Megadim",
+           "Ba'er Hetev": "the Be'er Heitev", "Darkhei Moshe": "the Darkei Moshe"},
     "he": {"Rambam": "הרמב״ם", "Tur": "הטור", "Shulchan Arukh": "השולחן ערוך",
            "Mishnah Berurah": "המשנה ברורה", "Rabbeinu Yonah": "רבינו יונה",
            "Beit Yosef": "הבית יוסף", "Magen Avraham": "המגן אברהם", "Turei Zahav": "הט״ז",
-           "Bach": "הב״ח", "Zmanim": "הזמנים של הלילה"},
+           "Bach": "הב״ח", "Zmanim": "הזמנים של הלילה", "Kessef Mishneh": "הכסף משנה",
+           "Hasagot HaRaavad": "הראב״ד", "Darkhei Moshe": "הדרכי משה", "Peri Megadim": "הפרי מגדים",
+           "Ba'er Hetev": "הבאר היטב", "Beur HaGra": "הגר״א", "Arukh HaShulchan": "הערוך השולחן",
+           "Kaf HaChayim": "הכף החיים", "Machatzit HaShekel": "המחצית השקל", "Eliyah Rabbah": "האליה רבה",
+           "Sha'arei Teshuvah": "השערי תשובה", "Lechem Mishneh": "הלחם משנה", "Mishneh LaMelech": "המשנה למלך"},
 }
 
 

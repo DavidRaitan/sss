@@ -196,12 +196,35 @@ WHO = {
         he='פתח עינים', era="acharon", died=1806, tier="wide", weight=30,
         answers=["aggadah", "conflict"],
         specialty="The Chida's notes: sources and parallels, strong on aggadah."),
+    "Chokhmat Shlomo": dict(
+        he='מהרש"ל', era="acharon", died=1574, tier="wide", weight=30,
+        answers=["meaning", "on_commentary"],
+        specialty="The Maharshal's emendations: fixes the printed text of the gemara, "
+                  "Rashi and Tosafot. The address when a line will not read."),
+    "Haggahot Ya'avetz": dict(
+        he='יעב"ץ', era="acharon", died=1776, tier="wide", weight=25,
+        answers=["meaning", "aggadah"],
+        specialty="R' Yaakov Emden's short glosses: emendations and sharp remarks, "
+                  "including on the aggadah."),
+    "Maharam": dict(
+        he='מהר"ם', era="acharon", died=1616, tier="wide", weight=30,
+        answers=["on_commentary"],
+        specialty="The Maharam Lublin: a straightforward explainer of Rashi and Tosafot."),
+    "Benayahu": dict(
+        he='בניהו', era="acharon", died=1909, tier="wide", weight=25,
+        answers=["aggadah"],
+        specialty="The Ben Ish Chai's shorter companion to the Ben Yehoyada."),
 }
 
 # Where Sefaria files someone under a different name than people use: the
 # Maharsha on Berakhot is "Chidushei Halachot" and "Chidushei Agadot". Asked
 # for "the Maharsha", nothing on the page was ever found.
-FILED_AS = {"Maharsha": ["Chidushei Halachot", "Chidushei Agadot"]}
+FILED_AS = {"Maharsha": ["Chidushei Halachot", "Chidushei Agadot"],
+            # From Sefaria's index (docs/research/gemara.md, section 7).
+            "Maharshal": ["Chokhmat Shlomo"], "Ya'avetz": ["Haggahot Ya'avetz"],
+            "Ramban": ["Chiddushei Ramban"], "Ra'ah": ["Chiddushei HaRa'ah"],
+            "Tzelach": ["Tziyyun LeNefesh Chayyah"], "Shita Mekubetzet": ["Shita Mekubbetzet"],
+            "Maharam": ["Maharam"], "Ba'al HaMaor": ["HaMaor"]}
 
 # What kind of work answers what kind of question -- the shelf sorted by what
 # each work does, not by how famous its author is. Genre predicts function:
@@ -209,11 +232,11 @@ FILED_AS = {"Maharsha": ["Chidushei Halachot", "Chidushei Agadot"]}
 # you missed; analytic novellae, why the argument works; a digest, what
 # survived as law; a summary, the whole page at once.
 ASK = {
-    "on_commentary": ["Maharsha", "Tosafot HaRosh", "Rashash", "Penei Yehoshua",
+    "on_commentary": ["Maharsha", "Tosafot HaRosh", "Maharam", "Rashash", "Penei Yehoshua",
                       "Chiddushei Rabbi Akiva Eiger"],
-    "on_tosafot": ["Maharsha", "Tosafot HaRosh", "Gilyon HaShas", "Penei Yehoshua",
+    "on_tosafot": ["Maharsha", "Tosafot HaRosh", "Maharam", "Gilyon HaShas", "Penei Yehoshua",
                    "Chiddushei Rabbi Akiva Eiger"],
-    "on_rashi": ["Maharsha", "Rashash", "Penei Yehoshua"],
+    "on_rashi": ["Maharsha", "Maharam", "Rashash", "Penei Yehoshua"],
     "conflict": ["Gilyon HaShas", "Chiddushei Rabbi Akiva Eiger", "Penei Yehoshua", "Petach Einayim"],
     "logic": ["Rashba", "Ritva", "Ramban", "Ran", "Ra'ah"],
     "aggadah": ["Maharsha", "Ben Yehoyada", "Petach Einayim"],
@@ -224,6 +247,10 @@ ASK = {
 
 # Masechtot where the printed page is not what you would assume.
 PAGE_EXCEPTIONS = {
+    "Berakhot": "What Sefaria calls 'Shita Mekubetzet on Berakhot' is, by Sefaria's own "
+                "description, the Ritva's commentary -- say 'the Ritva (printed as the Shita "
+                "Mekubetzet)', not 'the Shita Mekubetzet collects'. The Rif is read with "
+                "Talmidei Rabbeinu Yonah; Rabbeinu Chananel is not printed on Berakhot.",
     "Nedarim": "The printed 'Rashi' is not Rashi's, and the standard commentary is "
                "the Ran. Treat the Ran as backbone here.",
     "Nazir": "The printed 'Rashi' is not Rashi's. Lean on Tosafot and the Rosh.",
@@ -286,11 +313,15 @@ TABLE = [
                  ("Shita Mekubetzet", "שיטה מקובצת")]),
     ("אחרונים", [("Maharsha", 'מהרש"א'), ("Penei Yehoshua", "פני יהושע"),
                  ("Chiddushei Rabbi Akiva Eiger", "רבי עקיבא איגר"), ("Gilyon HaShas", 'גליון הש"ס'),
-                 ("Tzelach", 'צל"ח'), ("Rashash", 'רש"ש'), ("Petach Einayim", "פתח עינים"),
+                 ("Tzelach", 'צל"ח'), ("Rashash", 'רש"ש'), ("Maharshal", 'מהרש"ל'),
+                 ("Maharam", 'מהר"ם'), ("Ya'avetz", 'יעב"ץ'), ("Petach Einayim", "פתח עינים"),
                  ("Ben Yehoyada", "בן יהוידע")]),
-    ("פוסקים", [("Rambam", 'רמב"ם'), ("Tur", "טור"), ("Beit Yosef", "בית יוסף"), ("Bach", 'ב"ח'),
+    ("פוסקים", [("Rambam", 'רמב"ם'), ("Kessef Mishneh", "כסף משנה"), ("Hasagot HaRaavad", 'השגות הראב"ד'),
+                ("Tur", "טור"), ("Beit Yosef", "בית יוסף"), ("Bach", 'ב"ח'), ("Darkhei Moshe", "דרכי משה"),
                 ("Shulchan Arukh", "שולחן ערוך"), ("Magen Avraham", "מגן אברהם"),
-                ("Turei Zahav", 'ט"ז'), ("Mishnah Berurah", "משנה ברורה"), ("Kaf HaChayim", "כף החיים")]),
+                ("Turei Zahav", 'ט"ז'), ("Peri Megadim", "פרי מגדים"), ("Ba'er Hetev", "באר היטב"),
+                ("Beur HaGra", 'ביאור הגר"א'), ("Mishnah Berurah", "משנה ברורה"),
+                ("Arukh HaShulchan", "ערוך השולחן"), ("Kaf HaChayim", "כף החיים")]),
 ]
 
 
