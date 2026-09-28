@@ -15,6 +15,7 @@ import re
 import threading
 
 from . import sefaria
+from .commentators import MASECHTOT
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SESSIONS_DIR = os.environ.get("CHAVRUTA_SESSIONS") or os.path.join(ROOT, "sessions")
@@ -133,3 +134,112 @@ def recap(ref):
 
 QUIZ_OPENING = {"en": "That's the end of the amud. Want a few quick questions on it before you go on?",
                 "he": "סיימנו את העמוד. רוצה כמה שאלות חזרה לפני שממשיכים?"}
+
+
+# -- "did we learn this?" and "where did I see this?" ----------------------------
+
+ON_DISK = None       # set by the server: ref -> Pack if built, else None (never fetches)
+MISHNA = re.compile(r"\bmishn?ah?\b|המשנה|משנה", re.I)
+STOP = {"את", "של", "על", "עם", "זה", "זו", "הוא", "היא", "מה", "למה", "איפה", "אנחנו", "למדנו", "ראיתי",
+        "ראינו", "אתמול", "כבר", "פעם", "הזה", "הזאת", "כאן", "שם", "אולי", "אני", "חושב", "זוכר"}
+BAVLI = re.compile(r"^(%s) (\d+)([ab]):" % "|".join(re.escape(m["name"]) for m in MASECHTOT))
+
+
+def terms(said):
+    """What to look for: a quoted phrase, else the Hebrew words of what they said."""
+    quoted = re.findall(r"[«\"״“]([^»\"״”]{3,40})[»\"״”]", said)
+    if quoted:
+        return quoted[:2]
+    words = [w for w in re.findall(r"[א-ת\"׳״']{3,}", said) if w not in STOP]
+    return words[:4]
+
+
+def _distance(ref, here):
+    """Nearer pages first: this amud, its neighbours, this masechta, then elsewhere."""
+    m, h = BAVLI.match(ref + ":"), BAVLI.match(here + ":")
+    if not (m and h):
+        return 10 ** 6
+    if m.group(1) != h.group(1):
+        return 10 ** 5
+    return abs((int(m.group(2)) * 2 + (m.group(3) == "b")) - (int(h.group(2)) * 2 + (h.group(3) == "b")))
+
+
+def studied_on(learned):
+    """{amud: the dates it was learned}."""
+    out = {}
+    for sitting in learned:
+        for ref in sitting["refs"]:
+            out.setdefault(ref, []).append(sitting["date"])
+    return out
+
+
+def find_words(words, here, learned, limit=6):
+    """Lines holding these words, in the pages they learned and the pages
+    already on disk around here -- nearest first. [(line ref, text, dates)]."""
+    if not words or ON_DISK is None:
+        return []
+    dates = studied_on(learned)
+    masechta = here.rsplit(" ", 1)[0]
+    pool = list(dates) + sefaria.amudim(masechta)
+    pool = sorted(dict.fromkeys(pool), key=lambda r: (r not in dates, _distance(r, here)))[:80]
+    hits = []
+    for ref in pool:
+        pack = ON_DISK(ref)
+        if pack is None:
+            continue
+        for seg in pack.segments:
+            if any(w.replace('"', "").replace("״", "") in seg["he_plain"] for w in words):
+                hits.append((seg["ref"], seg["he_plain"][:160], dates.get(ref, [])))
+                break
+        if len(hits) >= limit:
+            break
+    return hits
+
+
+def parallels(pack, n, learned, limit=4):
+    """Where the page itself points for this passage elsewhere in the Bavli
+    (Mesoret HaShas): nearest first, marked when they learned it."""
+    sec = next((s for s in pack.data.get("sections") or [] if s["from"] <= n <= s["to"]), None)
+    lines = range(sec["from"], sec["to"] + 1) if sec else [n]
+    dates = studied_on(learned)
+    refs = []
+    for i in lines:
+        for ref in pack.segment(i).get("xrefs", []):
+            if BAVLI.match(ref) and not ref.startswith(pack.ref + ":") and ref not in refs:
+                refs.append(ref)
+    refs.sort(key=lambda r: _distance(r.split(":")[0], pack.ref))
+    return [(r, dates.get(r.split(":")[0], [])) for r in refs[:limit]]
+
+
+def find_mishna(ref, n, load, reach=24):
+    """The mishna this part of the gemara is on: on this page above the line,
+    or walking back page by page. A citable entry, or None."""
+    masechta = ref.rsplit(" ", 1)[0]
+    pages = sefaria.amudim(masechta)
+    if ref not in pages:
+        return None
+    at = pages.index(ref)
+    for i in range(at, max(-1, at - reach), -1):
+        pack = load(pages[i])
+        if pack is None:
+            return None
+        mishnas = [s for s in pack.data.get("sections") or []
+                   if s["kind"] == "mishna" and (i < at or s["from"] <= n)]
+        if mishnas:
+            sec = mishnas[-1]
+            lines = [pack.segment(k) for k in range(sec["from"], sec["to"] + 1)]
+            english = " ".join(s["text"] for seg in lines for s in seg.get("en", []) if s.get("text"))
+            body = "\n".join(seg["he"] for seg in lines) + ("\n\n(Steinsaltz) " + english if english else "")
+            first, last = lines[0]["ref"], lines[-1]["ref"]
+            return {"ref": first if first == last else "%s-%s" % (first, last.rsplit(":", 1)[1]),
+                    "he": body[:6000], "dibur": None, "fetched": True, "amud": pages[i]}
+    return None
+
+
+def recap_quietly(ref):
+    """After a page is learned: its recap, made in the background, so "did we
+    learn this?" can be answered from every page they studied."""
+    try:
+        recap(ref)
+    except Exception:
+        pass

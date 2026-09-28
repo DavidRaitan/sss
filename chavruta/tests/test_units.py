@@ -778,6 +778,42 @@ class Review(unittest.TestCase):
         self.assertIn("[[Berakhot 2a]]", text)
         self.assertEqual(trace["fetched"], ["Berakhot 2a"])
 
+    def on_disk(self):
+        self.review.ON_DISK = lambda ref: Pack(sefaria.build(ref)) if ref in ("Berakhot 2a", "Berakhot 2b") else None
+
+    def test_did_we_learn_this_word(self):
+        self.on_disk()
+        learned = [{"date": "2026-09-27", "refs": ["Berakhot 2a"]}]
+        hits = self.review.find_words(self.review.terms("did we already see «הקטר חלבים»?"), "Berakhot 2b", learned)
+        self.assertEqual(hits[0][0], "Berakhot 2a:5")
+        self.assertEqual(hits[0][2], ["2026-09-27"])
+        self.assertEqual(self.review.find_words(["מילהשלאקיימת"], "Berakhot 2b", learned), [])
+
+    def test_where_the_page_itself_points(self):
+        found = self.review.parallels(Pack(PACK), 5, [{"date": "2026-09-20", "refs": ["Berakhot 9a"]}])
+        self.assertIn(("Berakhot 9a:10", ["2026-09-20"]), found)
+        self.assertTrue(all(not r.startswith(("Leviticus", "Mishnah")) for r, _ in found))   # the Bavli only
+
+    def test_the_mishna_pages_back(self):
+        mishna = self.review.find_mishna("Berakhot 2b", 5, lambda ref: Pack(sefaria.build(ref)))
+        self.assertEqual(mishna["ref"], "Berakhot 2a:1-5")
+        self.assertIn("Rabban Gamliel says", mishna["he"])
+        self.assertEqual(mishna["amud"], "Berakhot 2a")
+
+    def test_did_we_learn_this_is_answered_from_what_was_learned(self):
+        self.on_disk()
+        self.write("2026-09-27", [{"kind": "heard", "ref": "Berakhot 2a"}])
+        p = partner.Partner(Pack(sefaria.build("Berakhot 2b")), LLM())
+        _, verdict, _, trace = p.ask(5, [], "did we learn «הקטר חלבים» yesterday?",
+                                     route={"kind": "recall", "names": []})
+        self.assertIn("Berakhot 2a:5", trace["fetched"])
+        self.assertIn("Berakhot 2a", trace["fetched"])          # its recap
+
+    def test_remind_me_of_the_mishna(self):
+        p = partner.Partner(Pack(sefaria.build("Berakhot 2b")), LLM())
+        _, verdict, _, trace = p.ask(5, [], "remind me what the mishna was", route={"kind": "review", "names": []})
+        self.assertEqual(trace["fetched"][:2], ["Berakhot 2a:1-5", "Berakhot 2a"])
+
     def test_questions_one_at_a_time(self):
         self.assertIn("one question", partner.SIZE["quiz"])
         self.assertIn("quiz", retrieve.KINDS)

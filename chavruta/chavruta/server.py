@@ -190,6 +190,10 @@ def session(sid):
 
 def fresh_page(state, ref):
     if state.get("ref") != ref:
+        # The page they are leaving gets its recap, quietly, so "did we learn
+        # this?" can be answered from every page they studied.
+        if state.get("ref"):
+            threading.Thread(target=review.recap_quietly, args=(state["ref"],), daemon=True).start()
         # The place they named stays; what was fetched for the last page goes.
         memory = {"place": state.get("memory", {}).get("place")}
         state.update(history=[], ref=ref, nudged=set(), recent=[], spoke=None, memory=memory)
@@ -701,6 +705,7 @@ def build_index(masechta):
 
 
 review.LOAD = lambda ref: load_pack(ref)
+review.ON_DISK = lambda ref: Pack.load(pack_path(ref)) if os.path.exists(pack_path(ref)) else None
 
 PREPARER = daily.Preparer(build=load_pack, exists=lambda ref: os.path.exists(pack_path(ref)),
                           finish=build_index)

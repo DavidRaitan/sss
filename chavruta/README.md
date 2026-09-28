@@ -58,6 +58,20 @@ read. Name a Rishon who isn't printed on the page — Rabbeinu Yonah — and it 
 the links to him. "Can you hear me?" gets "Yes, I hear you." — short questions get
 short answers.
 
+**Coming back to it.** Ask "what were the last six pages about?", "what did we do
+yesterday?" or "remind me of the mishna" (even when it is pages back) — each page
+you learn gets a short recap, kept, and it tells you the story from there. "Did we
+learn «הקטר חלבים» yesterday?" or "I think I saw this somewhere" gets a yes or no
+with where and when: it looks through the pages you learned, nearest first, and
+where the page itself points (Mesoret HaShas). "Test me" asks questions one at a
+time; at the end of an amud it offers. Opening the app after a day away, it says
+where you stopped, with ↺ review and ❓ questions one tap away.
+
+**Trusted sites** (⚙): for what Sefaria does not have — Halacha Yomit for Rav
+Ovadia's rulings, Hebrew Wikisource for the Sha'ar HaTziyun, Birkei Yosef, the
+Mordechai. Named ("what does Rav Ovadia say?") or asked ("check online"), it
+reads the page itself, quotes a line, and links to it. Add your own sites.
+
 **Units of learning** are marked where the page opens them — משנה, גמרא, תניא,
 אמר מר — and tapping one lights the whole unit, so "let's finish this piece"
 means something. When three or more opinions are in play, the answer comes as a

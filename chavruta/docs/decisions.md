@@ -453,3 +453,13 @@ routing judgement was tuned on Berakhot; elsewhere it is a first draft.
   back after a day, the page says where you stopped and offers ↺ a review or
   ❓ questions. At the end of an amud it offers a few questions; a quiz is one
   question at a time, each answer judged from the text.
+
+**51. "Did we learn this?", "where did I see it?", and the mishna pages back.**
+Every page left after a sitting gets its recap in the background, so what was
+learned can be answered from all of it. A new question kind, recall, brings:
+what was learned by day; the lines holding the words asked about, in the
+pages learned and those on disk, nearest first; recaps of the pages learned;
+and where the page itself points for this passage elsewhere in the Bavli
+(Mesoret HaShas), nearest first, the top two opened. It answers yes or no
+first, then where and when. "Remind me of the mishna" walks back page by page
+to the mishna the gemara is on, brings its text, and recaps the pages since.

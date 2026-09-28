@@ -34,6 +34,8 @@ LIGHT = {
     "review": "asks to be reminded what was learned before -- the last pages, yesterday, "
               "last time, the mishna or chapter so far -- or for a summary of it",
     "quiz": "asks you to test them or ask them questions on what they learned",
+    "recall": "asks whether they already learned something, or where they saw it -- 'did we learn "
+              "this yesterday?', 'I think I read this somewhere', 'where did this word come up?'",
 }
 KINDS = list(who.ROUTES) + list(LIGHT) + ["reading", "navigate"]
 
@@ -209,7 +211,7 @@ RULING = re.compile(r"^.{0,40}?(פסק|הלכה|הלכתא|נמצא|לענין �
 
 # Small exchanges and page-turns open nothing: a mic check does not need the Meiri.
 # Questions about people open no commentary either; they fetch the people.
-QUIET = ("ping", "reading", "navigate", "people", "review", "quiz")
+QUIET = ("ping", "reading", "navigate", "people", "review", "quiz", "recall")
 
 
 def extras(pack, n, route, depth="daf", budget=7):
@@ -349,8 +351,9 @@ def plan(pack, n, route):
     kind = route.get("kind")
     if kind == "people":
         return people_plan(pack, route)
-    if kind == "review":
-        return [(("recap", ref), "Recap") for ref in route.get("pages") or []]
+    if kind in ("review", "recall"):
+        return [(("recap", ref), "Recap") for ref in route.get("pages") or []] + \
+            [(("text", ref), "Parallels") for ref in route.get("parallels") or []]
     if kind in QUIET or kind == "check_reading":
         return []
     present = set(pack.commentators())

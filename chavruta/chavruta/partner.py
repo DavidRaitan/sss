@@ -3,7 +3,7 @@
 
 import re
 
-from . import align, ground, library, retrieve, review, web
+from . import align, ground, library, retrieve, review, sefaria, web
 from . import commentators as who
 
 BACKBONE_IN_PROMPT = ("Rashi", "Tosafot", "Rabbeinu Chananel", "Rashbam", "Ran")
@@ -94,6 +94,18 @@ time, the mishna so far -- the turn brings a short recap of each amud they
 mean, made from its text. Tell it as the story of the sugya in order, the
 question and where it landed, citing each amud ("on 5a [[Berakhot 5a]] the
 gemara asks ..."), briefly, and offer to go back into one.
+
+Did we learn this? When they ask whether they learned something, or where
+they saw it, the turn says what they learned by day, the lines holding the
+words they mean (nearest first), recaps of their pages, and where the page
+itself points for this passage elsewhere in the Bavli. Answer yes or no first,
+then where and when ("yes -- two days ago, on 4b [[Berakhot 4b:7]]"). Nearby
+pages before far ones. If it is not in what they learned, say so, and if it is
+on a page they have not learned yet, say that.
+
+When they ask for the mishna and it is pages back, the turn brings the mishna
+itself: tell it plainly, then how the gemara has gone since, so they can pick
+up from there.
 
 Testing them. When they ask you to test them, or say yes to your offer of
 questions, ask one question at a time on what they learned -- the argument,
@@ -217,6 +229,7 @@ SIZE = {
     "review": "about 60-120 words: the story of those pages in order -- the question each "
               "takes up and where it lands -- then offer to go into one",
     "quiz": "one question, then stop and wait for their answer",
+    "recall": "a direct yes or no, then where and when, in a sentence or two",
     "other": "as short as the question allows -- but if they are asking you to answer "
              "something, answer it in full",
 }
@@ -394,7 +407,7 @@ SPOKEN = {
            "Kessef Mishneh": "the Kesef Mishneh", "Hasagot HaRaavad": "the Raavad", "Beur HaGra": "the Gra",
            "Arukh HaShulchan": "the Aruch HaShulchan", "Peri Megadim": "the Pri Megadim",
            "Ba'er Hetev": "the Be'er Heitev", "Darkhei Moshe": "the Darkei Moshe",
-           "Wikisource": "Wikisource", "Recap": "those pages"},
+           "Wikisource": "Wikisource", "Recap": "those pages", "Parallels": "the parallel passages"},
     "he": {"Rambam": "הרמב״ם", "Tur": "הטור", "Shulchan Arukh": "השולחן ערוך",
            "Mishnah Berurah": "המשנה ברורה", "Rabbeinu Yonah": "רבינו יונה",
            "Beit Yosef": "הבית יוסף", "Magen Avraham": "המגן אברהם", "Turei Zahav": "הט״ז",
@@ -403,7 +416,7 @@ SPOKEN = {
            "Ba'er Hetev": "הבאר היטב", "Beur HaGra": "הגר״א", "Arukh HaShulchan": "הערוך השולחן",
            "Kaf HaChayim": "הכף החיים", "Machatzit HaShekel": "המחצית השקל", "Eliyah Rabbah": "האליה רבה",
            "Sha'arei Teshuvah": "השערי תשובה", "Lechem Mishneh": "הלחם משנה", "Mishneh LaMelech": "המשנה למלך",
-           "Halacha Yomit": "הלכה יומית", "Wikisource": "ויקיטקסט", "Recap": "הדפים הקודמים"},
+           "Halacha Yomit": "הלכה יומית", "Wikisource": "ויקיטקסט", "Recap": "הדפים הקודמים", "Parallels": "המקבילות"},
 }
 
 
@@ -501,13 +514,44 @@ class Partner:
             if r.strip() in self.ref_names}))
         # "What were the last six pages about?" -- which amudim, from where they
         # are and what they learned when.
-        if kind == "review":
+        # "Did we learn this yesterday? I think I saw it somewhere" -- the pages
+        # they learned, the lines holding the words, and where the page itself
+        # points (Mesoret HaShas), nearest first.
+        local = []
+        if kind in ("review", "recall"):
             import datetime
             learned = review.sittings()
-            route["pages"] = review.which_pages(self.pack.ref, said, learned, datetime.date.today().isoformat())
+            today = datetime.date.today().isoformat()
             if learned:
                 note += " [what they learned, by day: %s]" % "; ".join(
-                    "%s: %s" % (s["date"], ", ".join(s["refs"][:6])) for s in learned[:4])
+                    "%s: %s" % (s["date"], ", ".join(s["refs"][:8])) for s in learned[:6])
+            if kind == "review":
+                route["pages"] = review.which_pages(self.pack.ref, said, learned, today)
+                # "The mishna" when it is pages back: its text, and the pages since.
+                if review.MISHNA.search(said) and review.LOAD:
+                    mishna = review.find_mishna(self.pack.ref, n, review.LOAD)
+                    if mishna:
+                        local.append(("The mishna", mishna))
+                        pages = sefaria.amudim(self.pack.data.get("masechta", ""))
+                        if mishna["amud"] in pages and self.pack.ref in pages:
+                            since = pages[pages.index(mishna["amud"]):pages.index(self.pack.ref)]
+                            route["pages"] = since[-review.MOST:]
+            else:
+                route["pages"] = [r for s in learned for r in s["refs"]][:8]
+                hits = review.find_words(review.terms(said), self.pack.ref, learned)
+                if hits:
+                    note += " [where those words appear, nearest first: %s]" % "; ".join(
+                        "[[%s]]%s" % (ref, " (learned %s)" % ", ".join(d) if d else " (not learned yet)")
+                        for ref, _, d in hits)
+                    local += [("Found", {"ref": ref, "he": text, "dibur": None, "fetched": True})
+                              for ref, text, _ in hits]
+                found_elsewhere = review.parallels(self.pack, n, learned)
+                if found_elsewhere:
+                    note += " [where this passage appears elsewhere in the Bavli (Mesoret HaShas), nearest " \
+                            "first -- the first two are opened below: %s]" % "; ".join("%s%s" % (r, " (learned %s)" % ", ".join(d) if d else "")
+                                                     for r, d in found_elsewhere)
+                    route["parallels"] = [r for r, _ in found_elsewhere[:2]]
+
         chosen = retrieve.extras(self.pack, n, route, self.depth)
         jobs = retrieve.plan(self.pack, n, route)
         fetched, missed, waited = [], [], 0.0
@@ -517,6 +561,7 @@ class Partner:
             fetched, missed_jobs, waited = library.gather([job for job, _ in jobs])
             got = {label for job, label in jobs if job not in missed_jobs}
             missed = sorted({label for job, label in jobs if job in missed_jobs} - got)
+        fetched = local + fetched
         if any(job[0] == "zmanim" for job, _ in jobs):
             import time
             note += " [the time now, on their clock: %s]" % time.strftime("%Y-%m-%d %H:%M")
@@ -697,7 +742,7 @@ LEADING_CITES = re.compile(r"^\s*(\[\[[^\]]+\]\]\s*)+")
 # How hard the model thinks, by question. "What does this mean?" does not need
 # the deliberation a machlokes does, and thinking is time before the first word.
 EFFORT = {"meaning": "minimal", "people": "minimal", "other": "minimal", "check_reading": "minimal",
-          "ping": "minimal", "review": "minimal", "quiz": "minimal"}
+          "ping": "minimal", "review": "minimal", "quiz": "minimal", "recall": "minimal"}
 
 ANSWER_IT = re.compile(r"\b(answer|go on|continue|you didn'?t answer|what was my question|"
                        r"my (last|previous) question|the question i asked)\b|תענה|תמשיך|לא ענית|מה שאלתי", re.I)
