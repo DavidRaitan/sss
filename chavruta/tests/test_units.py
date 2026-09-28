@@ -421,6 +421,38 @@ class FourthSitting(unittest.TestCase):
         self.assertIn("dawn (alot hashachar): 2026-09-29 05:04", entry["he"])
 
 
+class FifthRound(unittest.TestCase):
+    pack = Pack(PACK)
+
+    def test_when_did_he_live_uses_whoever_was_just_cited(self):
+        jobs = [j for j, _ in retrieve.plan(self.pack, 4, {"kind": "people", "names": [],
+                                                          "avoid": ["Meiri", "Rashba"]})]
+        self.assertEqual(jobs, [("person", "Meiri", "Meiri on Berakhot"), ("person", "Rashba", "Rashba on Berakhot")])
+        found, missed, _ = library.gather(jobs)
+        text = " ".join(e["he"] for _, e in found)
+        self.assertIn("lived 1249–1315", text)
+        self.assertIn("lived 1235–1310", text)
+        self.assertIn("student of Ramban", text)
+
+    def test_a_sage_off_the_page_is_found_by_name(self):
+        entry = library.person("Rabban Gamliel")
+        self.assertIn("tanna (sage of the Mishnah era), generation 3", entry["he"])
+        self.assertIn("teachers: Rabban Yochanan ben Zakkai", entry["he"])
+        self.assertIn("students: Rabbi Yehudah ben Ilai", entry["he"])
+
+    def test_answer_it_finds_the_question(self):
+        history = [{"role": "user", "content": "[note]\nHow come it's okay to pray Arvit before nightfall? What is the basis?"},
+                   {"role": "assistant", "content": "..."},
+                   {"role": "user", "content": "[note]\nWhat was my previous question?"},
+                   {"role": "assistant", "content": "You asked why early Arvit is allowed."}]
+        self.assertIn("pray Arvit before nightfall", partner.pending_question(history, "So go ahead and answer."))
+        self.assertIsNone(partner.pending_question(history, "What does chatzot mean?"))
+
+    def test_turns_are_short_by_default(self):
+        self.assertIn("25-45 words", partner.SIZE["meaning"])
+        self.assertIn("It is a conversation: short turns", partner.CONSTITUTION)
+
+
 class Server(unittest.TestCase):
     def test_only_berakhot(self):
         from chavruta import server

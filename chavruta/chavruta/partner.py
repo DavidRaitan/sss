@@ -31,12 +31,16 @@ chain -- the gemara, the Rishonim, the Tur, the Shulchan Arukh and the Rema, the
 Mishnah Berurah, as far as the turn holds -- and where it lands. Never tell
 someone what they should do.
 
-3. Size the answer to the moment. "Can you hear me?" gets "Yes, I hear you."
-"Go ahead" gets "Go ahead." A yes-or-no question gets the answer and one
-sentence. An explanation gets two to four sentences. A summary, a machlokes or a
-halacha chain gets a short spoken paragraph, and a table when there are three or
-more positions. Never pad: no restating where we are, no summaries they did not
-ask for, no "want me to say more?" tacked on the end.
+3. It is a conversation: short turns, then let them come back. "What does
+this mean?" gets the plain meaning in a sentence or two -- not the meaning, the
+Rashi, the Tosafot and the halacha. Say the one thing that answers what was
+asked, and stop; if there is an obvious next layer, you may offer it in a few
+words ("Tosafot pushes on this -- want it?"), not deliver it. A yes-or-no
+question gets the answer and one sentence. Only a summary, a machlokes or a
+halacha chain gets a short paragraph, and a table when there are three or more
+positions. Never pad: no restating where we are or what they asked, no
+summaries they did not ask for. The length for each turn is in its note; keep
+to it.
 
 4. You disagree -- about meaning. This is the most important thing you do.
 When their explanation does not hold, say so plainly and show the words that
@@ -67,6 +71,13 @@ their reading: treat it as the line, and never "correct" it ("not 'sold'").
 Sometimes their turn holds several things said in a row, marked "(a moment
 earlier)" and "(and then)" -- they kept reading and talking while you were
 thinking. Answer them together, briefly, weighted to the last.
+
+When they ask about the people -- when someone lived, who came first, who
+learned from whom -- the app fetches Sefaria's record of them into the turn
+("About ... (Sefaria)"). Answer from it like a friend who knows: the century,
+the place, and how they relate ("the Rashba is a bit older; both were active
+around 1300, he in Barcelona, the Meiri in Provence"). If it is not in the
+record, say that one thing is not there.
 
 When they tell you to answer, go on, or repeat ("so answer", "answer the
 question I asked"), look back at what they asked and answer it in full, now.
@@ -142,16 +153,20 @@ No headers, no bullet lists, no bold, no emoji outside a table. Hebrew and
 Aramaic in Hebrew letters."""
 
 # How long, by what was asked. Told to the model each turn.
+# Word counts, because "a few sentences" came back as a paragraph. A turn in a
+# conversation is short; the learner asks for more if they want it.
 SIZE = {
     "ping": "a few words",
-    "check_reading": "one or two sentences",
-    "meaning": "two to four sentences",
-    "logic": "three to five sentences",
-    "conflict": "three to five sentences",
-    "on_commentary": "three to five sentences",
-    "structure": "a short spoken paragraph, and a table if there are three or more positions",
-    "halacha": "the chain in a short spoken paragraph, a table if three or more positions",
-    "other": "as short as the question allows",
+    "check_reading": "under 25 words",
+    "meaning": "about 25-45 words: the plain meaning, then stop",
+    "logic": "about 40-70 words",
+    "conflict": "about 40-70 words",
+    "on_commentary": "about 40-70 words",
+    "people": "about 30-50 words: when, where, and how they relate to the others asked about",
+    "structure": "up to about 100 words, and a table if there are three or more positions",
+    "halacha": "up to about 100 words for the chain, a table if three or more positions",
+    "other": "as short as the question allows -- but if they are asking you to answer "
+             "something, answer it in full",
 }
 
 LANGUAGE = {
@@ -378,9 +393,14 @@ class Partner:
         kind = route.get("kind")
         lang = self.speaks(route)
         note = listener_note(self.pack, n, heard, recent, spoke)
+        # "So answer it" -- about the question before, which is what they want.
+        pending = pending_question(history, said)
+        if pending:
+            note += (" [they are telling you to answer what they asked earlier: «%s». "
+                     "Answer that now, in full -- do not restate it.]" % pending)
 
         # "Can you hear me?" -- a few words back, no thinking, no sources.
-        if kind == "ping" and route.get("reply") and not (heard or {}).get("slips"):
+        if kind == "ping" and route.get("reply") and not pending and not (heard or {}).get("slips"):
             text = route["reply"]
             history = history + [{"role": "user", "content": note + "\n" + said},
                                  {"role": "assistant", "content": text}]
@@ -414,8 +434,9 @@ class Partner:
             unit = " ".join(self.pack.segment(i)["he_plain"] for i in lines)
             elsewhere = self.index.related(unit, exclude=self.pack.ref) or []
         known = self.known | {hit["ref"] for hit in elsewhere} | {e["ref"] for _, e in fetched}
-        note += " [%s Depth: %s. Length: %s.]" % (
-            LANGUAGE[self.language], retrieve.DEPTHS[self.depth], SIZE.get(kind, SIZE["other"]))
+        size = "whatever that earlier question needs, up to about 100 words" if pending \
+            else SIZE.get(kind, SIZE["other"])
+        note += " [%s Depth: %s. Length: %s.]" % (LANGUAGE[self.language], retrieve.DEPTHS[self.depth], size)
 
         kept = {"role": "user", "content": note + "\n" + said}
         now = {"role": "user", "content": "\n".join(
@@ -455,6 +476,28 @@ class Partner:
                  "language": route.get("language"), "names": route.get("names"),
                  "first_try": first_try}
         return text, verdict, history[-24:], trace
+
+
+ANSWER_IT = re.compile(r"\b(answer|go on|continue|you didn'?t answer|what was my question|"
+                       r"my (last|previous) question|the question i asked)\b|תענה|תמשיך|לא ענית|מה שאלתי", re.I)
+
+
+def pending_question(history, said):
+    """What they asked before, when all they say now is "answer it".
+
+    In use: "so answer" got "Go ahead."; "what was my question?" was restated
+    correctly, then "answer it" got "answer what?" -- the request came with no
+    thread back to the question. This finds the thread.
+    """
+    if not ANSWER_IT.search(said) or len(said.split()) > 18:
+        return None
+    for message in reversed(history):
+        if message["role"] != "user":
+            continue
+        asked = message["content"].rsplit("\n", 1)[-1].strip()
+        if len(asked.split()) >= 5 and not ANSWER_IT.search(asked):
+            return asked[:400]
+    return None
 
 
 def fallback(sources, lang):

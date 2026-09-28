@@ -16,6 +16,7 @@ actually read, and only then.
 
 import json
 import os
+import re
 import threading
 import time
 import urllib.error
@@ -125,6 +126,8 @@ def gather(jobs):
             futures.append((job, POOL.submit(text, job[1])))
         elif job[0] == "zmanim":
             futures.append((job, POOL.submit(zmanim, job[1])))
+        elif job[0] == "person":
+            futures.append((job, POOL.submit(person, job[1], job[2])))
         else:
             futures.append((job, POOL.submit(follow, job[1], job[2])))
     wait([f for _, f in futures], timeout=DEADLINE)
@@ -143,6 +146,8 @@ def gather(jobs):
             found.append((name_of(result["ref"]), result))
         elif job[0] == "zmanim":
             found.append(("Zmanim", result))
+        elif job[0] == "person":
+            found.append(("About " + job[1], result))
         else:
             found.extend(result)
     return found, missed, round(time.time() - started, 1)
@@ -153,7 +158,101 @@ def cached(job):
     with _LOCK:
         if job[0] == "zmanim":
             return job[1] in _ZMANIM
+        if job[0] == "person":
+            return (job[1], job[2]) in _PEOPLE
         return (job[1] in _TEXTS) if job[0] == "text" else (job[1] in _LINKS)
+
+
+# -- who they were ---------------------------------------------------------------
+
+# "When did he live? Who came first -- was he the Rashba's student?" Sefaria
+# keeps this for its authors and for the sages of the Mishnah and Gemara:
+# years and places, the generation of a tanna or amora, a short biography, and
+# who taught whom. A commentary's index names its author (and often says whose
+# student he was); the name search finds a sage who wrote no book. Wikipedia's
+# summary is used only when Sefaria has no description at all.
+_PEOPLE = {}
+WIKI_API = os.environ.get("CHAVRUTA_WIKI_API", "https://en.wikipedia.org/api/rest_v1/page/summary/")
+GENERATION = {"T": "tanna (sage of the Mishnah era)", "A": "amora (sage of the Gemara era)",
+              "Z": "zug (one of the pairs before the tannaim)", "P": "prophet", "M": "member of the Great Assembly"}
+ERA = {"GN": "Geonim", "RI": "Rishonim", "AH": "Acharonim", "CO": "contemporary", "T": "Tannaim", "A": "Amoraim"}
+
+
+def _human(slug):
+    """'rabbi-yehudah-b-ilai' -> 'Rabbi Yehudah b Ilai' (for teachers and students)."""
+    words = slug.replace("-(", " (").replace("-", " ").split()
+    return " ".join("ben" if w == "b" else w if w.startswith("(") else w[:1].upper() + w[1:] for w in words)
+
+
+def _topic(slug):
+    data = sefaria.get("v2/topics/%s" % slug, soft=True, with_links=1, group_related=1) or {}
+    if not data.get("slug"):
+        return None
+    props = {k: (v or {}).get("value") for k, v in (data.get("properties") or {}).items()}
+    lines = ["%s (%s)" % ((data.get("primaryTitle") or {}).get("en") or slug,
+                          (data.get("primaryTitle") or {}).get("he") or "")]
+    born, died = props.get("birthYear"), props.get("deathYear")
+    if born or died:
+        lines.append("lived %s–%s%s" % (born or "?", died or "?",
+                                        ", " + props["birthPlace"] if props.get("birthPlace") else ""))
+    gen = props.get("generation")
+    if gen and gen[:1] in GENERATION:
+        lines.append("%s, generation %s" % (GENERATION[gen[:1]], gen[1:]))
+    if props.get("era") in ERA:
+        lines.append("era: %s" % ERA[props["era"]])
+    about = (data.get("description") or {}).get("en") or props.get("enBio")
+    links = data.get("links") or {}
+    teachers = [_human(l["topic"]) for l in (links.get("learned-from") or {}).get("links", [])][:5]
+    students = [_human(l["topic"]) for l in (links.get("taught") or {}).get("links", [])][:6]
+    if teachers:
+        lines.append("teachers: " + ", ".join(teachers))
+    if students:
+        lines.append("students: " + ", ".join(students))
+    if not about and props.get("enWikiLink"):
+        about = _wiki(props["enWikiLink"].rsplit("/", 1)[-1])
+    if about:
+        lines.append(re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", about).replace("*", ""))
+    return "; ".join(lines)
+
+
+def _wiki(title):
+    try:
+        request = urllib.request.Request(WIKI_API + urllib.parse.quote(title), headers={"User-Agent": "chavruta/0.3"})
+        with urllib.request.urlopen(request, timeout=6) as response:
+            return (json.load(response).get("extract") or "")[:700]
+    except (urllib.error.URLError, TimeoutError, OSError, ValueError):
+        return ""
+
+
+def person(name, book=None):
+    """Who someone was, as a citable entry. `book` is the index title of their
+    commentary on this page ("Meiri on Berakhot"), when there is one."""
+    key = (name, book)
+    with _LOCK:
+        if key in _PEOPLE:
+            return _PEOPLE[key]
+    parts, slugs = [], []
+    if book:
+        index = sefaria.get("v2/index/%s" % book, soft=True) or {}
+        slugs = [a.get("slug") for a in index.get("authors") or [] if a.get("slug")]
+        when = (index.get("compDateString") or {}).get("en")
+        if index.get("enDesc") or when:
+            parts.append("%s%s: %s" % (book, " written" + when if when else "",
+                                       index.get("enDesc") or ""))
+    if not slugs:
+        found = sefaria.get("name/%s" % name, soft=True, limit=5) or {}
+        slugs = [o["key"] for o in found.get("completion_objects") or []
+                 if o.get("type") in ("AuthorTopic", "PersonTopic") and o.get("key")][:1]
+    for slug in slugs[:2]:
+        about = _topic(slug)
+        if about:
+            parts.append(about)
+    entry = None
+    if parts:
+        entry = {"ref": "About %s (Sefaria)" % name, "he": "\n".join(parts), "dibur": None, "fetched": True}
+    with _LOCK:
+        _PEOPLE[key] = entry
+    return entry
 
 
 # -- the clock: real times for a real night --------------------------------------

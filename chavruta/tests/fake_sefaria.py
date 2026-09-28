@@ -131,7 +131,44 @@ class Handler(BaseHTTPRequestHandler):
                 "tzeit85deg": day + "T18:50:00+03:00", "tzeit72min": day + "T19:33:00+03:00",
                 "chatzotNight": day + "T23:51:00+03:00", "alotHaShachar": day + "T05:04:00+03:00",
                 "sunrise": day + "T06:30:00+03:00"}})
+        # Who they were: trimmed from real responses recorded 2026-09-28.
+        path = urllib.parse.unquote(url.path)
+        if path.startswith("/api/v2/index/"):
+            title = path[len("/api/v2/index/"):].replace("_", " ")
+            if title in INDEXES:
+                return self.reply(INDEXES[title])
+        if path.startswith("/api/v2/topics/"):
+            slug = path[len("/api/v2/topics/"):]
+            if slug in TOPICS:
+                return self.reply(TOPICS[slug])
+        if path.startswith("/api/name/"):
+            query = path[len("/api/name/"):]
+            return self.reply({"completion_objects": [o for o in NAMES if query.lower() in o["title"].lower()]})
         return self.reply({"error": "not recorded: %s" % url.path}, 404)
+
+
+INDEXES = {
+    "Rashba on Berakhot": {"title": "Rashba on Berakhot", "authors": [{"en": "Shlomo ibn Adret (Rashba)", "slug": "rashba1"}],
+                           "enDesc": "Commentary on the Talmud written by the Rashba, Rabbi Shlomo ben Avraham ibn Aderet "
+                                     "(1235–1310). Rashba was a student of Ramban and follows his methodology.",
+                           "compDateString": {"en": " (c.1270  – c.1310 CE)"}, "compPlace": "Barcelona, Spain"},
+    "Meiri on Berakhot": {"title": "Meiri on Berakhot", "authors": [{"en": "Menachem Meiri", "slug": "menachem-meiri"}]},
+}
+TOPICS = {
+    "menachem-meiri": {"slug": "menachem-meiri", "primaryTitle": {"en": "Menachem Meiri", "he": "המאירי"},
+                       "properties": {"birthYear": {"value": 1249}, "deathYear": {"value": 1315},
+                                      "birthPlace": {"value": "Perpignan, France"}, "era": {"value": "RI"}},
+                       "description": {"en": "Menachem ben Solomon Meiri was one of Provence's most important scholars."}},
+    "rashba1": {"slug": "rashba1", "primaryTitle": {"en": "Shlomo ibn Adret (Rashba)", "he": "רשב\"א"},
+                "properties": {"birthYear": {"value": 1235}, "deathYear": {"value": 1310},
+                               "birthPlace": {"value": "Barcelona, Spain"}, "era": {"value": "RI"}}},
+    "rabban-gamliel": {"slug": "rabban-gamliel", "primaryTitle": {"en": "Rabban Gamliel of Yavneh (II)", "he": "רבן גמליאל דיבנה"},
+                       "properties": {"generation": {"value": "T3"}},
+                       "description": {"en": "Rabban Gamliel (II) was a tannaitic sage in the first and second centuries CE."},
+                       "links": {"learned-from": {"links": [{"topic": "rabban-yochanan-b-zakkai"}]},
+                                 "taught": {"links": [{"topic": "rabbi-yehudah-b-ilai"}]}}},
+}
+NAMES = [{"title": "Rabban Gamliel of Yavneh (II)", "type": "PersonTopic", "key": "rabban-gamliel"}]
 
 
 def start(port=0):

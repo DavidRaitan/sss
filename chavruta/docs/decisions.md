@@ -308,3 +308,22 @@ another city.
 **37. Panels: ✕ always in reach, and resizable.** The close button sits
 outside the scrolling panel; the panel's edge is a handle to drag it wider or
 narrower (taller or shorter on a phone), remembered.
+
+**38. Who they were.** "When did he live? Who came first?" got "I don't have
+that here." Sefaria keeps this: a commentary's index names its author, when
+and where it was written, and often whose student he was ("Rashba was a
+student of Ramban"); an author's or sage's topic has birth and death years,
+places, the generation of a tanna or amora, a short biography, and teachers and
+students. A "people" question fetches that — for the names asked about, or for
+"him", whoever the last answers cited — and Wikipedia's summary only when
+Sefaria has no description. (Britannica has no free API; Sefaria's records are
+the more specific source for these people anyway.)
+
+**39. "Answer it" keeps the thread.** When all they say is "answer it", "go
+on" or "you didn't answer", the partner is handed the question they asked
+before and told to answer it in full, not restate it.
+
+**40. Short turns.** "What does this mean?" came back as meaning, Rashi,
+Tosafot and halacha. Each kind of question now carries a word count (about
+25–45 words for meaning), and the partner is told to say the one thing asked
+and offer the next layer in a few words rather than deliver it.

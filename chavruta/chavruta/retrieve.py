@@ -29,6 +29,8 @@ LIGHT = {
              "you said, which you then do in full",
     "check_reading": "asking whether they read it right, or whether they missed or "
                      "swapped a word",
+    "people": "who a sage or commentator was: when or where he lived, which century, "
+              "who came first, who taught whom, was he someone's student",
 }
 KINDS = list(who.ROUTES) + list(LIGHT) + ["reading", "navigate"]
 
@@ -164,7 +166,8 @@ def resolve(name, present):
 RULING = re.compile(r"^.{0,40}?(פסק|הלכה|הלכתא|נמצא|לענין מעשה|והלכך)")
 
 # Small exchanges and page-turns open nothing: a mic check does not need the Meiri.
-QUIET = ("ping", "reading", "navigate")
+# Questions about people open no commentary either; they fetch the people.
+QUIET = ("ping", "reading", "navigate", "people")
 
 
 def extras(pack, n, route, depth="daf", budget=7):
@@ -263,6 +266,8 @@ def plan(pack, n, route):
     label is the book as a person would say it, for "let me pull up ...".
     """
     kind = route.get("kind")
+    if kind == "people":
+        return people_plan(pack, route)
     if kind in QUIET or kind == "check_reading":
         return []
     present = set(pack.commentators())
@@ -331,6 +336,27 @@ def plan(pack, n, route):
         if SEASONS.search(said):
             add(("zmanim", "%d-06-21" % today.year), "Zmanim")
             add(("zmanim", "%d-12-21" % today.year), "Zmanim")
+    return jobs
+
+
+def people_plan(pack, route):
+    """Who they asked about -- by name, or, for "when did *he* live?", whoever
+    the last answers cited. A commentator on this page is looked up through his
+    own book, which names him exactly; anyone else by name."""
+    present = set(pack.commentators())
+    names = [resolve(x, present) or x for x in route.get("names", [])]
+    if not names:
+        names = list(route.get("avoid") or [])     # the ones just cited
+    books = {}
+    for segment in pack.segments:
+        for name, entries in segment["commentaries"].items():
+            for entry in entries:
+                books.setdefault(name, re.sub(r"\s+\d+[ab]?(:\d+)*(-\d+)?$", "", entry["ref"]))
+    jobs = []
+    for name in names[:3]:
+        job = ("person", name, books.get(name))
+        if job not in [j for j, _ in jobs]:
+            jobs.append((job, "some background on " + name))
     return jobs
 
 
