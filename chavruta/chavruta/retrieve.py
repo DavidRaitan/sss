@@ -186,17 +186,22 @@ def extras(pack, n, route, depth="daf", budget=7):
         if pair not in chosen:
             chosen.append(pair)
 
-    def take(names, reach, per=2):
-        for name in names:
-            if name in backbone or name not in present:
-                continue
-            for pair in _near(pack, n, name, reach)[:per]:
-                add(pair)
+    def take(names, reach, per=2, most=None):
+        got = 0
+        for wanted in names:
+            for name in who.filed(wanted, present):
+                if name in backbone or (most is not None and got >= most):
+                    continue
+                pairs = _near(pack, n, name, reach)[:per]
+                for pair in pairs:
+                    add(pair)
+                got += bool(pairs)
 
     # Named by the learner: always, and look across the whole amud for them --
     # Sefaria hangs the Rosh on this mishna off line 12.
     for spoken in route.get("names", []):
-        match = _canonical(spoken, present)
+        match = _canonical(spoken, present) or (
+            ALIASES.get(_key(spoken)) if who.filed(ALIASES.get(_key(spoken), ""), present) else None)
         if match:
             before = len(chosen)
             take([match], 2, per=3)
@@ -207,9 +212,10 @@ def extras(pack, n, route, depth="daf", budget=7):
     if kind == "halacha":
         # Where the Rishonim on this amud say how it is ruled, wherever it
         # sits -- one ruling each, not four paragraphs of the same Meiri.
+        # The digests first; the Meiri last -- an overview, light for psak.
         ruled = set()
         for segment in pack.segments:
-            for name in ("Rosh", "Rif", "Meiri", "Rashba", "Tosafot HaRosh"):
+            for name in ("Rosh", "Rif", "Rashba", "Tosafot HaRosh", "Meiri"):
                 if name in ruled:
                     continue
                 for entry in segment["commentaries"].get(name, []):
@@ -218,10 +224,22 @@ def extras(pack, n, route, depth="daf", budget=7):
                         ruled.add(name)
                         break
         take(["Rif", "Rosh"], 99, per=1)
-    elif kind in ("logic", "conflict"):
-        take(who.wide_for(masechta, [kind])[:3], 1, per=1)
+    # Otherwise by what kind of work answers what kind of question: a question
+    # on Tosafot goes to his explainers (the Maharsha, Tosafot HaRosh), a
+    # contradiction with another sugya to R' Akiva Eiger, "why" to the
+    # Catalonian novellae, an aggadah to the Maharsha's Chidushei Agadot and the
+    # Ben Yehoyada.
+    elif kind == "conflict":
+        take(who.ASK["conflict"] + who.wide_for(masechta, [kind]), 1, per=1, most=3)
+    elif kind == "logic":
+        take(who.ASK["logic"] + who.wide_for(masechta, [kind]), 1, per=1, most=3)
     elif kind == "on_commentary":
-        take(["Maharsha", "Penei Yehoshua"], 1)
+        names = {resolve(x, present) for x in route.get("names", [])}
+        ask = who.ASK["on_tosafot"] if "Tosafot" in names else \
+            who.ASK["on_rashi"] if "Rashi" in names else who.ASK["on_commentary"]
+        take(ask, 1, per=1, most=3)
+    elif kind == "aggadah":
+        take(who.ASK["aggadah"], 1, per=1, most=3)
     elif kind == "structure":
         take(["Meiri"], 1, per=1)
 
@@ -316,9 +334,14 @@ def plan(pack, n, route):
             if tur:
                 add(("follow", tur, book), book)
 
-    # A Rishon who is not on this page but hangs off the Rif.
-    for book in named:
-        if book in ON_THE_RIF and rif:
+    # A Rishon who is not on this page but hangs off the Rif. On Berakhot the
+    # Rif is read with Talmidei Rabbeinu Yonah as a matter of course, so a
+    # halacha question brings him unasked.
+    rif_voices = [x for x in named if x in ON_THE_RIF]
+    if kind == "halacha" and pack.data.get("masechta") == "Berakhot":
+        rif_voices.append("Rabbeinu Yonah")
+    for book in rif_voices:
+        if rif:
             add(("follow", rif[0], book), book)
 
     # "I remember the opposite elsewhere": what the page itself points at.

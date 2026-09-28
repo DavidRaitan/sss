@@ -607,6 +607,49 @@ class SixthSitting(unittest.TestCase):
         self.assertFalse(partner.READ_TO_ME.search("I'm gonna read the Mishnah"))
 
 
+class Shelf(unittest.TestCase):
+    """The map of the sources: which kind of work answers which kind of question."""
+    pack = Pack(PACK)
+
+    def near(self, kind, n, names=()):
+        return [name for name, _ in retrieve.extras(self.pack, n, {"kind": kind, "names": list(names)}, "daf")]
+
+    def test_a_question_on_tosafot_goes_to_its_explainers(self):
+        got = self.near("on_commentary", 1, ["Tosafot"])
+        self.assertTrue(got)
+        self.assertTrue(set(got) <= {"Tosafot HaRosh", "Gilyon HaShas", "Penei Yehoshua",
+                                     "Chiddushei Rabbi Akiva Eiger", "Chidushei Halachot"}, got)
+
+    def test_a_contradiction_goes_to_rabbi_akiva_eiger_first(self):
+        got = self.near("conflict", 1)
+        self.assertIn(got[0], ("Gilyon HaShas", "Chiddushei Rabbi Akiva Eiger", "Penei Yehoshua", "Petach Einayim"))
+        self.assertLessEqual(len(got), 3)
+
+    def test_why_goes_to_the_catalonians(self):
+        got = self.near("logic", 1)
+        self.assertTrue(set(got) & {"Rashba", "Ritva", "Ra'ah"}, got)
+
+    def test_aggadah_has_its_own_ladder(self):
+        self.assertIn("aggadah", retrieve.KINDS)
+        n = next(s["n"] for s in self.pack.segments if s["commentaries"].get("Ben Yehoyada"))
+        self.assertIn("Ben Yehoyada", self.near("aggadah", n))
+
+    def test_the_maharsha_is_found_under_the_name_sefaria_files_him(self):
+        pack = Pack(sefaria.build("Berakhot 2b"))
+        n = next(s["n"] for s in pack.segments if s["commentaries"].get("Chidushei Halachot"))
+        got = retrieve.extras(pack, n, {"kind": "on_commentary", "names": ["Maharsha"]}, "daf")
+        self.assertIn("Chidushei Halachot", [name for name, _ in got])
+
+    def test_on_berakhot_halacha_brings_rabbeinu_yonah(self):
+        jobs = [job for job, _ in retrieve.plan(self.pack, 1, {"kind": "halacha", "names": []})]
+        self.assertIn(("follow", "Rif Berakhot 1a:1", "Rabbeinu Yonah"), jobs)
+
+    def test_the_meiri_is_an_overview_not_a_posek(self):
+        from chavruta import commentators as who
+        self.assertNotIn("halacha", who.WHO["Meiri"]["answers"])
+        self.assertIn("light as an authority", who.WHO["Meiri"]["specialty"])
+
+
 class Server(unittest.TestCase):
     def test_only_berakhot(self):
         from chavruta import server

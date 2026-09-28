@@ -384,3 +384,17 @@ the latest question. "Enough" / "skip" / "די" by voice does the same as ⏭.
 - *Never "Yes" before a correction* ("ותו" is not "that's all").
 - *A follow-up said while the first question is still being thought about* is
   asked together with it, once. Two answers came, the second repeating the first.
+
+**46. The shelf, sorted by what each work does** (from `sources-map.md`).
+The routing now follows genre, not fame: a question on Tosafot goes to its
+explainers (the Maharsha, Tosafot HaRosh) and question-raisers (Gilyon HaShas,
+Penei Yehoshua, R' Akiva Eiger); a contradiction with another sugya to R'
+Akiva Eiger first; "why" to the Catalonian novellae (Rashba, Ritva, Ra'ah); a
+new question kind, aggadah, to the Maharsha's Chidushei Agadot, the Ben
+Yehoyada and the Chida's Petach Einayim. The Meiri is an overview, light for
+psak, and comes last among the halachic voices. On Berakhot a halacha
+question brings Talmidei Rabbeinu Yonah on the Rif unasked. The Maharsha was
+never found: Sefaria files him on Berakhot as "Chidushei Halachot" and
+"Chidushei Agadot". The partner is told what each kind of work is for, that
+Maran and the Rema are both reported, and that the gemara's give-and-take is
+not yet the halacha.

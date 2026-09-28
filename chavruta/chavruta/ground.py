@@ -37,7 +37,7 @@ NAMES = {
     "Ritva": (["Ritva"], ["ריטב~א"], ["Ritva"]),
     "Ran": (["Ran"], ["ר~ן"], ["Ran on"]),
     "Meiri": (["Meiri"], ["מאירי"], ["Meiri"]),
-    "Maharsha": (["Maharsha"], ["מהרש~א"], ["Maharsha"]),
+    "Maharsha": (["Maharsha"], ["מהרש~א"], ["Maharsha", "Chidushei Halachot", "Chidushei Agadot"]),
     "Rambam": (["Rambam", "Maimonides"], ["רמב~ם"], ["Mishneh Torah"]),
     "Shulchan Arukh": (["Shulchan Arukh", "Shulchan Aruch"], ["שולחן ערוך", "שו~ע"], ["Shulchan Arukh"]),
     "Tur": (["Tur"], ["הטור"], ["Tur,"]),

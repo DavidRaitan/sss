@@ -112,10 +112,11 @@ WHO = {
                   "running page commentary itself. On Nedarim treat him as backbone."),
     "Meiri": dict(
         he='מאירי', era="rishon", died=1315, tier="wide", weight=55,
-        answers=["structure", "meaning", "halacha"],
-        specialty="Beit HaBechirah: an orderly summary of the whole sugya and its "
-                  "conclusions in clear Hebrew, without the dialectic. The best "
-                  "single source for 'what happened on this page overall'."),
+        answers=["structure", "meaning"],
+        specialty="Beit HaBechirah: a summarizing digest -- skips the give-and-take "
+                  "and states the upshot, naming Rishonim by epithet. The best single "
+                  "overview of 'what happened on this page', but light as an authority "
+                  "for halacha: unknown until 1920, so the codes never weighed him."),
     "Rashbam": dict(
         he='רשב"ם', era="rishon", died=1158, tier="backbone", weight=100,
         answers=["meaning"],
@@ -134,18 +135,88 @@ WHO = {
     "Maharsha": dict(
         he='מהרש"א', era="acharon", died=1631, tier="wide", weight=40,
         answers=["on_commentary"],
-        specialty="Commentary on Rashi and Tosafot rather than on the gemara. The "
-                  "address for 'what is Tosafot actually asking here'."),
+        specialty="Explainer of Rashi and Tosafot rather than of the gemara: what "
+                  "they mean and why. 'Whoever has grasped the Maharsha has understood "
+                  "Tosafot.' The first address for 'what is Tosafot actually asking'."),
+    # The Maharsha as Sefaria files him: his halachic and his aggadic halves.
+    "Chidushei Halachot": dict(
+        he='מהרש"א', era="acharon", died=1631, tier="wide", weight=40,
+        answers=["on_commentary"],
+        specialty="The Maharsha on the halachic passages -- explainer of Rashi and "
+                  "Tosafot, the first address for 'what is Tosafot actually asking'."),
+    "Chidushei Agadot": dict(
+        he='מהרש"א', era="acharon", died=1631, tier="wide", weight=45,
+        answers=["aggadah"],
+        specialty="The Maharsha on the aggadah: the first stop after Rashi on a "
+                  "story or aggadic statement, reading the strange tales as parables."),
     "Penei Yehoshua": dict(
         he='פני יהושע', era="acharon", died=1756, tier="wide", weight=30,
-        answers=["on_commentary", "logic"],
-        specialty="Sustained analysis of the sugya together with Rashi and Tosafot. "
-                  "Deep, and long -- offer it, do not volunteer it."),
+        answers=["on_commentary", "logic", "conflict"],
+        specialty="The classic question-raiser: shows the problem in the sugya, "
+                  "Rashi and Tosafot that you missed. Deep, and long -- offer it, do "
+                  "not volunteer it."),
+    "Chiddushei Rabbi Akiva Eiger": dict(
+        he='רבי עקיבא איגר', era="acharon", died=1837, tier="wide", weight=35,
+        answers=["conflict", "on_commentary"],
+        specialty="Short 'tzarich iyun' questions and cross-references that tie a "
+                  "distant sugya to this one. The address when something here seems "
+                  "to contradict another place."),
+    "Gilyon HaShas": dict(
+        he='גליון הש"ס', era="acharon", died=1837, tier="wide", weight=35,
+        answers=["conflict"],
+        specialty="R' Akiva Eiger's margin notes on the page: pointers to a "
+                  "contradiction or a proof elsewhere in shas. Printed on the daf."),
+    "Tzelach": dict(
+        he='צל"ח', era="acharon", died=1793, tier="wide", weight=25,
+        answers=["logic", "on_commentary"],
+        specialty="The Noda BiYehuda's novellae: a question-raiser on the sugya, Rashi "
+                  "and Tosafot, on some tractates only. Long; offer it."),
     "Rashash": dict(
-        he='רש"ש', era="acharon", died=1794, tier="wide", weight=30,
-        answers=["meaning"],
-        specialty="Short textual and emendation notes. Useful when a line looks "
-                  "corrupt or a word will not parse."),
+        he='רש"ש', era="acharon", died=1872, tier="wide", weight=30,
+        answers=["meaning", "on_commentary"],
+        specialty="Short textual and emendation notes, and pointed remarks on Rashi. "
+                  "Useful when a line looks corrupt or a word will not parse."),
+    "Ra'ah": dict(
+        he='רא"ה', era="rishon", died=1293, tier="wide", weight=50,
+        answers=["logic"],
+        specialty="Catalonian novellae (the Rashba's teacher's generation); on "
+                  "Berakhot, comments on the Rif and the sugya."),
+    "HaMaor": dict(
+        he='המאור', era="rishon", died=1186, tier="wide", weight=40,
+        answers=["halacha", "logic"],
+        specialty="The Ba'al HaMaor: Provençal critique of the Rif's rulings, "
+                  "answered by the Ramban's Milchamot."),
+    "Ben Yehoyada": dict(
+        he='בן יהוידע', era="acharon", died=1909, tier="wide", weight=40,
+        answers=["aggadah"],
+        specialty="The Ben Ish Chai on the aggadot of the Bavli, on the plain level "
+                  "and on remez and sod. For Sephardi and Mizrahi learners the major "
+                  "aggadah commentary."),
+    "Petach Einayim": dict(
+        he='פתח עינים', era="acharon", died=1806, tier="wide", weight=30,
+        answers=["aggadah", "conflict"],
+        specialty="The Chida's notes: sources and parallels, strong on aggadah."),
+}
+
+# Where Sefaria files someone under a different name than people use: the
+# Maharsha on Berakhot is "Chidushei Halachot" and "Chidushei Agadot". Asked
+# for "the Maharsha", nothing on the page was ever found.
+FILED_AS = {"Maharsha": ["Chidushei Halachot", "Chidushei Agadot"]}
+
+# What kind of work answers what kind of question -- the shelf sorted by what
+# each work does, not by how famous its author is. Genre predicts function:
+# an explainer tells you what the text says; a question-raiser, what problem
+# you missed; analytic novellae, why the argument works; a digest, what
+# survived as law; a summary, the whole page at once.
+ASK = {
+    "on_commentary": ["Maharsha", "Tosafot HaRosh", "Rashash", "Penei Yehoshua",
+                      "Chiddushei Rabbi Akiva Eiger"],
+    "on_tosafot": ["Maharsha", "Tosafot HaRosh", "Gilyon HaShas", "Penei Yehoshua",
+                   "Chiddushei Rabbi Akiva Eiger"],
+    "on_rashi": ["Maharsha", "Rashash", "Penei Yehoshua"],
+    "conflict": ["Gilyon HaShas", "Chiddushei Rabbi Akiva Eiger", "Penei Yehoshua", "Petach Einayim"],
+    "logic": ["Rashba", "Ritva", "Ramban", "Ran", "Ra'ah"],
+    "aggadah": ["Maharsha", "Ben Yehoyada", "Petach Einayim"],
 }
 
 # --- layer 2: where the defaults change ---------------------------------------
@@ -165,7 +236,9 @@ PAGE_EXCEPTIONS = {
 
 # Who is worth reaching for first, beyond the backbone, per masechta.
 STRONG_IN = {
-    "Berakhot": ["Rif", "Rosh", "Meiri", "Tosafot HaRosh", "Rashba"],
+    # The Rif is printed with Talmidei Rabbeinu Yonah on Berakhot alone -- a
+    # tractate where R' Yonah is standard iyun.
+    "Berakhot": ["Rif", "Rosh", "Rashba", "Ritva", "Tosafot HaRosh", "Meiri"],
     "Shabbat": ["Rabbeinu Chananel", "Ramban", "Rashba", "Ritva", "Meiri", "Rif"],
     "Eruvin": ["Rabbeinu Chananel", "Ritva", "Rashba", "Meiri"],
     "Pesachim": ["Rabbeinu Chananel", "Ramban", "Rashbam", "Ran", "Meiri"],
@@ -199,7 +272,13 @@ ROUTES = {
     "logic": "what is the underlying reasoning, what exactly is the machlokes about",
     "halacha": "where does this land in practice (reported, never ruled)",
     "on_commentary": "how do we understand Rashi or Tosafot here",
+    "aggadah": "what an aggadic story or statement means, or what its idea is",
 }
+
+
+def filed(name, present):
+    """The names a commentator is found under on this page."""
+    return [n for n in [name] + FILED_AS.get(name, []) if n in present]
 
 
 def backbone_for(masechta):
