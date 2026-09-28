@@ -14,7 +14,9 @@ from tests import fake_openai, fake_sefaria  # noqa: E402
 SEF, SEF_URL = fake_sefaria.start()
 OAI, OAI_URL = fake_openai.start()
 os.environ.update(CHAVRUTA_SEFARIA_API=SEF_URL, OPENAI_BASE_URL=OAI_URL, OPENAI_API_KEY="sk-test",
-                  CHAVRUTA_PACKS=tempfile.mkdtemp(), CHAVRUTA_ZMANIM_API=SEF_URL[:-4] + "/zmanim")
+                  CHAVRUTA_PACKS=tempfile.mkdtemp(), CHAVRUTA_ZMANIM_API=SEF_URL[:-4] + "/zmanim",
+                  CHAVRUTA_WIKISOURCE_API=SEF_URL[:-4] + "/w/api.php",
+                  CHAVRUTA_WEB_REWRITE='{"https://halachayomit.co.il": "%s/hy"}' % SEF_URL[:-4])
 
 from chavruta import sefaria  # noqa: E402
 importlib.reload(sefaria)
@@ -725,6 +727,117 @@ class Table(unittest.TestCase):
         p.ask(1, [], "what does this mean?", route={"kind": "meaning", "names": []})
         self.assertIn("they like to hear from Ritva", seen[0])
         self.assertIn("leave out Meiri", seen[0])
+
+
+class Review(unittest.TestCase):
+    """Coming back after a while: what we learned, and questions on it."""
+
+    def setUp(self):
+        from chavruta import review
+        review.LOAD = lambda ref: Pack(sefaria.build(ref))
+        review.SESSIONS_DIR = tempfile.mkdtemp()
+        self.review = review
+
+    def write(self, date, rows):
+        import json
+        with open(os.path.join(self.review.SESSIONS_DIR, date + ".jsonl"), "w") as f:
+            for row in rows:
+                f.write(json.dumps(row) + "\n")
+
+    def test_the_last_n_pages_before_this_one(self):
+        pages = self.review.which_pages
+        self.assertEqual(pages("Berakhot 6a", "what were the last two pages about?", [], "2026-09-28"),
+                         ["Berakhot 4a", "Berakhot 4b", "Berakhot 5a", "Berakhot 5b"])
+        self.assertEqual(len(pages("Berakhot 6a", "remind me of the last six pages", [], "2026-09-28")), 8)
+        self.assertEqual(pages("Berakhot 6a", "the last three amudim", [], "2026-09-28"),
+                         ["Berakhot 4b", "Berakhot 5a", "Berakhot 5b"])
+        self.assertEqual(pages("Berakhot 30a", "תזכיר לי את שלושת הדפים האחרונים", [], "2026-09-28")[0],
+                         "Berakhot 27a")
+        self.assertEqual(len(pages("Berakhot 40a", "the last twenty pages", [], "2026-09-28")), 12)   # capped
+
+    def test_last_time_comes_from_the_sittings(self):
+        self.write("2026-09-27", [{"kind": "heard", "ref": "Berakhot 4b"}, {"kind": "answer", "ref": "Berakhot 5a"},
+                                  {"kind": "heard", "ref": "Berakhot 4b"}])
+        self.write("2026-09-28", [{"kind": "heard", "ref": "Berakhot 6a"}])
+        history = self.review.sittings()
+        self.assertEqual(history[0], {"date": "2026-09-28", "refs": ["Berakhot 6a"]})
+        self.assertEqual(self.review.which_pages("Berakhot 6a", "what did we learn yesterday?", history, "2026-09-28"),
+                         ["Berakhot 4b", "Berakhot 5a"])
+
+    def test_each_amud_is_recapped_once_and_kept(self):
+        entry = self.review.recap("Berakhot 2a")
+        self.assertIn("evening Shema", entry["he"])
+        self.assertTrue(os.path.exists(self.review._path("Berakhot 2a")))
+        self.assertTrue(library.cached(("recap", "Berakhot 2a")))
+
+    def test_the_review_is_told_page_by_page_and_cited(self):
+        p = partner.Partner(Pack(sefaria.build("Berakhot 2b")), LLM())
+        text, verdict, _, trace = p.ask(1, [], "remind me what the last page was about",
+                                        route={"kind": "review", "names": []})
+        self.assertTrue(verdict.ok, text)
+        self.assertIn("[[Berakhot 2a]]", text)
+        self.assertEqual(trace["fetched"], ["Berakhot 2a"])
+
+    def test_questions_one_at_a_time(self):
+        self.assertIn("one question", partner.SIZE["quiz"])
+        self.assertIn("quiz", retrieve.KINDS)
+        self.assertEqual(retrieve.extras(Pack(PACK), 1, {"kind": "quiz", "names": []}, "acharonim"), [])
+
+
+class TrustedSites(unittest.TestCase):
+    pack = Pack(PACK)
+
+    def test_only_domains_are_trusted(self):
+        from chavruta import web
+        self.assertEqual(web.clean_sites(["https://www.halachayomit.co.il/he/", "he.wikisource.org",
+                                          "javascript:alert(1)", "not a site"]),
+                         ["halachayomit.co.il", "he.wikisource.org"])
+
+    def test_a_page_is_read_for_its_text_not_its_menus(self):
+        from chavruta import web
+        entry = web.page("https://halachayomit.co.il/he/ReadHalacha.aspx?HalachaID=4521", "halachayomit.co.il")
+        self.assertEqual(entry["ref"], "Halacha Yomit: זמן קריאת שמע של ערבית")
+        self.assertIn("עד עלות השחר", entry["he"])
+        self.assertNotIn("תפריט", entry["he"])
+        self.assertNotIn("var x", entry["he"])
+        self.assertEqual(library.text(entry["ref"])["url"], entry["url"])     # opens in the panel
+
+    def test_rav_ovadia_is_looked_up_on_halacha_yomit(self):
+        route = {"kind": "halacha", "names": [], "said": "What does Rav Ovadia say about this?",
+                 "sites": ["halachayomit.co.il", "he.wikisource.org"]}
+        jobs = [j for j, _ in retrieve.plan(self.pack, 1, route)]
+        site = [j for j in jobs if j[0] == "site"]
+        self.assertEqual(site[0][1], "halachayomit.co.il")
+        self.assertIn("שולחן ערוך אורח חיים סימן 235", site[0][2])
+        found, missed, _ = library.gather(site)
+        self.assertEqual(found[0][0], "Halacha Yomit")
+        self.assertIn("עובדיה יוסף", found[0][1]["he"])
+
+    def test_not_trusted_not_searched(self):
+        route = {"kind": "halacha", "names": [], "said": "What does Rav Ovadia say?", "sites": ["he.wikisource.org"]}
+        self.assertFalse([j for j, _ in retrieve.plan(self.pack, 1, route) if j[0] == "site"])
+
+    def test_the_shaar_hatziyun_is_found_on_wikisource(self):
+        route = {"kind": "halacha", "names": [], "said": "and the Sha'ar HaTziyun?",
+                 "sites": ["he.wikisource.org"]}
+        wiki = [j for j, _ in retrieve.plan(self.pack, 1, route) if j[0] == "wiki"]
+        self.assertEqual(wiki, [("wiki", "שער הציון רלה")])
+        found, _, _ = library.gather(wiki)
+        self.assertEqual(found[0][1]["ref"], "Wikisource: שער הציון/רלה")
+
+    def test_rav_ovadia_only_through_the_site(self):
+        known = {"Halacha Yomit: זמן קריאת שמע של ערבית"}
+        self.assertFalse(ground.check("Rav Ovadia rules until dawn.", known).ok)
+        self.assertTrue(ground.check("Rav Ovadia [[Halacha Yomit: זמן קריאת שמע של ערבית]] rules until dawn.",
+                                     known).ok)
+
+    def test_the_answer_quotes_the_site(self):
+        p = partner.Partner(self.pack, LLM(), sites=["halachayomit.co.il"], sites_halacha=True)
+        text, verdict, _, trace = p.ask(1, [], "what's the halacha, and what does Rav Ovadia hold?",
+                                        route={"kind": "halacha", "names": []})
+        self.assertTrue(verdict.ok, text)
+        self.assertIn("Halacha Yomit", text)
+        self.assertIn("Halacha Yomit: זמן קריאת שמע של ערבית", trace["fetched"])
 
 
 class Server(unittest.TestCase):

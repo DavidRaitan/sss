@@ -438,3 +438,18 @@ tomorrow's are built each morning while the app runs. Settings: open on
 today's daf or where you stopped; "my tractates" first in the menu, each
 remembering its place. By voice: "go to Shabbat 30", "the daf yomi". The
 routing judgement was tuned on Berakhot; elsewhere it is a first draft.
+
+**50. Trusted sites, and coming back to it.**
+- Trusted sites (settings; Halacha Yomit and Hebrew Wikisource to start):
+  Wikisource through its own API; any other site through a web search limited
+  to it, after which the page itself is read and its text -- not the search
+  engine's retelling -- goes to the partner, cited with its address and quoted
+  briefly. Named ("what does Rav Ovadia say", "the Sha'ar HaTziyun"), asked for
+  ("check online"), or with every halacha question if set. Rav Ovadia may be
+  named only through such a page (the gate enforces it).
+- Review: "what were the last six pages about", "what did we do yesterday".
+  Each amud gets a short recap, made once from its text and kept; which pages
+  comes from where they are, or from the sittings the app records. Coming
+  back after a day, the page says where you stopped and offers ↺ a review or
+  ❓ questions. At the end of an amud it offers a few questions; a quiz is one
+  question at a time, each answer judged from the text.

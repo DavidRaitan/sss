@@ -49,6 +49,9 @@ NAMES = {
     "Mishnah Berurah": (["Mishnah Berurah", "Mishna Berura"], ["משנה ברורה"], ["Mishnah Berurah"]),
     "Rabbeinu Yonah": (["Rabbeinu Yonah"], ["רבינו יונה"], ["Rabbeinu Yonah"]),
     "Beit Yosef": (["Beit Yosef"], ["בית יוסף"], ["Beit Yosef"]),
+    # Off Sefaria, through a trusted site only.
+    "Rav Ovadia": (["Rav Ovadia", "Rabbi Ovadia", "Ovadia Yosef", "Yalkut Yosef", "Yabia Omer"],
+                   ["עובדיה יוסף", "הרב עובדיה", "ילקוט יוסף", "יביע אומר"], ["Halacha Yomit"]),
 }
 
 

@@ -33,7 +33,7 @@ import traceback
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from . import align, commentators, daily, library, retrieve, sefaria, smalltalk
+from . import align, commentators, daily, library, retrieve, review, sefaria, smalltalk
 from .commentators import MASECHTOT
 from .llm import LLM, VOICE_DIRECTION, ModelError, speakable
 from .masechta_index import Index
@@ -44,7 +44,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WEB = os.path.join(ROOT, "web")
 PACKS = os.environ.get("CHAVRUTA_PACKS") or os.path.join(ROOT, "packs")
 LOG_PATH = os.path.join(ROOT, "chavruta.log")
-SESSIONS_DIR = os.path.join(ROOT, "sessions")
+SESSIONS_DIR = os.environ.get("CHAVRUTA_SESSIONS") or os.path.join(ROOT, "sessions")
 VOICE_DIR = os.path.join(PACKS, "_voice")
 VOICES = {}   # id -> text waiting to be spoken
 SPOKEN = []   # the words of what it said last, to know its own voice when it hears it
@@ -282,6 +282,9 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json({"masechtot": MASECHTOT})
         if url.path == "/api/table":
             return self.send_json({"table": commentators.table()})
+        if url.path == "/api/history":
+            # What was learned, sitting by sitting -- for "last time you were on ...".
+            return self.send_json({"sittings": review.sittings()[:10]})
         if url.path == "/api/today":
             found = daily.daf_yomi()
             return self.send_json(found) if found else self.fail(502, "no_daf_yomi")
@@ -451,6 +454,12 @@ class Handler(BaseHTTPRequestHandler):
                 state["nudged"].add((ref, n))
                 state["spoke"] = text
                 reply["nudge"], reply["nudge_ref"] = text, nudge_ref
+            elif heard.get("line") == len(pack.segments) and (ref, "end") not in state["nudged"]:
+                # The end of the amud: a few questions on it, if they want.
+                text = review.QUIZ_OPENING[lang]
+                state["nudged"].add((ref, "end"))
+                state["spoke"] = text
+                reply["nudge"], reply["nudge_ref"] = text, None
         return self.send_json(reply)
 
     def say(self):
@@ -520,7 +529,9 @@ class Handler(BaseHTTPRequestHandler):
         partner = Partner(pack, llm, depth=body.get("depth") or "daf",
                           language=body.get("language") or "en",
                           index=index_for(pack.data.get("masechta", "")),
-                          favor=favor, voices=body.get("voices"))
+                          favor=favor, voices=body.get("voices"),
+                          sites=body.get("sites") if isinstance(body.get("sites"), list) else None,
+                          sites_halacha=body.get("sites_halacha", True))
         # "Can you read it for me?" -- the page's words may be spoken in full.
         read_out = bool(READ_TO_ME.search(said))
         if read_out and stream:
@@ -688,6 +699,8 @@ def build_index(masechta):
     except Exception as exc:
         log.info("index %s: %s", masechta, exc)
 
+
+review.LOAD = lambda ref: load_pack(ref)
 
 PREPARER = daily.Preparer(build=load_pack, exists=lambda ref: os.path.exists(pack_path(ref)),
                           finish=build_index)

@@ -52,8 +52,16 @@ def start_stack():
     s1, sef = fake_sefaria.start()
     s2, oai = fake_openai.start()
     packs = tempfile.mkdtemp()
+    # Yesterday's sitting, so coming back has something to review.
+    sessions = tempfile.mkdtemp()
+    import datetime
+    yesterday = (datetime.date.today() - datetime.timedelta(days=1)).isoformat()
+    with open(os.path.join(sessions, yesterday + ".jsonl"), "w") as f:
+        for ref in ("Berakhot 2a", "Berakhot 2b"):
+            f.write(json.dumps({"kind": "heard", "ref": ref, "at": yesterday + " 21:00:00"}) + "\n")
     os.environ.update(CHAVRUTA_SEFARIA_API=sef, OPENAI_BASE_URL=oai, OPENAI_API_KEY="sk-test",
-                      CHAVRUTA_PACKS=packs)
+                      CHAVRUTA_PACKS=packs, CHAVRUTA_SESSIONS=sessions, CHAVRUTA_WIKISOURCE_API=sef[:-4] + "/w/api.php",
+                      CHAVRUTA_WEB_REWRITE='{"https://halachayomit.co.il": "%s/hy"}' % sef[:-4])
     import importlib
     import chavruta.sefaria as sf
     importlib.reload(sf)
@@ -115,6 +123,16 @@ def main():
         check("printed text has no nikud", not any(0x591 <= ord(c) <= 0x5c7 for c in page.inner_text("#gtext")))
         shot("01-daf")
 
+        # Coming back after a day: where you were, and a review on one tap.
+        page.wait_for_selector("#chips .chip:has-text('חזרה על מה שלמדנו')", timeout=10000)
+        check("coming back, it says where you stopped", "בפעם הקודמת" in page.inner_text("#reply"),
+              page.inner_text("#reply")[:60])
+        page.click("#chips .chip:has-text('חזרה על מה שלמדנו')")
+        page.wait_for_function("S.turns.some(t => /\\[\\[Berakhot 2b\\]\\]/.test(t.text || ''))", timeout=20000)
+        check("↺ reviews last time's pages, each cited",
+              page.evaluate("S.turns.some(t => /Berakhot 2a/.test(t.text) && /Berakhot 2b/.test(t.text))"))
+        page.wait_for_function("!saying && !speechQ.length", timeout=20000)
+
         # The picker: daf ג, amud ב.
         page.select_option("#daf", "3")
         page.click("#am-b")
@@ -166,10 +184,16 @@ def main():
             page.wait_for_function("document.querySelectorAll('.w.read').length > 5", timeout=25000)
             check("follows the reading on the page", page.locator(".w.read").count() >= 10,
                   "(%d words marked)" % page.locator(".w.read").count())
-            said = lambda pattern, t=60000: page.wait_for_function(
-                "S.log.some((t) => !t.me && %s.test(t.text))" % pattern, timeout=t)
+            def said(pattern, t=60000):
+                try:
+                    page.wait_for_function("S.log.some((t) => !t.me && %s.test(t.text))" % pattern, timeout=t)
+                except Exception:
+                    print("waited for %s; the log was:" % pattern,
+                          page.evaluate("JSON.stringify(S.log.map((t) => [t.me, t.mode, (t.text || '').slice(0, 60)]))"))
+                    raise
             said("/מעשר\\?/")
             log = page.evaluate("S.log.map((t) => [t.me ? 'me' : 'it', t.mode || '', t.text])")
+            log = log[next(i for i, t in enumerate(log) if t[1] == "reading"):]   # after the review at the start
             check("a clean reading gets no reply", log[0][:2] == ["me", "reading"] and log[1][0] == "me",
                   str(log[:2])[:160])
             check("a different word is asked about, once", sum("מעשר?" in t[2] for t in log) == 1,
@@ -182,7 +206,8 @@ def main():
             said("/pull up/")
             said("/rules like Rabban Gamliel/")
             log = page.evaluate("S.log.map((t) => [t.me ? 'me' : 'it', t.interim ? 'interim' : '', t.text])")
-            fetching = next(t[2] for t in log if t[1] == "interim")
+            fetching = next(t[2] for t in log if t[1] == "interim" and "the Tur" in t[2]) \
+                if any("the Tur" in t[2] for t in log if t[1] == "interim") else ""
             check("says it is fetching, then answers from the Tur", "the Tur" in fetching, fetching)
             said("/hear you/")
             check("a mic check gets a few words", True)
@@ -215,7 +240,7 @@ def main():
                   "(%d chars)" % len(report))
             if args.shots:
                 open(os.path.join(args.shots, "session.md"), "w").write(report)
-            recorded = os.listdir(os.path.join(os.path.dirname(HERE), "sessions"))
+            recorded = os.listdir(os.environ["CHAVRUTA_SESSIONS"])
             check("each turn is recorded on disk", bool(recorded), str(recorded))
             page.click("#mic")
             page.wait_for_function("!saying && !speakingDone", timeout=15000)

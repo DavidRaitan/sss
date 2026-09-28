@@ -123,6 +123,26 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(texts(_ref(url.path, "/api/v3/texts/"), q.get("version", [])))
         if url.path.startswith("/api/links/"):
             return self.reply(links(_ref(url.path, "/api/links/")))
+        if url.path.startswith("/hy/"):
+            # Stands in for a Halacha Yomit page: menus around one halacha.
+            page = ("<html><head><title>זמן קריאת שמע של ערבית | הלכה יומית</title><script>var x=1;</script></head>"
+                    "<body><nav><a>דף הבית</a><a>הלכות</a></nav><div class='menu'>תפריט</div>"
+                    "<div class='halacha'><p>מי שלא קרא קריאת שמע של ערבית עד חצות הלילה, יקרא עד עלות השחר, "
+                    "וכן פסק מרן רבינו עובדיה יוסף זצוק\"ל, שהעיקר כדעת רבן גמליאל.</p>"
+                    "<p>ומכל מקום לכתחילה יש להקדים ולקרוא קודם חצות, כדי להרחיק את האדם מן העבירה.</p></div>"
+                    "<footer>כל הזכויות שמורות להלכה יומית</footer></body></html>")
+            body = page.encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            return self.wfile.write(body)
+        if url.path == "/w/api.php":
+            # Stands in for Hebrew Wikisource's MediaWiki API.
+            if q.get("action") == ["query"]:
+                return self.reply({"query": {"search": [{"title": "שער הציון/רלה", "snippet": "..."}]}})
+            return self.reply({"parse": {"title": q.get("page", [""])[0], "text":
+                "<div><p>(א) עד חצות – כדי להרחיק אדם מן העבירה, ובדיעבד עד עמוד השחר, כמבואר בגמרא ובפוסקים.</p></div>"}})
         if url.path == "/api/calendars":
             # Same shape as Sefaria's; today's daf pinned to a recorded page.
             return self.reply({"date": "2026-09-28", "timezone": q.get("timezone", ["UTC"])[0], "calendar_items": [

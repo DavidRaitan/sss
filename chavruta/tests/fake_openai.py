@@ -42,6 +42,10 @@ def router(said):
     if re.search(r"can you hear|hear me read|go ahead", low):
         return {"kind": "ping", "claim": False, "names": [], "navigate": None, "language": "en",
                 "reply": "Yes, I hear you." if "can you" in low else "Go ahead."}
+    if re.search(r"remind me|last time|last \w+ pages|what did we learn|refresh", low):
+        return {"kind": "review", "claim": False, "names": [], "navigate": None, "language": "en", "reply": None}
+    if re.search(r"test me|quiz me|ask me questions", low):
+        return {"kind": "quiz", "claim": False, "names": [], "navigate": None, "language": "en", "reply": None}
     names = [n for n in ("Rashba", "Ritva", "Meiri", "Rif", "Rashi", "Tosafot", "Tur",
                          "Shulchan Aruch", "Rama") if n.lower() in low]
     if re.search(r"read it (right|correctly)", low):
@@ -56,10 +60,31 @@ def router(said):
 
 def partner(system, messages):
     last = messages[-1]["content"]
+    if system.startswith("Summarize one amud"):
+        return "%s: the gemara asks when the evening Shema may be read, and brings the three views." \
+            % last.split("\n", 1)[0]
+    # Only what was fetched for this turn: earlier fetches ride along for a few turns.
+    now = last.split("[fetched from Sefaria just now", 1)[1] if "[fetched from Sefaria just now" in last else ""
+    recaps = re.findall(r"\[\[(\w+ \d+[ab])\]\] Recap", now)
+    if recaps:
+        return " ".join("On %s [[%s]] the gemara asks about the evening Shema." % (r.split()[-1], r)
+                        for r in recaps) + " Want to go back into one?"
+    if "Want a few quick questions" in last or re.search(r"\btest me\b|quiz", last, re.I):
+        return "First question: why does the Mishnah open with the evening Shema?"
     rashi = re.search(r"\[\[(Rashi on [^\]]+)\]\]", system)
     ref = rashi.group(1) if rashi else "Berakhot 2a:1"
     if "UNGROUNDED" in last and not any("[from the app" in m["content"] for m in messages):
         return "The Rashba says the opposite, and so does Rashi."
+    site = re.search(r"\[\[((?:Halacha Yomit|Wikisource): [^\]]+)\]\]", now)
+    tur = re.search(r"\[\[(Tur, [^\]]+)\]\]", now)
+    if tur:
+        return ("The Tur [[%s]] rules like Rabban Gamliel -- «והלכה כר\"ג» -- even לכתחלה, until dawn." % tur.group(1)
+                + (" Halacha Yomit [[%s]] brings Rav Ovadia's ruling the same way." % site.group(1)
+                   if site and site.group(1).startswith("Halacha") else ""))
+    if site:
+        return "Halacha Yomit [[%s]] brings Rav Ovadia's ruling: one who did not read before midnight reads until dawn." \
+            % site.group(1) if site.group(1).startswith("Halacha") else \
+            "The Sha'ar HaTziyun [[%s]] brings the sources." % site.group(1)
     fetched = re.search(r"\[\[(Tur, [^\]]+)\]\]", last)
     if "fetched from Sefaria just now" in last and fetched:
         return ("The Tur [[%s]] rules like Rabban Gamliel -- «והלכה כר\"ג» -- even "
@@ -114,6 +139,24 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/control/latency":
             STATE["latency"] = float(json.loads(raw)["seconds"])
             return self.reply({"ok": True})
+        if path.endswith("/responses"):
+            # Web search limited to the trusted sites: the pages it found.
+            body = json.loads(raw)
+            STATE["log"].append({"path": "search", "input": body.get("input"),
+                                 "domains": [d for t in body.get("tools") or []
+                                             for d in (t.get("filters") or {}).get("allowed_domains") or []]})
+            url = "https://halachayomit.co.il/he/ReadHalacha.aspx?HalachaID=4521"
+            return self.reply({
+                "id": "resp_1", "object": "response", "created_at": 0, "status": "completed",
+                "model": body.get("model"), "parallel_tool_calls": True, "tool_choice": "auto", "tools": [],
+                "output": [
+                    {"type": "web_search_call", "id": "ws_1", "status": "completed",
+                     "action": {"type": "search", "query": body.get("input"),
+                                "sources": [{"type": "url", "url": url}]}},
+                    {"type": "message", "id": "msg_1", "role": "assistant", "status": "completed",
+                     "content": [{"type": "output_text", "text": "Found it.", "annotations": [
+                         {"type": "url_citation", "url": url, "title": "זמן קריאת שמע של ערבית",
+                          "start_index": 0, "end_index": 5}]}]}]})
         if path == "/control/reset":
             STATE.update(transcripts=[], log=[])
             return self.reply({"ok": True})

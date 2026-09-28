@@ -17,7 +17,8 @@ function el(tag, cls, text) {
 
 const DEFAULTS = { view: "daf", depth: "daf", language: "en", voice: "natural",
   hearing: "api", speak: true, pause: "normal", nudges: true, checks: true, translate: false, stops: false,
-  speakers: false, rate: 1, favor: {}, voices: 3, open: "last", mine: [] };
+  speakers: false, rate: 1, favor: {}, voices: 3, open: "last", mine: [],
+  sites: ["halachayomit.co.il", "he.wikisource.org"], sites_halacha: true };
 const PAUSES = { short: 1000, normal: 1500, long: 2400 };
 function loadSettings() {
   try { return Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem("chavruta.settings") || "{}")); }
@@ -144,9 +145,27 @@ function fillMasechtot() {
   if (keep) mas.value = keep;
 }
 
+// Coming back after a day or more: say where you were, and offer a review.
+async function lastTime() {
+  try {
+    const { sittings } = await (await fetch("/api/history")).json();
+    const todayIso = new Date().toLocaleDateString("sv");   // YYYY-MM-DD, local
+    const last = (sittings || []).find((s) => s.date < todayIso);
+    if (!last || (sittings[0] && sittings[0].date === todayIso)) return;
+    const he = S.settings.language === "he";
+    const where = last.refs.slice(-1).map(runnerText)[0];
+    showReply("בפעם הקודמת (" + last.date.split("-").reverse().join(".") + ") למדת עד " + where + ".", { hint: true });
+    const again = el("button", "chip", "↺ חזרה על מה שלמדנו");
+    again.onclick = () => onUtterance({ text: he ? "תזכיר לי מה למדנו בפעם הקודמת" : "Remind me what we learned last time" });
+    const test = el("button", "chip", "❓ שאלות חזרה");
+    test.onclick = () => onUtterance({ text: he ? "תבחן אותי על מה שלמדנו בפעם הקודמת" : "Test me on what we learned last time" });
+    $("chips").append(again, test);
+  } catch (e) {}
+}
+
 // Today's daf, from Sefaria's calendar.
 async function today() {
-  if (S.today && S.today.date === new Date().toISOString().slice(0, 10)) return S.today;
+  if (S.today && S.today.date === new Date().toLocaleDateString("sv")) return S.today;
   try {
     const r = await fetch("/api/today");
     if (r.ok) S.today = await r.json();
@@ -1228,7 +1247,8 @@ async function respond(batch, g) {
   try {
     answer = await postStream("/api/say", Object.assign({ ref: S.pack.ref, line: last.line || S.line, session: S.session,
       said, heard: last.heard.heard, depth: S.settings.depth, language: S.settings.language,
-      favor: S.settings.favor, voices: S.settings.voices }, extra),
+      favor: S.settings.favor, voices: S.settings.voices,
+      sites: S.settings.sites, sites_halacha: S.settings.sites_halacha }, extra),
       (msg) => {
         if (g !== S.gen) return;
         if (msg.mode === "read") {
@@ -1505,7 +1525,9 @@ function textLink(ref) {
       if (!r.ok) throw new Error(data.error);
       body.textContent = data.he;
       body.dataset.done = "1";
-      const go = el("a", "lnk", "בספריא ↗"); go.href = sefariaUrl(ref); go.target = "_blank"; go.rel = "noopener";
+      // A page of a trusted site links back to the site itself.
+      const go = el("a", "lnk", data.url ? "באתר המקור ↗" : "בספריא ↗");
+      go.href = data.url || sefariaUrl(ref); go.target = "_blank"; go.rel = "noopener";
       body.append(el("br"), go);
     } catch (e) { body.textContent = "לא הצלחתי להביא את זה מספריא."; }
   };
@@ -1668,6 +1690,40 @@ function learningBox() {
   return box;
 }
 
+// Sites you trust for what Sefaria does not have: read, quoted briefly, cited
+// with their address.
+function sitesBox() {
+  const box = el("div", "set sites");
+  box.append(el("div", "lbl", "אתרים מהימנים"));
+  box.append(el("div", "help", "למה שאין בספריא: הלכה יומית (פסקי הרב עובדיה), ויקיטקסט (שער הציון, ברכי יוסף, המרדכי). " +
+    "הוא בודק שם כשתזכיר אותם (״מה אומר הרב עובדיה?״) או כשתגיד ״תבדוק באתרים״, מצטט משפט ונותן קישור."));
+  const list = el("div", "opts");
+  const draw = () => {
+    list.replaceChildren();
+    for (const site of S.settings.sites) {
+      const b = el("button", "btn", site + " ✕");
+      b.title = "להסיר"; b.dataset.site = site;
+      b.onclick = () => { S.settings.sites = S.settings.sites.filter((x) => x !== site); saveSettings(); draw(); };
+      list.append(b);
+    }
+  };
+  draw();
+  const form = el("form"); form.className = "addsite";
+  const input = el("input"); input.className = "btn"; input.placeholder = "example.org"; input.dir = "ltr";
+  const add = el("button", "btn", "הוסף"); add.type = "submit";
+  form.append(input, add);
+  form.onsubmit = (e) => {
+    e.preventDefault();
+    const site = input.value.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0];
+    if (/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(site) && !S.settings.sites.includes(site)) {
+      S.settings.sites = [...S.settings.sites, site]; saveSettings(); draw();
+    }
+    input.value = "";
+  };
+  box.append(list, form);
+  return box;
+}
+
 // Who sits at the table: tap a name once to always want him (★), again to
 // leave him out (⊘), again for neither. Rashi and Tosafot are the page itself.
 function seatsBox() {
@@ -1742,6 +1798,9 @@ function openSettings() {
       choice("voices", "כמה קולות בתשובה", [[1, "אחד"], [2, "שניים"], [3, "שלושה"], [5, "רחב"]],
         "כמה מפרשים מעבר לרש״י ותוספות הוא פותח בעצמו לכל שאלה (בהלכה — קצת יותר, בשביל השרשרת)."),
       seatsBox(),
+      sitesBox(),
+      choice("sites_halacha", "בכל שאלת הלכה — לבדוק גם בהלכה יומית", [[true, "כן"], [false, "רק כשאני מבקש"]],
+        "מוסיף כמה שניות וכמה אגורות לשאלה."),
       choice("language", "שפת התשובה", [["en", "English"], ["he", "עברית"], ["auto", "כמוני"]],
         "באנגלית הוא מצטט את הגמרא בעברית, בתוך המשפט — כמו שמדברים בבית המדרש."),
       choice("view", "תצוגת הדף", [["daf", "צורת הדף"], ["lin", "שטיינזלץ, מנוקד"]]),
@@ -1806,6 +1865,7 @@ document.addEventListener("touchend", (e) => {
   const last = recall("ref");
   const valid = last && parseRef(last) && S.masechtot.some((m) => m.name === parseRef(last).masechta);
   today();                // the 📅 button shows today's daf by name
+  lastTime();             // "last time you learned ... -- a quick review?"
   if (S.settings.open === "today" && (await today())) return openToday();
   turnTo(valid ? last : pickedRef());
 })();

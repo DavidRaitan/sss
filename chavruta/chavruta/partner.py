@@ -3,7 +3,7 @@
 
 import re
 
-from . import align, ground, library, retrieve
+from . import align, ground, library, retrieve, review, web
 from . import commentators as who
 
 BACKBONE_IN_PROMPT = ("Rashi", "Tosafot", "Rabbeinu Chananel", "Rashbam", "Ran")
@@ -89,6 +89,19 @@ of one name -- Rabban Gamliel the Elder, of Yavneh, the son of Rabbi -- work out
 from the page which one is meant (whom he argues with, which layer of the text
 he is in), say so, and use his record only.
 
+Coming back to it. When they ask what they learned -- the last pages, last
+time, the mishna so far -- the turn brings a short recap of each amud they
+mean, made from its text. Tell it as the story of the sugya in order, the
+question and where it landed, citing each amud ("on 5a [[Berakhot 5a]] the
+gemara asks ..."), briefly, and offer to go back into one.
+
+Testing them. When they ask you to test them, or say yes to your offer of
+questions, ask one question at a time on what they learned -- the argument,
+who holds what and why, what a word does in the sugya; not trivia -- and
+wait. When they answer, say plainly whether it holds, from the text, in a
+sentence or two, then ask the next, up to five, unless they want to stop.
+Their answer to your question is an answer, not a new topic.
+
 When they tell you to answer, go on, or repeat ("so answer", "answer the
 question I asked"), look back at what they asked and answer it in full, now.
 Never reply that you will answer, or restate their question instead of
@@ -128,6 +141,14 @@ On a Tosafot with several voices. The argument line of each comment marks who
 speaks (by רש״י, by ר״ת, by ר״י). A Tosafot is often three voices -- Rashi's
 reading, the questions on it, Rabbeinu Tam's answer, the Ri's -- keep them apart
 when you describe it, and say which is which.
+
+From the web. Some of the turn may come from sites the learner trusts --
+Halacha Yomit, which publishes Rav Ovadia Yosef's rulings, or Wikisource, for
+the Sha'ar HaTziyun, the Birkei Yosef, the Mordechai. Cite them like any
+source ("Halacha Yomit [[Halacha Yomit: ...]] brings Rav Ovadia's ruling that
+..."), say it is from that site, and quote at most a sentence: the words are
+theirs. Rav Ovadia, Yalkut Yosef or Yabia Omer may be named only through such
+a page.
 
 On the shelf. Reach for a work by what it does, not by how famous it is. An
 explainer says what the text means (Rashi; the Maharsha on Rashi and
@@ -193,6 +214,9 @@ SIZE = {
     "structure": "up to about 100 words, and a table if there are three or more positions",
     "halacha": "up to about 100 words for the chain, a table if three or more positions",
     "aggadah": "about 40-70 words: what it says, then the idea, and stop",
+    "review": "about 60-120 words: the story of those pages in order -- the question each "
+              "takes up and where it lands -- then offer to go into one",
+    "quiz": "one question, then stop and wait for their answer",
     "other": "as short as the question allows -- but if they are asking you to answer "
              "something, answer it in full",
 }
@@ -369,7 +393,8 @@ SPOKEN = {
            "Turei Zahav": "the Taz", "Bach": "the Bach", "Zmanim": "tonight's times",
            "Kessef Mishneh": "the Kesef Mishneh", "Hasagot HaRaavad": "the Raavad", "Beur HaGra": "the Gra",
            "Arukh HaShulchan": "the Aruch HaShulchan", "Peri Megadim": "the Pri Megadim",
-           "Ba'er Hetev": "the Be'er Heitev", "Darkhei Moshe": "the Darkei Moshe"},
+           "Ba'er Hetev": "the Be'er Heitev", "Darkhei Moshe": "the Darkei Moshe",
+           "Wikisource": "Wikisource", "Recap": "those pages"},
     "he": {"Rambam": "הרמב״ם", "Tur": "הטור", "Shulchan Arukh": "השולחן ערוך",
            "Mishnah Berurah": "המשנה ברורה", "Rabbeinu Yonah": "רבינו יונה",
            "Beit Yosef": "הבית יוסף", "Magen Avraham": "המגן אברהם", "Turei Zahav": "הט״ז",
@@ -377,7 +402,8 @@ SPOKEN = {
            "Hasagot HaRaavad": "הראב״ד", "Darkhei Moshe": "הדרכי משה", "Peri Megadim": "הפרי מגדים",
            "Ba'er Hetev": "הבאר היטב", "Beur HaGra": "הגר״א", "Arukh HaShulchan": "הערוך השולחן",
            "Kaf HaChayim": "הכף החיים", "Machatzit HaShekel": "המחצית השקל", "Eliyah Rabbah": "האליה רבה",
-           "Sha'arei Teshuvah": "השערי תשובה", "Lechem Mishneh": "הלחם משנה", "Mishneh LaMelech": "המשנה למלך"},
+           "Sha'arei Teshuvah": "השערי תשובה", "Lechem Mishneh": "הלחם משנה", "Mishneh LaMelech": "המשנה למלך",
+           "Halacha Yomit": "הלכה יומית", "Wikisource": "ויקיטקסט", "Recap": "הדפים הקודמים"},
 }
 
 
@@ -404,8 +430,12 @@ def fetching_line(labels, lang):
 
 
 class Partner:
-    def __init__(self, pack, llm, depth="daf", language="en", index=None, favor=None, voices=None):
+    def __init__(self, pack, llm, depth="daf", language="en", index=None, favor=None, voices=None,
+                 sites=None, sites_halacha=False):
         self.pack = pack
+        # Trusted sites for what Sefaria lacks, from settings.
+        self.sites = web.clean_sites(web.DEFAULT_SITES if sites is None else sites)
+        self.sites_halacha = bool(sites_halacha)
         # The learner's table, from settings: who they want to hear from, who
         # they asked to leave out, and how many voices past the page a turn opens.
         self.favor = {k: v for k, v in (favor or {}).items() if v in (1, -1)}
@@ -466,9 +496,18 @@ class Partner:
         if library.place_in(said):
             memory["place"] = library.place_in(said)
         route = dict(route, said=said, place=memory.get("place"), prefer=self.prefer, mute=self.mute,
-                     voices=self.voices, avoid=sorted({
+                     voices=self.voices, sites=self.sites, sites_halacha=self.sites_halacha, avoid=sorted({
             self.ref_names[r.strip()] for text in recent for r in ground.CITE.findall(text)
             if r.strip() in self.ref_names}))
+        # "What were the last six pages about?" -- which amudim, from where they
+        # are and what they learned when.
+        if kind == "review":
+            import datetime
+            learned = review.sittings()
+            route["pages"] = review.which_pages(self.pack.ref, said, learned, datetime.date.today().isoformat())
+            if learned:
+                note += " [what they learned, by day: %s]" % "; ".join(
+                    "%s: %s" % (s["date"], ", ".join(s["refs"][:6])) for s in learned[:4])
         chosen = retrieve.extras(self.pack, n, route, self.depth)
         jobs = retrieve.plan(self.pack, n, route)
         fetched, missed, waited = [], [], 0.0
@@ -658,7 +697,7 @@ LEADING_CITES = re.compile(r"^\s*(\[\[[^\]]+\]\]\s*)+")
 # How hard the model thinks, by question. "What does this mean?" does not need
 # the deliberation a machlokes does, and thinking is time before the first word.
 EFFORT = {"meaning": "minimal", "people": "minimal", "other": "minimal", "check_reading": "minimal",
-          "ping": "minimal"}
+          "ping": "minimal", "review": "minimal", "quiz": "minimal"}
 
 ANSWER_IT = re.compile(r"\b(answer|go on|continue|you didn'?t answer|what was my question|"
                        r"my (last|previous) question|the question i asked)\b|תענה|תמשיך|לא ענית|מה שאלתי", re.I)

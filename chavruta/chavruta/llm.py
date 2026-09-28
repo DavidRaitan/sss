@@ -27,6 +27,7 @@ import io
 import json
 import os
 import re
+import urllib.parse
 
 DEFAULTS = {
     # ~$2/$12 per Mtok heavy, ~$0.20/$1.20 cheap; cached input ~10x cheaper.
@@ -260,6 +261,46 @@ class LLM:
         except Exception as exc:
             raise ModelError("%s: %s" % (model, exc))
         return (getattr(response, "output_text", "") or "").strip()
+
+    def find_pages(self, query, domains, limit=3):
+        """Pages on these sites that answer `query`: [(url, title)].
+
+        Only the addresses are taken from the search; the pages themselves are
+        then read directly (library.page), so what the partner quotes is the
+        site's own text and not a search engine's retelling of it.
+        """
+        if self.provider != "openai" or not domains:
+            return []
+        kwargs = {"model": self.cheap, "input": query,
+                  "tools": [{"type": "web_search", "filters": {"allowed_domains": list(domains)}}],
+                  "include": ["web_search_call.action.sources"]}
+        try:
+            response = self.leashed("cheap").responses.create(**kwargs)
+        except Exception as exc:
+            if not _rejects(exc, "include"):
+                raise ModelError("web search: %s" % exc)
+            kwargs.pop("include")
+            try:
+                response = self.leashed("cheap").responses.create(**kwargs)
+            except Exception as exc2:
+                raise ModelError("web search: %s" % exc2)
+        found = []
+
+        def keep(url, title=""):
+            host = urllib.parse.urlparse(url or "").hostname or ""
+            if url and any(host == d or host.endswith("." + d) for d in domains) and \
+                    url not in [u for u, _ in found]:
+                found.append((url, title or ""))
+
+        data = response.model_dump() if hasattr(response, "model_dump") else response
+        for item in data.get("output") or []:
+            for source in ((item.get("action") or {}).get("sources") or []):
+                keep(source.get("url"), source.get("title"))
+            for part in item.get("content") or []:
+                for note in part.get("annotations") or []:
+                    if note.get("type") == "url_citation":
+                        keep(note.get("url"), note.get("title"))
+        return found[:limit]
 
     def _anthropic(self, model, system, messages, budget):
         try:

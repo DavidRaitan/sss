@@ -16,7 +16,7 @@ or because the learner has asked to learn deeper.
 import re
 
 from . import commentators as who
-from . import library
+from . import library, web
 
 # Beyond the question kinds: the small exchanges of sitting together, which
 # want a few words back and not a lecture.
@@ -31,6 +31,9 @@ LIGHT = {
                      "swapped a word",
     "people": "who a sage or commentator was: when or where he lived, which century, "
               "who came first, who taught whom, was he someone's student",
+    "review": "asks to be reminded what was learned before -- the last pages, yesterday, "
+              "last time, the mishna or chapter so far -- or for a summary of it",
+    "quiz": "asks you to test them or ask them questions on what they learned",
 }
 KINDS = list(who.ROUTES) + list(LIGHT) + ["reading", "navigate"]
 
@@ -206,7 +209,7 @@ RULING = re.compile(r"^.{0,40}?(פסק|הלכה|הלכתא|נמצא|לענין �
 
 # Small exchanges and page-turns open nothing: a mic check does not need the Meiri.
 # Questions about people open no commentary either; they fetch the people.
-QUIET = ("ping", "reading", "navigate", "people")
+QUIET = ("ping", "reading", "navigate", "people", "review", "quiz")
 
 
 def extras(pack, n, route, depth="daf", budget=7):
@@ -346,6 +349,8 @@ def plan(pack, n, route):
     kind = route.get("kind")
     if kind == "people":
         return people_plan(pack, route)
+    if kind == "review":
+        return [(("recap", ref), "Recap") for ref in route.get("pages") or []]
     if kind in QUIET or kind == "check_reading":
         return []
     present = set(pack.commentators())
@@ -442,6 +447,26 @@ def plan(pack, n, route):
 
     # "Give me numbers": tonight's real times, and a summer and a winter night
     # when they ask about the seasons.
+    # Trusted sites, for what Sefaria does not have: Rav Ovadia's rulings on
+    # Halacha Yomit, the Sha'ar HaTziyun on Wikisource. Named, asked for ("check
+    # online"), or -- if the learner set it -- with every halacha question.
+    said_ = route.get("said") or ""
+    sites = route.get("sites") or []
+    wanted = [d for d, pattern in web.WORKS if d in sites and pattern.search(said_)]
+    if web.ANY_SITE.search(said_):
+        wanted = list(sites)
+    if kind == "halacha" and route.get("sites_halacha") and "halachayomit.co.il" in sites:
+        wanted.append("halachayomit.co.il")
+    seif = (found.get("Shulchan Arukh") or [None])[0]
+    siman = re.search(r"Orach Chayim (\d+)", seif or "")
+    for domain in dict.fromkeys(wanted):
+        if domain == "he.wikisource.org":
+            add(("wiki", wiki_query(pack, n, said_, siman.group(1) if siman else None)), web.label(domain))
+        else:
+            context = "%s%s" % (pack.data.get("he_ref") or pack.ref,
+                                ", שולחן ערוך אורח חיים סימן %s" % siman.group(1) if siman else "")
+            add(("site", domain, "%s (%s)" % (said_, context)), web.label(domain))
+
     # A place named on its own ("let's say in Tel Aviv") is about the clock too:
     # in use that turn was answered with a sunset the model made up.
     said = route.get("said") or ""
@@ -454,6 +479,43 @@ def plan(pack, n, route):
             add(("zmanim", "%d-06-21" % today.year, place), "Zmanim")
             add(("zmanim", "%d-12-21" % today.year, place), "Zmanim")
     return jobs
+
+
+def hebrew_number(n):
+    """235 -> רלה, as Wikisource titles number simanim."""
+    ones, tens, hundreds = "אבגדהוזחט", "יכלמנסעפצ", "קרשת"
+    out, n = "", int(n)
+    while n >= 400:
+        out, n = out + "ת", n - 400
+    if n >= 100:
+        out, n = out + hundreds[n // 100 - 1], n % 100
+    if n in (15, 16):
+        return out + ("טו" if n == 15 else "טז")
+    if n >= 10:
+        out, n = out + tens[n // 10 - 1], n % 10
+    return out + (ones[n - 1] if n else "")
+
+
+# The Wikisource works, as its titles name them, and how to find the place.
+WIKI_WORKS = [
+    (re.compile(r"sha'?ar ha-?tziyun|שער הציון", re.I), "שער הציון", "siman"),
+    (re.compile(r"birkei yosef|ברכי יוסף", re.I), "ברכי יוסף אורח חיים", "siman"),
+    (re.compile(r"chazon ish|חזון איש", re.I), "חזון איש אורח חיים", "siman"),
+    (re.compile(r"mordechai|מרדכי", re.I), "מרדכי", "line"),
+]
+
+
+def wiki_query(pack, n, said, siman):
+    for pattern, work, by in WIKI_WORKS:
+        if pattern.search(said):
+            if by == "siman" and siman:
+                return "%s %s" % (work, hebrew_number(siman))
+            if by == "line":
+                words = pack.segment(n)["he_plain"].split()[:4]
+                masechta = (pack.data.get("he_ref") or "").split(" ")[0]
+                return "%s %s %s" % (work, masechta, " ".join(words))
+            return work
+    return said
 
 
 def people_plan(pack, route):

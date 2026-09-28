@@ -24,7 +24,7 @@ import urllib.parse
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, wait
 
-from . import sefaria
+from . import review, sefaria, web
 
 _TEXTS, _LINKS = {}, {}
 _LOCK = threading.Lock()
@@ -55,7 +55,11 @@ def text(ref):
     with _LOCK:
         if ref in _TEXTS:
             return _TEXTS[ref]
-        # A cited night's times open in the panel like any other source.
+        # A page of a trusted site, or a cited night's times, opens in the
+        # panel like any other source.
+        page = web.cached(ref)
+        if page:
+            return page
         for entry in _ZMANIM.values():
             if entry and entry["ref"] == ref:
                 return entry
@@ -128,6 +132,12 @@ def gather(jobs):
             futures.append((job, POOL.submit(zmanim, *job[1:])))
         elif job[0] == "person":
             futures.append((job, POOL.submit(person, *job[1:])))
+        elif job[0] == "site":
+            futures.append((job, POOL.submit(_site, job[1], job[2])))
+        elif job[0] == "wiki":
+            futures.append((job, POOL.submit(web.wikisource, job[1])))
+        elif job[0] == "recap":
+            futures.append((job, POOL.submit(review.recap, job[1])))
         else:
             futures.append((job, POOL.submit(follow, job[1], job[2])))
     wait([f for _, f in futures], timeout=DEADLINE)
@@ -148,13 +158,26 @@ def gather(jobs):
             found.append(("Zmanim", result))
         elif job[0] == "person":
             found.append(("About " + job[1], result))
+        elif job[0] == "recap":
+            found.append(("Recap", result))
+        elif job[0] in ("site", "wiki"):
+            found.extend((web.label(entry["site"]), entry) for entry in result)
         else:
             found.extend(result)
     return found, missed, round(time.time() - started, 1)
 
 
+def _site(domain, query):
+    from .llm import LLM
+    return web.search(domain, query, LLM().find_pages)
+
+
 def cached(job):
     """Whether a job would be answered without going out -- then nothing is announced."""
+    if job[0] in ("site", "wiki"):
+        return False
+    if job[0] == "recap":
+        return os.path.exists(review._path(job[1]))
     with _LOCK:
         if job[0] == "zmanim":
             place = job[2] if len(job) > 2 and (job[2] in PLACES or job[2] == "Jerusalem") else None
