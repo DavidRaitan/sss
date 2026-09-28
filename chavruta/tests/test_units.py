@@ -16,6 +16,8 @@ OAI, OAI_URL = fake_openai.start()
 os.environ.update(CHAVRUTA_SEFARIA_API=SEF_URL, OPENAI_BASE_URL=OAI_URL, OPENAI_API_KEY="sk-test",
                   CHAVRUTA_PACKS=tempfile.mkdtemp(), CHAVRUTA_ZMANIM_API=SEF_URL[:-4] + "/zmanim",
                   CHAVRUTA_WIKISOURCE_API=SEF_URL[:-4] + "/w/api.php",
+                  CHAVRUTA_NOTES=os.path.join(tempfile.mkdtemp(), "notes.jsonl"),
+                  CHAVRUTA_SESSIONS=tempfile.mkdtemp(),
                   CHAVRUTA_WEB_REWRITE='{"https://halachayomit.co.il": "%s/hy", "https://www.dafyomi.co.il": "%s/daf"}' % (SEF_URL[:-4], SEF_URL[:-4]))
 
 from chavruta import sefaria  # noqa: E402
@@ -818,6 +820,68 @@ class Review(unittest.TestCase):
         self.assertIn("one question", partner.SIZE["quiz"])
         self.assertIn("quiz", retrieve.KINDS)
         self.assertEqual(retrieve.extras(Pack(PACK), 1, {"kind": "quiz", "names": []}, "acharonim"), [])
+
+
+class LearningAlong(unittest.TestCase):
+    """Reading onto the next page, notes, progress, the phone link."""
+
+    def test_reading_on_turns_the_page(self):
+        from chavruta import server
+        importlib.reload(server)
+        two_a, two_b = server.load_pack("Berakhot 2a"), server.load_pack("Berakhot 2b")
+        said = "דילמא ביאת אורו הוא ומאי וטהר טהר גברא"
+        heard = align.listen(server.page_of(two_a), said)
+        turned = server.onto_next_page(two_a, said, heard, 13)
+        self.assertEqual(turned[0], "Berakhot 2b")
+        self.assertEqual((turned[1]["mode"], turned[1]["line"]), ("reading", 1))
+        # Across the break in one breath: the end of 2a, then the start of 2b.
+        across = "וממאי דהאי ובא השמש ביאת השמש והאי וטהר טהר יומא דילמא ביאת אורו הוא ומאי וטהר טהר גברא"
+        heard = align.listen(server.page_of(two_a), across)
+        self.assertEqual((server.onto_next_page(two_a, across, heard, 14) or [None])[0], "Berakhot 2b")
+        # Not from the middle of the page.
+        middle = "אמר רבה בר רב שילא אם כן לימא קרא ויטהר"
+        self.assertIsNone(server.onto_next_page(two_a, middle, align.listen(server.page_of(two_a), middle), 4))
+        self.assertEqual(server.onto_next_page(two_a, middle, align.listen(server.page_of(two_a), middle), 14)[0],
+                         "Berakhot 2b")
+
+    def test_notes_by_voice(self):
+        from chavruta import notes
+        self.assertEqual(notes.taken("Note: Rashi reads it as a third of the night"), "Rashi reads it as a third of the night")
+        self.assertEqual(notes.taken("save this"), "")
+        self.assertEqual(notes.taken("תרשום: רבן גמליאל חולק"), "רבן גמליאל חולק")
+        self.assertIsNone(notes.taken("Notes are important here, why?"))
+        self.assertTrue(notes.ASK.search("what did I note on this page?"))
+        notes.add("Berakhot 2a", 5, "the fence is for Shema, not the fats")
+        notes.add("Berakhot 3b", 2, "David's harp")
+        self.assertEqual([n["line"] for n in notes.on(ref="Berakhot 2a")], [5])
+        self.assertEqual(len(notes.on(masechta="Berakhot")), 2)
+        self.assertIn("line 5: the fence", notes.spoken(notes.on(ref="Berakhot 2a"), "en", here="Berakhot 2a"))
+
+    def test_progress(self):
+        import datetime
+        from chavruta import daily
+        today = datetime.date(2026, 9, 28)
+        sittings = [{"date": "2026-09-28", "refs": ["Berakhot 2a", "Berakhot 2b"]},
+                    {"date": "2026-09-27", "refs": ["Berakhot 3a"]},
+                    {"date": "2026-09-25", "refs": ["Berakhot 3b"]}]
+        p = daily.progress(sittings, today, ["Shabbat"])
+        self.assertEqual(p["streak"], 2)                          # the 25th is not in a row
+        self.assertEqual(p["daf_yomi"]["done"], True)             # the fake calendar's daf is Berakhot 2
+        self.assertEqual({t["name"]: (t["done"], t["total"]) for t in p["tractates"]},
+                         {"Berakhot": (4, 125), "Shabbat": (0, 312)})
+        from chavruta import server
+        self.assertIn("2 days in a row", server.progress_text(p, "en"))
+
+    def test_the_phone_link_has_a_key_and_a_certificate(self):
+        from chavruta import phone
+        phone.DIR = tempfile.mkdtemp()
+        key = phone.key()
+        self.assertGreaterEqual(len(key), 20)
+        self.assertEqual(phone.key(), key)                        # kept, not remade
+        cert, private = phone.certificate("192.168.1.5")
+        with open(cert) as handle:
+            self.assertIn("BEGIN CERTIFICATE", handle.read())
+        self.assertEqual(oct(os.stat(private).st_mode)[-3:], "600")
 
 
 class VoiceSettings(unittest.TestCase):

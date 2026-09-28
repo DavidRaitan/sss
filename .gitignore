@@ -11,9 +11,11 @@ __pycache__/
 *.pyc
 .env
 .venv/
-packs/*.json
-!packs/berakhot_2a.json
-!packs/berakhot_2b.json
-chavruta.log
+chavruta/packs/*
+!chavruta/packs/berakhot_2a.json
+!chavruta/packs/berakhot_2b.json
+chavruta/chavruta.log
 chavruta/sessions/
-packs/_voice/
+# Personal, and secret: your notes, and the phone link's key and certificate.
+chavruta/notes.jsonl
+chavruta/.phone/

@@ -3,7 +3,7 @@
 
 import re
 
-from . import align, ground, library, retrieve, review, sefaria, web
+from . import align, ground, library, notes, retrieve, review, sefaria, web
 from . import commentators as who
 
 BACKBONE_IN_PROMPT = ("Rashi", "Tosafot", "Rabbeinu Chananel", "Rashbam", "Ran")
@@ -595,6 +595,10 @@ class Partner:
         # Tosafot on the first line.
         if kind == "on_commentary" or SO_FAR.search(said):
             note += " " + covered_note(self.pack, n, history)
+        mine = notes.on(ref=self.pack.ref)
+        if mine and kind not in ("ping", "settings"):
+            note += " [their own notes on this page: %s]" % "; ".join(
+                "line %d: %s" % (r["line"], r["text"][:200]) for r in mine[-5:])
         liked = [n for n, v in self.favor.items() if v == 1]
         left_out = [n for n, v in self.favor.items() if v == -1]
         if (liked or left_out) and kind not in ("ping", "people"):

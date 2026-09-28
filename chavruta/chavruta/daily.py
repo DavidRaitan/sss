@@ -13,6 +13,7 @@ so preparing again only fills what is missing.
 """
 
 import datetime
+import json
 import os
 import threading
 import time
@@ -25,11 +26,22 @@ _DAYS = {}
 _LOCK = threading.Lock()
 
 
+def _days_path():
+    return os.path.join(os.environ.get("CHAVRUTA_PACKS") or os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "packs"), "_dafyomi_days.json")
+
+
 def daf_yomi(day=None):
     """{"ref": "Bekhorot 10", "he": "בכורות י׳", "amudim": [...], "date": ...} or None."""
     day = day or datetime.date.today()
     key = day.isoformat()
     with _LOCK:
+        if not _DAYS:
+            try:
+                with open(_days_path(), encoding="utf-8") as handle:
+                    _DAYS.update(json.load(handle))
+            except (OSError, ValueError):
+                pass
         if key in _DAYS:
             return _DAYS[key]
     data = sefaria.get("calendars", soft=True, timezone=TIMEZONE, diaspora=0,
@@ -48,7 +60,49 @@ def daf_yomi(day=None):
     if found:
         with _LOCK:
             _DAYS[key] = found
+            try:
+                with open(_days_path(), "w", encoding="utf-8") as handle:
+                    json.dump(_DAYS, handle, ensure_ascii=False)
+            except OSError:
+                pass
     return found
+
+
+def progress(sittings, today, mine=()):
+    """How far they have come: pages learned per tractate, the days in a row
+    they learned, and the Daf Yomi -- today's, and how many days running they
+    learned that day's daf."""
+    learned = {}
+    days = set()
+    for sitting in sittings:
+        days.add(sitting["date"])
+        for ref in sitting["refs"]:
+            learned.setdefault(ref.rsplit(" ", 1)[0], set()).add(ref)
+    streak, day = 0, today
+    if day.isoformat() not in days:
+        day -= datetime.timedelta(days=1)            # today not started yet: yesterday still counts
+    while day.isoformat() in days:
+        streak, day = streak + 1, day - datetime.timedelta(days=1)
+    all_refs = set().union(*learned.values()) if learned else set()
+    todays = daf_yomi(today) or {}
+    yomi_streak, day = 0, today
+    for _ in range(30):
+        d = daf_yomi(day) or {}
+        if not d.get("amudim") or not set(d["amudim"]) & all_refs:
+            if day == today:
+                day -= datetime.timedelta(days=1)
+                continue
+            break
+        yomi_streak, day = yomi_streak + 1, day - datetime.timedelta(days=1)
+    tractates = []
+    for m in MASECHTOT:
+        if m["name"] in learned or m["name"] in mine:
+            tractates.append({"name": m["name"], "he": m["he"], "done": len(learned.get(m["name"], ())),
+                              "total": len(sefaria.amudim(m["name"]))})
+    return {"streak": streak, "learned_today": today.isoformat() in days,
+            "daf_yomi": {"ref": todays.get("ref"), "he": todays.get("he"),
+                         "done": bool(set(todays.get("amudim") or []) & all_refs), "streak": yomi_streak},
+            "tractates": tractates}
 
 
 class Preparer:

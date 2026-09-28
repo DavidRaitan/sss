@@ -80,6 +80,8 @@ def main():
     ap.add_argument("--no-browser", action="store_true")
     ap.add_argument("--lan", action="store_true",
                     help="listen on the local network too (the microphone needs https on a phone)")
+    ap.add_argument("--phone", action="store_true",
+                    help="also serve over https on the local network, behind a private link, for a phone")
     args = ap.parse_args()
     if args.command == "doctor":
         return doctor()
@@ -87,7 +89,8 @@ def main():
         from . import prefetch
         return prefetch.run(args.what)
     from .server import serve
-    serve(port=args.port, open_browser=not args.no_browser, host="0.0.0.0" if args.lan else "127.0.0.1")
+    serve(port=args.port, open_browser=not args.no_browser, host="0.0.0.0" if args.lan else "127.0.0.1",
+          phone=args.phone)
     return 0
 
 

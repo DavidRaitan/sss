@@ -485,3 +485,18 @@ to the mishna the gemara is on, brings its text, and recaps the pages since.
   summary for pages learned before this app. Addresses seen for eight
   tractates; for the rest the first daf is found by a site search and the
   pattern kept.
+
+**53. Along the way: the page turns with you, notes, progress, the phone.**
+- Read on past the last lines and the next amud is checked (only if already
+  built -- turning never waits on the network); if that is where the words
+  are, the page turns, and words from the next page are not taken for words
+  "not on the page".
+- Each page remembers its line; the app and each tractate open where you were.
+- Notes by voice ("note: ...", "save this" = the last answer, "what did I
+  note?"), kept in notes.jsonl (not committed), 📝 on the line, and shown to
+  the partner as the learner's own notes on the page.
+- Progress from the recorded sittings: days in a row, pages per tractate, the
+  Daf Yomi (today's, and days running); the calendar is kept on disk.
+- The phone: `--phone` serves over https on the local network with a
+  certificate made once, behind a private link whose key becomes a cookie;
+  the Mac itself needs no key. The handshake runs per connection.

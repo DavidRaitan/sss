@@ -67,6 +67,13 @@ where the page itself points (Mesoret HaShas). "Test me" asks questions one at a
 time; at the end of an amud it offers. Opening the app after a day away, it says
 where you stopped, with ↺ review and ❓ questions one tap away.
 
+**Along the way.** Read on past the last line and the page turns to the next amud
+with you. Close the app and it opens again at the line you were on. Say "note:
+…" (or "תרשום: …") to pin a thought to the line, "save this" to keep the last answer,
+"what did I note on this page / in this tractate?" to hear them — 📝 marks the lines.
+"How much have I learned?" — days in a row, pages per tractate, and whether you
+learned today's daf; the same in ⚙ under "ההתקדמות שלי", and ✓ on 📅 once done.
+
 **Trusted sites** (⚙): for what Sefaria does not have — Halacha Yomit for Rav
 Ovadia's rulings, Hebrew Wikisource for the Sha'ar HaTziyun, Birkei Yosef, the
 Mordechai. Named ("what does Rav Ovadia say?") or asked ("check online"), it
@@ -145,8 +152,10 @@ Tests: `./run.sh test` (unit), `python3 tests/e2e.py` (browser, needs Playwright
 `./run.sh doctor` checks each piece for real and says what to do. The server writes
 problems to `chavruta.log`; the last few show up in `doctor`.
 
-Using it from a phone: the app runs on your Mac. `./run.sh --lan` lets a phone on the
-same wifi open it, but phones only allow the microphone over https, so for now use it
-on the Mac with earbuds, or mirror the Mac screen.
+**Using it from a phone** (same wifi as the Mac): `./run.sh --phone`. The Mac makes
+its own certificate once and prints a private link — send it to yourself and open it
+on the phone. The first time the phone warns the certificate isn't trusted (it's your
+Mac's own): continue (Safari: *Show Details → visit this website*). Without the key
+in that link, nobody else on the wifi can use the app or your OpenAI key.
 
 Sefaria's Davidson/Steinsaltz texts are CC BY-NC: free to use, not to sell.

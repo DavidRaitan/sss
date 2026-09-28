@@ -33,7 +33,7 @@ import traceback
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from . import align, commentators, daily, library, retrieve, review, sefaria, smalltalk
+from . import align, commentators, daily, library, notes, retrieve, review, sefaria, smalltalk
 from .commentators import MASECHTOT
 from .llm import LLM, VOICE_DIRECTION, ModelError, speakable
 from .masechta_index import Index
@@ -188,6 +188,46 @@ def session(sid):
             "recent": [], "spoke": None, "memory": {}})
 
 
+PROGRESS = re.compile(r"\bhow much (have i|did i|i've) (learn(ed)?|done|covered|finished)\b|\bmy progress\b|"
+                      r"\bhow am i doing\b|\bmy streak\b|כמה למדתי|ההתקדמות שלי|כמה ימים ברצף|איך אני מתקדם", re.I)
+
+
+def progress_text(p, lang):
+    """Progress in a sentence or two."""
+    he = lang == "he"
+    parts = []
+    if p["streak"]:
+        parts.append(("%d ימים ברצף שאתה לומד." % p["streak"]) if he else
+                     ("%d day%s in a row." % (p["streak"], "" if p["streak"] == 1 else "s")))
+    for t in p["tractates"][:3]:
+        parts.append(("ב%s: %d מתוך %d עמודים." % (t["he"], t["done"], t["total"])) if he else
+                     ("%s: %d of %d amudim." % (t["name"], t["done"], t["total"])))
+    dy = p["daf_yomi"]
+    if dy.get("ref"):
+        parts.append(("הדף היומי (%s): %s." % (dy["he"], "למדת ✓" if dy["done"] else "עוד לא")) if he else
+                     ("Today's daf, %s: %s." % (dy["ref"], "done" if dy["done"] else "not yet")))
+    return " ".join(parts) or ("עוד לא למדנו יחד." if he else "We haven't learned together yet.")
+
+
+def onto_next_page(pack, said, heard, line):
+    """(next amud, its reading) when they have read on from the last lines of
+    this amud into the next -- or None. Only a page already built is checked:
+    turning must never wait on the network."""
+    if line < len(pack.segments) - 2 and (heard.get("line") or 0) < len(pack.segments) - 2:
+        return None
+    ran_over = heard.get("mode") == "reading" and (heard.get("slips") or {}).get("after")
+    if heard.get("mode") == "reading" and not ran_over:
+        return None
+    nxt = pack.data.get("next")
+    if not nxt or not allowed(nxt) or not os.path.exists(pack_path(nxt)):
+        return None
+    there = align.listen(page_of(load_pack(nxt)), said)
+    if there.get("line") and there["line"] <= 3 and there.get("matched", 0) >= 3 and \
+            (there["mode"] == "reading" or (ran_over and there["mode"] == "quoting")):
+        return nxt, {k: v for k, v in dict(there, mode="reading").items() if k != "slips"}
+    return None
+
+
 def fresh_page(state, ref):
     if state.get("ref") != ref:
         # The page they are leaving gets its recap, quietly, so "did we learn
@@ -265,7 +305,28 @@ class Handler(BaseHTTPRequestHandler):
 
     # -- GET -------------------------------------------------------------------
 
+    def let_in(self):
+        """On the phone link, only with the key: the first visit carries it in
+        the address and leaves it as a cookie. The Mac itself needs none."""
+        if not PHONE_KEY or self.client_address[0] in ("127.0.0.1", "::1"):
+            return True
+        cookie = self.headers.get("Cookie") or ""
+        if "chavruta_key=%s" % PHONE_KEY in cookie:
+            return True
+        q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+        if (q.get("k") or [""])[0] == PHONE_KEY and self.command == "GET":
+            self.send_response(302)
+            self.send_header("Set-Cookie", "chavruta_key=%s; Path=/; Max-Age=31536000; Secure; HttpOnly; SameSite=Strict"
+                             % PHONE_KEY)
+            self.send_header("Location", urllib.parse.urlparse(self.path).path or "/")
+            self.end_headers()
+            return False
+        self.fail(403, "need_key")
+        return False
+
     def do_GET(self):
+        if not self.let_in():
+            return
         url = urllib.parse.urlparse(self.path)
         q = urllib.parse.parse_qs(url.query)
         arg = lambda k, d="": (q.get(k) or [d])[0].strip()
@@ -286,6 +347,11 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json({"masechtot": MASECHTOT})
         if url.path == "/api/table":
             return self.send_json({"table": commentators.table()})
+        if url.path == "/api/progress":
+            mine = [m for m in arg("mine").split(",") if m]
+            return self.send_json(daily.progress(review.sittings(400), datetime.date.today(), mine))
+        if url.path == "/api/notes":
+            return self.send_json({"notes": notes.on(ref=arg("ref"))})
         if url.path == "/api/history":
             # What was learned, sitting by sitting -- for "last time you were on ...".
             return self.send_json({"sittings": review.sittings()[:10]})
@@ -320,6 +386,8 @@ class Handler(BaseHTTPRequestHandler):
     # -- POST ------------------------------------------------------------------
 
     def do_POST(self):
+        if not self.let_in():
+            return
         route = urllib.parse.urlparse(self.path).path
         try:
             if route == "/api/hear":
@@ -398,14 +466,50 @@ class Handler(BaseHTTPRequestHandler):
             record("echo", session=sid, ref=ref, said=said)
             return self.send_json({"said": said, "mode": "echo"})
         heard = align.listen(page_of(pack), said)
-        record("heard", session=sid, ref=ref, line=line, said=said, heard=heard)
         state = session(sid)
+        # Read on past the last line: the next amud, turned to without a word.
+        onward = onto_next_page(pack, said, heard, max(line or 0, state.get("line") or 0))
+        turned = None
+        if onward:
+            turned, heard = onward
+            ref, pack = turned, load_pack(turned)
+        record("heard", session=sid, ref=ref, line=line, said=said, heard=heard)
         fresh_page(state, ref)
         if heard.get("line"):
             state["line"] = heard["line"]
         state["heard"] = heard
         reply = {"said": said, "mode": heard["mode"], "heard": heard,
                  "line": state["line"] or line}
+        if turned:
+            reply["turn"] = turned
+
+        # "Note: ..." / "save this" / "what did I note?" -- the learner's own notes.
+        if heard["mode"] == "talking":
+            lang = language if language in ("he", "en") else ("he" if heard.get("hebrew", 0) > 0.5 else "en")
+            wanted = notes.taken(said)
+            if wanted is not None:
+                last = next((m["content"] for m in reversed(state["history"]) if m["role"] == "assistant"), "")
+                text = wanted or re.sub(r"\s*\[\[[^\]]+\]\]", "", last) or said
+                entry = notes.add(ref, state["line"] or line, text, "note" if wanted else "answer")
+                reply["note"] = entry
+                reply["quick"] = ("רשמתי, בשורה %d." if lang == "he" else "Noted, on line %d.") % entry["line"]
+                record("answer", session=sid, ref=ref, line=line, said=said, text=reply["quick"], grounded=True,
+                       trace={"kind": "note", "quick": True, "seconds": 0})
+                return self.send_json(reply)
+            if PROGRESS.search(said) and len(said.split()) <= 14:
+                reply["quick"] = progress_text(daily.progress(review.sittings(400), datetime.date.today(),
+                                                              [pack.data.get("masechta", "")]), lang)
+                record("answer", session=sid, ref=ref, line=line, said=said, text=reply["quick"], grounded=True,
+                       trace={"kind": "progress", "quick": True, "seconds": 0})
+                return self.send_json(reply)
+            if notes.ASK.search(said) and len(said.split()) <= 14:
+                masechta = pack.data.get("masechta", "")
+                rows = notes.on(masechta=masechta) if notes.WIDE.search(said) else (
+                    notes.on(ref=ref) or notes.on(masechta=masechta))
+                reply["quick"] = notes.spoken(rows, lang, here=ref)
+                record("answer", session=sid, ref=ref, line=line, said=said, text=reply["quick"], grounded=True,
+                       trace={"kind": "notes", "quick": True, "seconds": 0})
+                return self.send_json(reply)
 
         # "Hey", "can you hear me?", "go ahead": answered from the words alone,
         # with no model, before anything else happens.
@@ -738,7 +842,32 @@ def morning():
         time.sleep(1800)
 
 
-def serve(port=8765, open_browser=True, host="127.0.0.1"):
+PHONE_KEY = None
+
+
+def serve_phone(port):
+    """The same app over https on the local network, for the phone, behind a key."""
+    import ssl
+    from . import phone
+    global PHONE_KEY
+    PHONE_KEY = phone.key()
+    ip = phone.lan_ip()
+    cert, private = phone.certificate(ip)
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    context.load_cert_chain(cert, private)
+    httpd = ThreadingHTTPServer(("0.0.0.0", port), Handler)
+    # The handshake happens in each connection's own thread, on its first read,
+    # so one slow or stalled device never holds up the others.
+    httpd.socket = context.wrap_socket(httpd.socket, server_side=True, do_handshake_on_connect=False)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    link = "https://%s:%d/?k=%s" % (ip, port, PHONE_KEY)
+    print("\nOn your phone (same wifi), open this private link -- send it to yourself:\n  %s\n"
+          "The first time, the phone warns that the certificate is not trusted: it is this Mac's own.\n"
+          "Choose to continue (Safari: Show Details -> visit this website). Keep the link to yourself.\n" % link)
+    return link
+
+
+def serve(port=8765, open_browser=True, host="127.0.0.1", phone=False):
     os.makedirs(PACKS, exist_ok=True)
     logging.basicConfig(filename=LOG_PATH, level=logging.INFO,
                         format="%(asctime)s %(levelname)s %(message)s")
@@ -761,6 +890,8 @@ def serve(port=8765, open_browser=True, host="127.0.0.1"):
     port = httpd.server_address[1]
     threading.Thread(target=prewarm, daemon=True).start()
     threading.Thread(target=morning, daemon=True).start()
+    if phone:
+        serve_phone(port + 1)
     url ="http://127.0.0.1:%d/" % port
     print("chavruta -> %s   (ctrl-c to stop; problems are written to chavruta.log)" % url)
     if open_browser:

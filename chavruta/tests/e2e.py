@@ -60,7 +60,8 @@ def start_stack():
         for ref in ("Berakhot 2a", "Berakhot 2b"):
             f.write(json.dumps({"kind": "heard", "ref": ref, "at": yesterday + " 21:00:00"}) + "\n")
     os.environ.update(CHAVRUTA_SEFARIA_API=sef, OPENAI_BASE_URL=oai, OPENAI_API_KEY="sk-test",
-                      CHAVRUTA_PACKS=packs, CHAVRUTA_SESSIONS=sessions, CHAVRUTA_WIKISOURCE_API=sef[:-4] + "/w/api.php",
+                      CHAVRUTA_PACKS=packs, CHAVRUTA_SESSIONS=sessions,
+                      CHAVRUTA_NOTES=os.path.join(sessions, "notes.jsonl"), CHAVRUTA_WIKISOURCE_API=sef[:-4] + "/w/api.php",
                       CHAVRUTA_WEB_REWRITE='{"https://halachayomit.co.il": "%s/hy", "https://www.dafyomi.co.il": "%s/daf"}' % (sef[:-4], sef[:-4]))
     import importlib
     import chavruta.sefaria as sf
@@ -98,7 +99,9 @@ def main():
         page = ctx.new_page()
         errors = []
         page.on("pageerror", lambda e: errors.append(str(e)))
-        page.on("console", lambda m: errors.append("console: " + m.text) if m.type == "error" else None)
+        # A web font refused by this sandbox's network proxy is not the page's error.
+        page.on("console", lambda m: errors.append("console: " + m.text)
+                if m.type == "error" and "ERR_CERT_AUTHORITY_INVALID" not in m.text else None)
 
         def check(label, ok, detail=""):
             print("%s %s %s" % ("✓" if ok else "✗", label, detail))
@@ -394,6 +397,25 @@ def main():
         check("syllables counted alike in Hebrew and English",
               page.evaluate("syllables('מאימתי קורין את שמע')") == 9 and page.evaluate("syllables('from when do we read the Shema')") == 8,
               str(page.evaluate("[syllables('מאימתי קורין את שמע'), syllables('from when do we read the Shema')]")))
+        # Progress, in settings: days in a row, pages per tractate.
+        page.click("#open-settings")
+        page.wait_for_selector(".progress .prog-row", timeout=10000)
+        check("progress shows pages learned", "ברכות" in page.inner_text(".progress"), page.inner_text(".progress")[:80])
+        # A note by voice: kept, and 📝 on its line.
+        page.evaluate("S.settings.view = 'daf'; render(); selectLine(3)")
+        page.evaluate("onUtterance({ text: 'note: check what Tosafot says here' })")
+        page.wait_for_selector("#gtext .note-mark", timeout=15000)
+        check("a note by voice is pinned to its line", page.locator("#gtext .note-mark").count() == 1)
+        # Reading on past the last line turns to the next amud.
+        page.evaluate("selectLine(14)")
+        page.evaluate("onUtterance({ text: 'אמר רבה בר רב שילא אם כן לימא קרא ויטהר מאי וטהר טהר יומא' })")
+        page.wait_for_function("S.pack && S.pack.ref === 'Berakhot 2b'", timeout=20000)
+        check("reading on turns the page", page.evaluate("S.line") <= 3, "line %s" % page.evaluate("S.line"))
+        # Back at the same line after closing and opening.
+        page.evaluate("selectLine(7)")
+        page.reload(wait_until="domcontentloaded")
+        page.wait_for_function("S.pack && S.pack.ref === 'Berakhot 2b' && S.line === 7", timeout=20000)
+        check("opens again at the line you were on", True)
         check("no JavaScript errors", not errors, "; ".join(errors[:3]))
         browser.close()
     print("\n%s" % ("ALL PASSED" if not problems else "FAILED: " + ", ".join(problems)))

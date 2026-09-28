@@ -78,6 +78,7 @@ main { overflow: hidden; display: flex; justify-content: center; padding: 14px; 
 .seg { cursor: pointer; border-radius: 4px; transition: background .25s; padding: 1px 0; }
 .seg:hover { background: color-mix(in srgb, var(--glow) 45%, transparent); }
 .seg.on { background: var(--glow); box-shadow: 0 0 0 3px var(--glow); }
+.note-mark { border: 0; background: none; cursor: pointer; font-size: 13px; padding: 0 3px; vertical-align: super; }
 /* Read words fade a little, like a karaoke line: where it thinks you are,
    never a mark on how you read. */
 .w.read { color: var(--dim); }
@@ -265,3 +266,10 @@ kbd { font-family: var(--ui); font-size: 11px; border: 1px solid var(--rule); bo
 .positions th, .positions td { border: 1px solid var(--rule); padding: 4px 8px; text-align: start; vertical-align: top; }
 .positions th { background: var(--glow); font-weight: 600; }
 .reply .para + .para { margin-top: 4px; }
+
+.prog { display: grid; gap: 6px; font-size: 13px; }
+.prog-top { margin-bottom: 2px; }
+.prog-row { display: grid; grid-template-columns: 90px 1fr auto; align-items: center; gap: 8px; }
+.prog-row .bar { height: 6px; border-radius: 3px; background: color-mix(in srgb, var(--faint) 25%, transparent); overflow: hidden; }
+.prog-row .fill { height: 100%; background: var(--mark); }
+.prog-n { color: var(--faint); font-size: 12px; }

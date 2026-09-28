@@ -122,7 +122,7 @@ async function buildPickers() {
   // A tractate opens where you left it, not at its first page.
   $("mas").onchange = () => {
     const back = recall("pos." + $("mas").value);
-    if (back) return turnTo(back);
+    if (back) return turnTo(back, +recall("line." + back) || 1);
     fillDapim(); turnTo(pickedRef());
   };
   $("today").onclick = openToday;
@@ -175,6 +175,10 @@ async function today() {
     if (r.ok) S.today = await r.json();
   } catch (e) {}
   if (S.today) $("today-label").textContent = S.today.he;
+  fetch("/api/progress").then((r) => r.json()).then((p) => {
+    if (p.daf_yomi && p.daf_yomi.done) $("today-label").textContent = (S.today ? S.today.he : "") + " ✓";
+    if (p.streak > 1) $("today").title = "הדף היומי · " + p.streak + " ימים ברצף";
+  }).catch(() => {});
   return S.today;
 }
 async function openToday() {
@@ -244,7 +248,7 @@ async function turnTo(ref, line) {
     remember("ref", ref);
     remember("pos." + data.masechta, ref);
     render();
-    selectLine(line || 1, { scroll: "top" });
+    selectLine(line || 1, { scroll: line > 1 ? "line" : "top" });   // back where you were
   } catch (e) {
     if (token === opening) pageError(ref, "network");
   }
@@ -282,6 +286,30 @@ function render() {
   }
   applyToggles();
   markRead(null);
+  drawNotes();
+}
+
+// Your notes: 📝 on the line each belongs to; tap to read it.
+async function drawNotes(fresh) {
+  if (!S.pack) return;
+  const ref = S.pack.ref;
+  if (!fresh) {
+    try { S.notes = (await (await fetch("/api/notes?ref=" + encodeURIComponent(ref))).json()).notes || []; }
+    catch (e) { S.notes = []; }
+    if (!S.pack || S.pack.ref !== ref) return;
+  }
+  document.querySelectorAll(".note-mark").forEach((m) => m.remove());
+  const main = S.settings.view === "daf" ? $("gtext") : $("linear");
+  const byLine = {};
+  for (const n of S.notes || []) (byLine[n.line] = byLine[n.line] || []).push(n);
+  for (const [line, list] of Object.entries(byLine)) {
+    const node = main && main.querySelector('[data-n="' + line + '"]');
+    if (!node) continue;
+    const mark = el("button", "note-mark", "📝");
+    mark.title = list.map((n) => n.text).join("\n—\n");
+    mark.onclick = (e) => { e.stopPropagation(); showReply(list.map((n) => "📝 " + n.text).join("\n\n"), { hint: true }); };
+    node.append(mark);
+  }
 }
 
 // A line as word spans. data-i counts only real words -- tokens that reduce to
@@ -396,6 +424,7 @@ function selectLine(n, opts) {
   opts = opts || {};
   const max = S.pack.segments.length;
   S.line = Math.min(Math.max(1, n), max);
+  remember("line." + S.pack.ref, S.line);        // to pick up at this line next time
   for (const node of document.querySelectorAll(".seg, .line, .c"))
     node.classList.toggle("on", +node.dataset.n === S.line);
   const sec = sectionOf(S.line);
@@ -1077,6 +1106,8 @@ async function hearOne(u, g, t0) {
     return idleMode();
   }
 
+  // Read on past the last line into the next amud: the page turns with you.
+  if (heard.turn && (!S.pack || S.pack.ref !== heard.turn)) await turnTo(heard.turn, heard.line);
   logPush({ me: true, text: heard.said, mode: heard.mode, ref: S.pack.ref, line: heard.line || S.line,
     heard: heard.heard, ms_hear: Math.round(performance.now() - t0), at: new Date().toLocaleTimeString() });
   if (heard.line) selectLine(heard.line, { scroll: "side" });
@@ -1116,6 +1147,7 @@ async function hearOne(u, g, t0) {
     answered(heard.said, last, { kind: "said again" });
     return;
   }
+  if (heard.note) { (S.notes = S.notes || []).push(heard.note); drawNotes(true); }
   if (heard.quick) {
     // "Hey", "can you hear me?", "go ahead": answered at once, no thinking.
     answered(heard.said, heard.quick, { kind: "small talk" });
@@ -1772,6 +1804,31 @@ function sessionReport() {
   return lines.join("\n");
 }
 
+// How far you have come: pages per tractate, days in a row, the Daf Yomi.
+function progressBox() {
+  const box = el("div", "set progress");
+  box.append(el("div", "lbl", "ההתקדמות שלי"));
+  const body = el("div", "prog"); body.textContent = "…";
+  box.append(body);
+  fetch("/api/progress?mine=" + encodeURIComponent(S.settings.mine.join(","))).then((r) => r.json()).then((p) => {
+    body.replaceChildren();
+    const top = [];
+    if (p.streak) top.push("🔥 " + p.streak + " ימים ברצף");
+    if (p.daf_yomi && p.daf_yomi.ref) top.push("📅 " + p.daf_yomi.he + (p.daf_yomi.done ? " ✓" : " — עוד לא") +
+      (p.daf_yomi.streak > 1 ? " (" + p.daf_yomi.streak + " ימים ברצף בדף היומי)" : ""));
+    body.append(el("div", "prog-top", top.join(" · ") || "עוד לא למדנו יחד."));
+    for (const t of p.tractates) {
+      const row = el("div", "prog-row");
+      const bar = el("div", "bar"); const fill = el("div", "fill");
+      fill.style.width = Math.round(100 * t.done / Math.max(1, t.total)) + "%";
+      bar.append(fill);
+      row.append(el("span", "prog-name", t.he), bar, el("span", "prog-n", t.done + "/" + t.total));
+      body.append(row);
+    }
+  }).catch(() => { body.textContent = ""; });
+  return box;
+}
+
 // What you are learning: your tractates (first in the picker), and each one
 // prepared ahead -- every page built in the background -- so it opens at once.
 function learningBox() {
@@ -1928,6 +1985,7 @@ function openSettings() {
     panel.append(
       choice("open", "בפתיחה", [["last", "איפה שהפסקתי"], ["today", "הדף היומי"]],
         "📅 למעלה תמיד מביא לדף היומי. הוא נבנה מראש כל בוקר (וגם של מחר) כל עוד האפליקציה פתוחה."),
+      progressBox(),
       learningBox(),
       choice("depth", "עומק", [["daf", "הדף — רש״י ותוספות"], ["rishonim", "+ ראשונים"], ["acharonim", "+ אחרונים"]],
         "מה החברותא מביא בעצמו. אם תשאל על מפרש מסוים, הוא יביא אותו בכל מקרה."),
@@ -2003,5 +2061,5 @@ document.addEventListener("touchend", (e) => {
   today();                // the 📅 button shows today's daf by name
   lastTime();             // "last time you learned ... -- a quick review?"
   if (S.settings.open === "today" && (await today())) return openToday();
-  turnTo(valid ? last : pickedRef());
+  turnTo(valid ? last : pickedRef(), valid ? +recall("line." + last) || 1 : 1);
 })();
