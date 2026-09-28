@@ -31,7 +31,10 @@ conversation, not a chat.
 - **Ask**: "what does the Rashba say here?", "does he really hold that, I learned the
   opposite elsewhere", "what's the halacha", "read it inside or summarise".
 - **Move by voice**: "go to daf 5 amud b" / "תעבור לדף ה עמוד ב".
-- **Interrupt** it by talking; it stops.
+- **Interrupt** it by talking; it stops, and hears you. **⏸** (or space) pauses it
+  without talking over it; **🔊** says the last answer again.
+- **Keep reading while it thinks.** It follows your reading at once, answers when you
+  pause, and if you've read on it says which question it's answering.
 
 What it will never do: correct *how you say the words* — pronunciation, havara,
 Hebrew for Aramaic. It hears you through speech recognition and cannot know those,

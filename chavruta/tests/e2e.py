@@ -183,12 +183,12 @@ def main():
             log = page.evaluate("S.log.map((t) => [t.me ? 'me' : 'it', t.interim ? 'interim' : '', t.text])")
             fetching = next(t[2] for t in log if t[1] == "interim")
             check("says it is fetching, then answers from the Tur", "the Tur" in fetching, fetching)
-            said("/^Yes, I hear you\\.$/")
+            said("/hear you/")
             check("a mic check gets a few words", True)
             shot("04-answer")
             spoken = [e for e in json.loads(urllib.request.urlopen(control + "/control/log").read())
                       if e["path"] == "speech"]
-            check("replies are spoken", len(spoken) >= 5, "(%d)" % len(spoken))
+            check("replies are spoken", len(spoken) >= 4, "(%d)" % len(spoken))
             check("the fetching line is spoken before the answer",
                   any("pull up" in e["input"] for e in spoken))
             check("short quotes are spoken, the gemara is not read back",
@@ -227,6 +227,43 @@ def main():
             shot("06-tur")
             page.keyboard.press("Escape")
             check("mic closes", page.get_attribute("#mic", "data-state") == "idle")
+
+            # ⏸ stops it without talking over it; ▶ carries on.
+            page.evaluate("void say('Rabban Gamliel holds the whole night is bedtime, and the Sages set midnight "
+                          "as a fence so that a person does not come to miss it altogether. ' .repeat(2))")
+            page.wait_for_selector("#hold:not([hidden])", timeout=15000)
+            page.click("#hold")
+            check("⏸ pauses the voice", page.get_attribute("#mic", "data-state") == "paused"
+                  and page.inner_text("#hold") == "▶")
+            page.click("#hold")
+            check("▶ resumes it", page.get_attribute("#mic", "data-state") == "speaking"
+                  and page.inner_text("#hold") == "⏸", page.get_attribute("#mic", "data-state"))
+            page.keyboard.press("Escape")
+            page.wait_for_selector("#hold", state="hidden", timeout=5000)
+            check("Esc stops it", True)
+
+            # Mic on/off/on quickly: never stuck, never two microphones.
+            for _ in range(3):
+                page.click("#mic")
+            page.wait_for_function("['listening','capturing','hearing'].includes(document.querySelector('#mic').dataset.state)",
+                                   timeout=8000)
+            page.click("#mic")
+            check("mic toggles cleanly", page.get_attribute("#mic", "data-state") == "idle"
+                  and page.evaluate("ears === null && !S.listening"))
+
+            # Typing: the panel stays open, the gemara stays in view, the turn appears.
+            page.click("#open-log")
+            page.fill("#panel input", "can you hear me?")
+            page.press("#panel input", "Enter")
+            page.wait_for_function("/hear you|I'm here/.test(document.querySelector('#turns').textContent)",
+                                   timeout=15000)
+            check("typing answers in the open transcript", page.locator("#over.open").count() == 1)
+            box = page.evaluate("(() => { const g = document.querySelector('#col-gemara').getBoundingClientRect();"
+                                " const p = document.querySelector('#panel').getBoundingClientRect();"
+                                " return [g.left, g.right, p.left, p.right]; })()")
+            check("the gemara stays in view beside the panel", box[1] <= box[2] + 1 or box[0] >= box[3] - 1, str(box))
+            shot("07-docked")
+            page.keyboard.press("Escape")
 
         page.click("#open-settings")
         check("settings open", page.locator(".set").count() >= 8)

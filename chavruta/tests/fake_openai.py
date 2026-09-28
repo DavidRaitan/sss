@@ -152,7 +152,8 @@ class Handler(BaseHTTPRequestHandler):
             body = json.loads(raw)
             STATE["log"].append({"path": "speech", "model": body.get("model"),
                                  "voice": body.get("voice"), "input": body.get("input")})
-            data = wav()
+            # About as long as the words would take to say, so pausing can be tested.
+            data = wav(seconds=min(6.0, max(0.4, len(body.get("input", "")) / 45.0)))
             self.send_response(200)
             self.send_header("Content-Type", "audio/wav")
             self.send_header("Content-Length", str(len(data)))

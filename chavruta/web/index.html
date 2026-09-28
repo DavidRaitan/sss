@@ -51,7 +51,8 @@
   <div class="bar">
     <div class="micwrap">
       <span class="level" id="level"></span>
-      <button id="mic" data-state="idle" title="לחץ ודבר (רווח)" aria-label="מיקרופון">🎙</button>
+      <button id="mic" data-state="idle" title="מיקרופון: לפתוח / לסגור" aria-label="מיקרופון">🎙</button>
+      <button id="hold" class="hold" hidden title="לעצור (רווח)" aria-label="לעצור את הדיבור">⏸</button>
     </div>
     <div class="talk" id="talk" aria-live="polite">
       <div class="state" id="state">לחץ על המיקרופון — וקרא, או תגיד מה אתה חושב שכתוב.</div>
@@ -66,7 +67,7 @@
   </div>
 </footer>
 
-<div class="over" id="over"><div class="panel" id="panel" role="dialog" aria-modal="true"></div></div>
+<aside class="over" id="over"><div class="panel" id="panel" role="complementary"></div></aside>
 
 <script src="app.js"></script>
 </body>

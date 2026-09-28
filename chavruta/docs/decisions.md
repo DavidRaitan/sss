@@ -213,3 +213,42 @@ on the panel and in the prompt, so they are not run together.
 shapes only on works that argue (not on remez), the Rishonim that Sefaria hangs
 on other lines of the amud one tap away, and every reference — halacha,
 Tanakh, Talmud — opens its text in place.
+
+## After the second sitting
+
+**24. Small talk never touches a model.** "Hey, what's up?" took hearing, a
+routing model, the partner and speech synthesis — six or seven seconds for
+"hey". `smalltalk.py` recognises mic checks, greetings, "go ahead", thanks and
+"what time is it" from the words alone (only when nothing else was said), and
+their audio is made once at startup and kept.
+
+**25. Nothing hangs.** A request that hung waited a minute and retried twice,
+so the learner watched "listening" for over a minute before an error, which
+never reached the export. Every model call now has a short timeout and one
+retry, failures are written to the sitting's record and shown in the
+transcript, and speech is streamed so playback starts while it is being made.
+
+**26. Hearing, answering and speaking run side by side.** One queue for all
+three meant reading waited behind the previous answer's voice, and questions
+asked mid-reading were answered one by one after the learner had moved on.
+Now reading is followed the moment it is heard; questions asked while an
+answer is being made are answered together, once; an answer waits for the end
+of the learner's sentence rather than talking into it, and says what it is
+answering if they have read on. Talking over it stops it and is heard; ⏸ (or
+space) pauses it without having to talk over it; 🔊 says it again. Speaking
+over the learner mid-reading was considered and not done: with a mic open,
+their own reading would cut it off at once, so waiting for the pause is what
+actually gets heard.
+
+**27. Mic off is a clean stop.** Clicking the mic on and off left requests,
+queued answers and a second microphone behind. Off now cancels everything in
+flight and drops whatever arrives late.
+
+**28. Panels sit beside the page.** Sources, transcript and settings no
+longer cover the gemara; on a phone they are a sheet from below. Typing in the
+transcript keeps it open and the turn appears there.
+
+**29. What speech recognition mangles is not corrected.** «הם מוכרים עד חצות»
+got "Not 'sold'", and a dropped «אתם» got "You skipped «אתם»". A short line is
+now recognised from fewer words, a skipped word alone never prompts a remark,
+and the partner asks rather than announces.

@@ -94,6 +94,18 @@ class LLM:
                 self._client = anthropic.Anthropic()
         return self._client
 
+    # A spoken partner cannot wait out a hung request: the client default is a
+    # minute per try with two retries, which in use left the learner staring at
+    # "listening" for over a minute before an error. Short leashes, one retry.
+    LEASH = {"hear": (15, 1), "cheap": (12, 1), "heavy": (50, 1), "speak": (20, 1)}
+
+    def leashed(self, job):
+        timeout, retries = self.LEASH[job]
+        try:
+            return self.client.with_options(timeout=timeout, max_retries=retries)
+        except AttributeError:
+            return self.client
+
     def models(self):
         """What this key can actually reach. Model names drift; this is truth."""
         try:
@@ -109,10 +121,10 @@ class LLM:
         budget = max_tokens or (4000 if heavy else 1200)
         if self.provider == "openai":
             return self._openai(model, system, messages, budget, as_json,
-                                self.effort if heavy else "none", cache_key)
+                                self.effort if heavy else "none", cache_key, "heavy" if heavy else "cheap")
         return self._anthropic(model, system, messages, budget)
 
-    def _openai(self, model, system, messages, budget, as_json, effort, cache_key):
+    def _openai(self, model, system, messages, budget, as_json, effort, cache_key, job="heavy"):
         kwargs = {
             "model": model,
             # The system prompt carries the whole amud and holds still for the
@@ -133,7 +145,7 @@ class LLM:
         ladder = {"none": "minimal", "minimal": "low"}
         for _ in range(6):
             try:
-                response = self.client.chat.completions.create(**kwargs)
+                response = self.leashed(job).chat.completions.create(**kwargs)
             except Exception as exc:
                 if "reasoning_effort" in kwargs and _rejects(exc, "reasoning_effort", "reasoning effort"):
                     nxt = ladder.get(kwargs["reasoning_effort"])
@@ -228,7 +240,7 @@ class LLM:
             buffer = io.BytesIO(audio)
             buffer.name = "speech.%s" % suffix
             try:
-                result = self.client.audio.transcriptions.create(file=buffer, **kwargs)
+                result = self.leashed("hear").audio.transcriptions.create(file=buffer, **kwargs)
                 return (getattr(result, "text", "") or "").strip()
             except Exception as exc:
                 for optional in ("keywords", "languages", "prompt"):
@@ -249,10 +261,40 @@ class LLM:
                   "instructions": VOICE_DIRECTION, "response_format": "mp3"}
         for _ in range(3):
             try:
-                response = self.client.audio.speech.create(**kwargs)
+                response = self.leashed("speak").audio.speech.create(**kwargs)
                 audio = response.read()
                 return audio, ("audio/wav" if audio[:4] == b"RIFF" else "audio/mpeg")
             except Exception as exc:
+                if "instructions" in kwargs and _rejects(exc, "instructions"):
+                    kwargs.pop("instructions")
+                    continue
+                if kwargs.get("voice") not in ("alloy", None) and _rejects(exc, "voice"):
+                    kwargs["voice"] = "alloy"
+                    continue
+                raise ModelError("%s: %s" % (self.tts, exc))
+        raise ModelError("%s: could not speak" % self.tts)
+
+    def speak_stream(self, text):
+        """Text to speech as it is made, so playback starts before it is finished.
+
+        Yields chunks of mp3. A parameter the model refuses is dropped and the
+        request made again, as long as nothing has been sent yet.
+        """
+        if not self.can_speak:
+            raise ModelError("natural voice needs the openai provider")
+        kwargs = {"model": self.tts, "voice": self.voice, "input": text[:3800],
+                  "instructions": VOICE_DIRECTION, "response_format": "mp3"}
+        sent = False
+        for _ in range(3):
+            try:
+                with self.leashed("speak").audio.speech.with_streaming_response.create(**kwargs) as response:
+                    for chunk in response.iter_bytes(4096):
+                        sent = True
+                        yield chunk
+                return
+            except Exception as exc:
+                if sent:
+                    raise ModelError("%s: cut off: %s" % (self.tts, exc))
                 if "instructions" in kwargs and _rejects(exc, "instructions"):
                     kwargs.pop("instructions")
                     continue

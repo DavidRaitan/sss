@@ -9,6 +9,8 @@
                                  that up" line first when it goes to Sefaria)
     GET  /api/text?ref=          any text on Sefaria, for the sources panel
     POST /api/speak              a reply as audio, never the gemara
+    POST /api/voice              the same, prepared; then GET /api/voice/<id>
+                                 streams it, so playback starts at once
     GET  /api/health             what works, and what to fix if it does not
 
 One process, standard library apart from the model SDK. Packs are cached on
@@ -17,6 +19,7 @@ page is instant.
 """
 
 import errno
+import hashlib
 import io
 import json
 import logging
@@ -28,7 +31,7 @@ import traceback
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from . import align, library, retrieve, sefaria
+from . import align, library, retrieve, sefaria, smalltalk
 from .commentators import MASECHTOT
 from .llm import LLM, ModelError, speakable
 from .masechta_index import Index
@@ -40,6 +43,8 @@ WEB = os.path.join(ROOT, "web")
 PACKS = os.environ.get("CHAVRUTA_PACKS") or os.path.join(ROOT, "packs")
 LOG_PATH = os.path.join(ROOT, "chavruta.log")
 SESSIONS_DIR = os.path.join(ROOT, "sessions")
+VOICE_DIR = os.path.join(PACKS, "_voice")
+VOICES = {}   # id -> text waiting to be spoken
 
 
 def record(kind, **fields):
@@ -158,14 +163,13 @@ def fresh_page(state, ref):
 def worth_asking(heard):
     """Whether a reading differed from the page in a way a chavruta would ask about.
 
-    A swapped word, always. A skipped word only when the rest was heard well --
-    otherwise it is the recogniser that skipped it. Words that are not on the
-    page, when there are enough of them to be something they said.
+    A swapped word, always. Words that are not on the page, when there are
+    enough of them to be something they said. Never a skipped word on its own:
+    in use "you skipped «אתם»" was the recogniser dropping it, and said as a
+    fact it is exactly the correction the learner asked never to get.
     """
     slips = heard.get("slips") or {}
     if slips.get("swapped") or slips.get("after"):
-        return True
-    if slips.get("skipped") and heard.get("coverage", 0) >= 0.75:
         return True
     return len(slips.get("added", [])) >= 2
 
@@ -206,9 +210,11 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def fail(self, status, message, exc=None):
-        """A short message for the screen; the whole story goes to the log."""
+        """A short message for the screen; the whole story goes to the log,
+        and a line to the sitting's record, so a failure shows in the export."""
         if exc is not None:
             log.error("%s %s: %s\n%s", self.command, self.path, exc, traceback.format_exc())
+            record("error", path=self.path.split("?")[0], status=status, error=str(exc)[:400])
         return self.send_json({"error": message}, status)
 
     def body_json(self):
@@ -227,6 +233,8 @@ class Handler(BaseHTTPRequestHandler):
 
         if url.path == "/api/health":
             return self.send_json(health())
+        if url.path.startswith("/api/voice/"):
+            return self.voice(url.path.rsplit("/", 1)[-1])
         if url.path == "/api/text":
             ref = arg("ref")
             if not ref or len(ref) > 200:
@@ -273,6 +281,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.say()
             if route == "/api/speak":
                 return self.speak()
+            if route == "/api/voice":
+                return self.prepare_voice()
         except ModelError as exc:
             return self.fail(502, "model: %s" % exc, exc)
         except sefaria.SefariaError as exc:
@@ -328,6 +338,18 @@ class Handler(BaseHTTPRequestHandler):
         reply = {"said": said, "mode": heard["mode"], "heard": heard,
                  "line": state["line"] or line}
 
+        # "Hey", "can you hear me?", "go ahead": answered from the words alone,
+        # with no model, before anything else happens.
+        quick = smalltalk.reply(said, language) if heard["mode"] == "talking" else None
+        if quick:
+            kind, text = quick
+            state["history"] = (state["history"] + [{"role": "user", "content": said},
+                                                    {"role": "assistant", "content": text}])[-24:]
+            record("answer", session=sid, ref=ref, line=line, said=said, text=text, grounded=True,
+                   trace={"kind": "small talk: " + kind, "quick": True, "seconds": 0})
+            reply["quick"] = text
+            return self.send_json(reply)
+
         if heard["mode"] == "reading":
             # Followed silently -- and remembered, so "did I read that right?"
             # is answered from what was actually heard.
@@ -359,6 +381,10 @@ class Handler(BaseHTTPRequestHandler):
         llm = LLM()
         heard = body.get("heard") or state.get("heard")
 
+        if body.get("about_reading") and heard:
+            # A question about one word, not about where they stopped: the
+            # next utterance usually carries on the same sentence.
+            heard = dict(heard, stopped_mid_clause=False)
         if body.get("about_reading"):
             # They were reading and a word came out different: nothing to route.
             route = {"kind": "check_reading", "claim": False, "names": [], "navigate": None,
@@ -422,14 +448,68 @@ class Handler(BaseHTTPRequestHandler):
             return emit(payload)
         return self.send_json(payload)
 
-    def speak(self):
-        body = self.body_json()
+    def spoken_text(self, body):
         text = speakable((body.get("text") or "").strip())
         ref = (body.get("ref") or "").strip()
         if ref and allowed(ref):
-            # The net under the «» marks: whatever the model did, no stretch of
-            # the page itself reaches the voice.
+            # The net under the «» marks: whatever the model did, no long
+            # stretch of the page itself reaches the voice.
             text = align.unspeak(text, page_of(load_pack(ref)))
+        return text
+
+    def prepare_voice(self):
+        text = self.spoken_text(self.body_json())
+        if not text.strip(" …"):
+            return self.fail(400, "nothing_to_say")
+        llm = LLM()
+        key = hashlib.sha1(("%s|%s|%s" % (llm.tts, llm.voice, text)).encode("utf-8")).hexdigest()[:20]
+        VOICES[key] = text
+        return self.send_json({"id": key})
+
+    def voice(self, key):
+        """Stream a prepared reply's audio, and keep it: the same words are never
+        paid for or waited on twice ("Go ahead." comes back instantly)."""
+        path = os.path.join(VOICE_DIR, key + ".mp3")
+        if os.path.exists(path):
+            with open(path, "rb") as handle:
+                return self.send_bytes(handle.read(), "audio/mpeg")
+        text = VOICES.get(key)
+        if not text:
+            return self.fail(404, "no_such_voice")
+        stream = LLM().speak_stream(text)
+        try:
+            first = next(stream)
+        except StopIteration:
+            return self.fail(502, "model: no audio")
+        except ModelError as exc:
+            return self.fail(502, "model: %s" % exc, exc)
+        mime = "audio/wav" if first[:4] == b"RIFF" else "audio/mpeg"
+        self.send_response(200)
+        self.send_header("Content-Type", mime)
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        kept = [first]
+        try:
+            self.wfile.write(first)
+            for chunk in stream:
+                kept.append(chunk)
+                self.wfile.write(chunk)
+                self.wfile.flush()
+        except (BrokenPipeError, ConnectionResetError):
+            return  # they talked over it; the rest is not needed
+        except ModelError as exc:
+            log.error("voice: %s", exc)
+            return
+        if mime == "audio/mpeg":
+            os.makedirs(VOICE_DIR, exist_ok=True)
+            tmp = path + ".tmp"
+            with open(tmp, "wb") as handle:
+                handle.write(b"".join(kept))
+            os.replace(tmp, path)
+        VOICES.pop(key, None)
+
+    def speak(self):
+        text = self.spoken_text(self.body_json())
         if not text.strip(" …"):
             return self.fail(400, "nothing_to_say")
         audio, mime = LLM().speak(text)
@@ -455,6 +535,27 @@ def health():
             "index": any(c.startswith("_index_") for c in cached)}
 
 
+def prewarm():
+    """Make the audio for the small-talk replies once, so they are instant."""
+    llm = LLM()
+    if not (llm.can_speak and os.environ.get("OPENAI_API_KEY")):
+        return
+    os.makedirs(VOICE_DIR, exist_ok=True)
+    for text in smalltalk.FIXED:
+        key = hashlib.sha1(("%s|%s|%s" % (llm.tts, llm.voice, text)).encode("utf-8")).hexdigest()[:20]
+        path = os.path.join(VOICE_DIR, key + ".mp3")
+        if os.path.exists(path):
+            continue
+        try:
+            audio, mime = llm.speak(text)
+            if mime == "audio/mpeg":
+                with open(path, "wb") as handle:
+                    handle.write(audio)
+        except Exception as exc:
+            log.info("prewarm %r: %s", text, exc)
+            return
+
+
 def serve(port=8765, open_browser=True, host="127.0.0.1"):
     os.makedirs(PACKS, exist_ok=True)
     logging.basicConfig(filename=LOG_PATH, level=logging.INFO,
@@ -476,6 +577,7 @@ def serve(port=8765, open_browser=True, host="127.0.0.1"):
     if httpd is None:
         raise SystemExit("no free port between %d and %d" % (port, port + 9))
     port = httpd.server_address[1]
+    threading.Thread(target=prewarm, daemon=True).start()
     url = "http://127.0.0.1:%d/" % port
     print("chavruta -> %s   (ctrl-c to stop; problems are written to chavruta.log)" % url)
     if open_browser:

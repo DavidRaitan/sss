@@ -16,3 +16,4 @@ packs/*.json
 !packs/berakhot_2b.json
 chavruta.log
 chavruta/sessions/
+packs/_voice/

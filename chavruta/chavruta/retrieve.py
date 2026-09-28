@@ -210,7 +210,9 @@ def extras(pack, n, route, depth="daf", budget=7):
     elif kind == "structure":
         take(["Meiri"], 1, per=1)
 
-    if kind not in ("check_reading",):
+    # Depth widens questions about the page, not chat: "what time is it?"
+    # opened six commentaries and paid for reading them.
+    if kind in who.ROUTES:
         if depth in ("rishonim", "acharonim"):
             take(who.wide_for(masechta)[:5], 1, per=1)
         if depth == "acharonim":

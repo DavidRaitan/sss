@@ -129,7 +129,12 @@ footer { background: var(--paper); border-top: 1px solid var(--rule); padding: 1
   background: var(--paper); font-size: 25px; cursor: pointer; }
 #mic[data-state="listening"], #mic[data-state="capturing"] { background: var(--mark); border-color: var(--mark); color: #fff; }
 #mic[data-state="thinking"], #mic[data-state="hearing"] { background: var(--ink); color: var(--paper); }
-#mic[data-state="speaking"] { background: var(--glow); }
+#mic[data-state="speaking"], #mic[data-state="paused"] { background: var(--glow); }
+.hold { position: absolute; bottom: -4px; inset-inline-end: -12px; width: 32px; height: 32px; border-radius: 50%;
+  border: 1px solid var(--edge); background: var(--paper); cursor: pointer; font-size: 14px; line-height: 1; padding: 0; }
+.hold:hover { background: var(--glow); }
+.chip.again { font-family: var(--ui); padding: 1px 8px; }
+.turn.err { color: var(--bad); font-size: 13px; }
 .talk { min-width: 0; max-height: 34vh; overflow-y: auto; }
 .state { font-size: 12px; color: var(--faint); letter-spacing: .03em; min-height: 17px; }
 .state.err { color: var(--bad); }
@@ -157,12 +162,22 @@ footer { background: var(--paper); border-top: 1px solid var(--rule); padding: 1
   .reply { font-size: 16px; }
 }
 
-/* ---- panels slide over the page, they do not compete with it -------------- */
-.over { position: fixed; inset: 0; background: rgba(20, 14, 6, .28); z-index: 40; display: none; }
+/* ---- panels sit beside the page, so the gemara stays in view ------------- */
+:root { --side: min(440px, 40vw); }
+.over { position: fixed; inset-block: 0; inset-inline-start: 0; width: var(--side); z-index: 40; display: none; }
 .over.open { display: block; }
-.panel { position: absolute; inset-block: 0; inset-inline-start: 0; width: min(460px, 94vw);
+body.docked { padding-inline-start: var(--side); }
+.panel { position: absolute; inset: 0;
   background: var(--paper); border-inline-end: 1px solid var(--rule); overflow-y: auto;
-  padding: 18px 20px 40px; box-shadow: 8px 0 30px -12px rgba(0,0,0,.25); }
+  padding: 18px 20px 40px; box-shadow: 8px 0 30px -18px rgba(0,0,0,.25); }
+@media (max-width: 760px) {
+  /* A phone has no room beside the page: the panel is a sheet from below,
+     and the page above it still scrolls. */
+  :root { --side: 100vw; }
+  .over { inset-block-start: auto; height: 52vh; width: 100vw; }
+  .over .panel { border-inline-end: 0; border-top: 1px solid var(--rule); border-radius: 12px 12px 0 0; }
+  body.docked { padding-inline-start: 0; padding-bottom: 52vh; }
+}
 .panel h2 { margin: 0 0 2px; font-size: 16px; font-family: var(--square); }
 .panel .sub { font-size: 12px; color: var(--faint); margin-bottom: 12px; }
 .panel .x { position: absolute; top: 12px; inset-inline-end: 14px; }

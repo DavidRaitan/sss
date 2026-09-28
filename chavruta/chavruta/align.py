@@ -162,7 +162,10 @@ def listen(page, transcript):
     # says תנא אקרא קאי he means..." is mostly English and still points at a line.
     hebrew_words = sum(1 for t in transcript.split() if HEBREW_CHAR.search(t))
     hit = page.locate(transcript) if hebrew_words >= 3 else None
-    if not hit or hit["matched"] < 3:
+    # A short line needs fewer words to be recognised: «הם מוכרים עד חצות» is
+    # «וחכמים אומרים עד חצות» misheard, not talk.
+    need = 2 if hebrew_words <= 4 else 3
+    if not hit or hit["matched"] < need:
         return {"mode": "talking", "hebrew": round(share, 2)}
 
     coverage = hit["matched"] / float(max(hit["heard"], 1))
@@ -189,7 +192,28 @@ def listen(page, transcript):
     slips = differences(page, hit)
     if slips:
         result["slips"] = slips
+    # "Are you sure? Let me read it again. מאימתי..." -- a question wrapped
+    # around a reading. The reading is followed, and the question answered.
+    if result["mode"] == "reading" and asks(page, transcript):
+        result["mode"] = "quoting"
+        result["asked"] = True
     return result
+
+
+QUESTION = re.compile(r"[^.?!]*\?")
+
+
+def asks(page, transcript):
+    """Whether they asked something of their own, not a question the page asks."""
+    for sentence in QUESTION.findall(transcript):
+        latin = len(re.findall(r"[A-Za-z]+", sentence))
+        hebrew = [norm(t) for t in sentence.split() if HEBREW_CHAR.search(t)]
+        on_page = sum(1 for w in hebrew if w in page.vocabulary)
+        if latin >= 2 and latin > len(hebrew):
+            return True
+        if hebrew and on_page < 0.5 * len(hebrew):
+            return True
+    return False
 
 
 # Small words the recogniser drops or invents all the time. Never worth a word.

@@ -334,6 +334,38 @@ class Reading(unittest.TestCase):
         self.assertEqual([m["by"] for m in struct["moves"] if m["by"]], ["רש״י", "ר״ת", "ר״י"])
 
 
+class SmallTalk(unittest.TestCase):
+    def test_small_talk_is_answered_without_a_model(self):
+        from chavruta import smalltalk
+        self.assertEqual(smalltalk.reply("Hey, what's up?")[0], "hello")
+        self.assertEqual(smalltalk.reply("Okay, so I'm gonna read, okay?")[0], "reading")
+        self.assertEqual(smalltalk.reply("Can you hear me?")[0], "hear_me")
+        self.assertIn(":", smalltalk.reply("What time is it?")[1])
+        self.assertIn(smalltalk.reply("שומע אותי?", "he")[1], ["כן, שומע אותך.", "כאן, שומע."])
+
+    def test_a_question_is_not_small_talk(self):
+        from chavruta import smalltalk
+        self.assertIsNone(smalltalk.reply("Hey, what's the summary here?"))
+        self.assertIsNone(smalltalk.reply("Can you hear me? What does Rashi say?"))
+        self.assertIsNone(smalltalk.reply("so he's saying you read shema whenever you go to sleep"))
+
+    def test_a_question_around_a_reading_is_answered(self):
+        page = align.Page(PACK)
+        asked = align.listen(page, "Are you sure? Let me read it again. מאימתי קורין את שמע בערבית? "
+                                   "משעה שהכהנים נכנסים לאכול בתרומתן.")
+        self.assertEqual(asked["mode"], "quoting")
+        plain = align.listen(page, "Okay, so I'm gonna read again. מאימתי קורין את שמע בערבית? "
+                                   "משעה שהכהנים נכנסים לאכול בתרומתן.")
+        self.assertEqual(plain["mode"], "reading")   # the page's own question is not theirs
+
+    def test_chat_does_not_open_commentaries_at_any_depth(self):
+        self.assertEqual(retrieve.extras(Pack(PACK), 1, {"kind": "other"}, "acharonim"), [])
+
+    def test_every_model_call_is_on_a_short_leash(self):
+        self.assertLessEqual(LLM.LEASH["hear"][0], 20)
+        self.assertLessEqual(max(r for _, r in LLM.LEASH.values()), 1)
+
+
 class Server(unittest.TestCase):
     def test_only_berakhot(self):
         from chavruta import server
