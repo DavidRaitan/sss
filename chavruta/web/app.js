@@ -16,7 +16,8 @@ function el(tag, cls, text) {
 /* ---------------------------------------------------------------- settings */
 
 const DEFAULTS = { view: "daf", depth: "daf", language: "en", voice: "natural",
-  hearing: "api", speak: true, pause: "normal", nudges: true, checks: true, translate: false, stops: false };
+  hearing: "api", speak: true, pause: "normal", nudges: true, checks: true, translate: false, stops: false,
+  speakers: false };
 const PAUSES = { short: 1000, normal: 1500, long: 2400 };
 function loadSettings() {
   try { return Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem("chavruta.settings") || "{}")); }
@@ -575,26 +576,48 @@ async function speak(text) {
   const done = new Promise((resolve) => { mine = resolve; speakingDone = resolve; });
   resolvers.set(done, mine);
   showHold();
-  const natural = S.settings.voice === "natural" && S.health && S.health.can_speak;
-  let played = false;
-  if (natural) {
+  // One voice, always. The browser's own voices are used only when chosen in
+  // settings or when there is no OpenAI voice at all -- never as a quiet
+  // stand-in when the natural voice hiccups or is interrupted. In use that
+  // swapped voices mid-conversation, and the browser reads Hebrew and English
+  // in two different voices besides.
+  const h = S.health;
+  const natural = S.settings.voice === "natural" && !(h && (h.key === false || h.can_speak === false));
+  if (!natural) { browserSpeak(speakable(text)); return done; }
+  const current = () => speakingDone === mine;
+  for (let attempt = 0; attempt < 2 && current(); attempt++) {
     try {
       // Prepared, then streamed: playback starts while the voice is still
       // being made, and a reply heard before comes straight from disk.
       const r = await fetch("/api/voice", { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text, ref: S.pack && S.pack.ref }) });
-      if (r.ok) {
-        const { id } = await r.json();
-        if (speakingDone !== resolveOf(done)) return done;   // stopped while it was being made
-        player = new Audio("/api/voice/" + id);
-        player.onended = player.onerror = () => stopSpeaking();
-        if (!paused) await player.play();                    // ⏸ pressed before the first word
-        played = true;
+      if (!r.ok) throw new Error("voice_" + r.status);
+      const { id } = await r.json();
+      if (!current()) return done;                           // stopped while it was being made
+      player = new Audio("/api/voice/" + id);
+      player.onended = () => stopSpeaking();
+      player.onerror = () => { logVoiceTrouble("playback"); stopSpeaking(); };
+      if (!paused) await player.play();                      // ⏸ pressed before the first word
+      return done;
+    } catch (e) {
+      if (!current() || (e && e.name === "AbortError")) return done;   // stopped on purpose
+      if (e && e.name === "NotAllowedError") {
+        setMode(S.listening ? "listening" : "idle", "הדפדפן חוסם קול — לחץ פעם אחת על הדף.", true);
+        break;
       }
-    } catch (e) { played = false; }
+      await sleep(400);
+    }
   }
-  if (!played) browserSpeak(speakable(text));
+  // It could not be said in its own voice: the words stay on the screen.
+  if (current()) { logVoiceTrouble("voice"); stopSpeaking(); }
   return done;
+}
+
+function logVoiceTrouble(stage) {
+  const last = S.log[S.log.length - 1];
+  if (last && last.error && last.stage === stage) return;   // one line, not a hundred
+  logPush({ me: false, error: true, stage, text: "לא הצלחתי להשמיע — התשובה על המסך.", detail: "voice " + stage,
+    ms: 0, at: new Date().toLocaleTimeString() });
 }
 
 // The browser's voices speak one language each, so a bilingual reply is read
@@ -647,16 +670,26 @@ class Ears {
   record() {
     this.chunks = []; this.discard = false;
     this.rec = new MediaRecorder(this.stream, this.mime ? { mimeType: this.mime } : undefined);
-    this.rec.ondataavailable = (e) => { if (e.data && e.data.size) this.chunks.push(e.data); };
-    this.rec.onstop = () => {
-      const keep = !this.discard && this.chunks.length;
-      const blob = keep ? new Blob(this.chunks, { type: this.rec.mimeType || this.mime || "audio/webm" }) : null;
-      const spoke = this.lastSpeech || 0;
+    const rec = this.rec, chunks = this.chunks, began = performance.now();
+    this.overlap = false;   // set if it was talking during this recording
+    rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+    rec.onstop = () => {
+      // A scrap is not an utterance. In use, recorders stopped moments after
+      // they started (its own voice through the speakers, heard as speech)
+      // and hundreds of fragments too short to decode went out, each an error.
+      const long = performance.now() - began >= 500;
+      const keep = !this.discard && chunks.length && long;
+      const blob = keep ? new Blob(chunks, { type: rec.mimeType || this.mime || "audio/webm" }) : null;
+      const spoke = this.lastSpeech || 0, overlap = this.overlap;
+      this.lastSpeech = 0;
       if (this.active) this.record();
-      if (blob && spoke >= 350) this.onUtterance({ blob });
+      if (blob && blob.size > 3000 && spoke >= 350) this.onUtterance({ blob, overlap });
     };
-    this.rec.start();
-    this.recAt = performance.now();
+    rec.start();
+    this.recAt = began;
+  }
+  stopRec() {
+    try { if (this.rec && this.rec.state === "recording") this.rec.stop(); } catch (e) {}
   }
   tick() {
     if (!this.active) return;
@@ -669,7 +702,19 @@ class Ears {
     level(Math.min(1, rms / (threshold * 3)));
     if (rms > threshold) { this.loud += 40; this.quiet = 0; } else { this.quiet += 40; this.loud = Math.max(0, this.loud - 20); }
 
-    if (!this.talking && this.loud >= (this.guard ? 320 : 140)) {
+    // Speaker mode (no earbuds): while it talks, and a moment after, it does
+    // not listen -- its own voice would be heard as the learner's. ⏸ stops it.
+    const deaf = S.settings.speakers && (this.guard || now - (this.spokeAt || 0) < 700);
+    if (this.guard) this.spokeAt = now;
+    if (now - (this.spokeAt || 0) < 1500) this.overlap = true;
+    if (deaf) {
+      this.loud = 0;
+      if (this.talking) { this.talking = false; this.discard = true; this.lastSpeech = 0; this.stopRec(); }
+    }
+    // Only while a recorder is running: speech noticed in the gap between two
+    // recordings would be sent without its beginning.
+    const live = this.rec && this.rec.state === "recording";
+    if (!deaf && live && !this.talking && this.loud >= (this.guard ? 500 : 140)) {
       this.talking = true; this.startedAt = now - this.loud;
       if (this.guard) this.onBarge();
       setMode("capturing", "שומע אותך…");
@@ -677,11 +722,11 @@ class Ears {
     const pause = PAUSES[S.settings.pause] || 1500;
     if (this.talking && (this.quiet >= pause || now - this.startedAt > 45000)) {
       this.talking = false; this.lastSpeech = now - this.startedAt - this.quiet;
-      this.rec.stop();
-    } else if (!this.talking && this.quiet >= 600 && now - this.recAt > 4000 && this.rec.state === "recording") {
+      this.stopRec();
+    } else if (!this.talking && this.quiet >= 600 && now - this.recAt > 4000 && live) {
       // Nothing said for a few seconds: start a fresh recording, so what is
       // sent to be heard is the speech and not the silence before it.
-      this.discard = true; this.lastSpeech = 0; this.rec.stop();
+      this.discard = true; this.lastSpeech = 0; this.stopRec();
     }
   }
   stop() {
@@ -873,14 +918,27 @@ async function hearOne(u, g, t0) {
   const ctl = new AbortController(); aborts.add(ctl);
   try {
     const q = "ref=" + encodeURIComponent(S.pack.ref) + "&line=" + S.line + "&session=" + S.session +
-      "&language=" + S.settings.language + "&checks=" + (S.settings.checks ? 1 : 0);
+      "&language=" + S.settings.language + "&checks=" + (S.settings.checks ? 1 : 0) +
+      "&overlap=" + (u.overlap ? 1 : 0);
     heard = u.blob ? await post("/api/hear?" + q, u.blob, u.blob.type || "audio/webm", ctl.signal)
       : await post("/api/heard", { ref: S.pack.ref, line: S.line, session: S.session,
           language: S.settings.language, said: u.text, checks: S.settings.checks }, null, ctl.signal);
   } catch (e) { if (g === S.gen) failed(e, "hear", t0); return; }
   finally { aborts.delete(ctl); }
   if (g !== S.gen) return;
-  if (!heard.said || heard.mode === "silence") return idleMode("לא שמעתי מילים — נסה שוב.");
+  if (!heard.said || heard.mode === "silence") return idleMode();
+  if (heard.mode === "echo") {
+    // It heard its own voice through the speakers. Twice, and it stops
+    // listening while it talks (speaker mode); ⏸ is how to stop it then.
+    S.echoes = (S.echoes || 0) + 1;
+    if (S.echoes >= 2 && !S.settings.speakers) {
+      S.settings.speakers = true; saveSettings();
+      showReply("נשמע שאין אוזניות — שמעתי את עצמי. מעכשיו, בזמן שאני מדבר אני לא מקשיב; לעצור אותי: ⏸ או רווח.", { hint: true });
+      logPush({ me: false, error: true, stage: "echo", text: "עברתי למצב רמקול (בלי אוזניות).", detail: "heard itself twice",
+        ms: 0, at: new Date().toLocaleTimeString() });
+    }
+    return idleMode();
+  }
 
   showMine(heard.said);
   logPush({ me: true, text: heard.said, mode: heard.mode, ref: S.pack.ref, line: heard.line || S.line,
@@ -1282,7 +1340,9 @@ function openSettings() {
       choice("checks", "לשאול על מילה שיצאה אחרת", [[true, "כן"], [false, "לא"]],
         "כשאמרת מילה אחרת מהכתוב (מעשר במקום תרומה) — לא על מבטא או הגייה."),
       choice("speak", "שיענה בקול", [[true, "כן"], [false, "לא"]]),
-      choice("voice", "קול", [["natural", "טבעי (OpenAI)"], ["browser", "הדפדפן (חינם)"]]),
+      choice("voice", "קול", [["natural", "טבעי (OpenAI) — תמיד אותו קול"], ["browser", "הדפדפן (חינם, רובוטי)"]]),
+      choice("speakers", "שמע", [[false, "אוזניות"], [true, "רמקול"]],
+        "ברמקול, בזמן שאני מדבר אני לא מקשיב (אחרת אני שומע את עצמי). לעצור: ⏸ או רווח."),
       choice("hearing", "זיהוי דיבור", [["api", "מדויק, עברית ואנגלית יחד"], ["browser", "הדפדפן (חינם, שפה אחת)"]]),
     );
     const k = el("div", "set"); k.append(el("div", "lbl", "מקשים"));

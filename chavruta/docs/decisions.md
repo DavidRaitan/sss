@@ -252,3 +252,23 @@ transcript keeps it open and the turn appears there.
 got "Not 'sold'", and a dropped «אתם» got "You skipped «אתם»". A short line is
 now recognised from fewer words, a skipped word alone never prompts a remark,
 and the partner asks rather than announces.
+
+## After the third sitting
+
+**30. One voice, always.** The voice kept changing: whenever the OpenAI voice
+hiccuped or was interrupted while loading, the page quietly fell back to the
+browser's voices (two of them, one per language); the server could fall back
+to a different OpenAI voice; and the voice direction asked for an Israeli
+accent in Hebrew and plain English, which made each switch of language sound
+like a new speaker. Now there is no fallback voice at all — if it cannot be
+said in its own voice, the words stay on screen — and the direction asks for
+one person throughout. Kept clips are keyed by voice and direction.
+
+**31. It knows its own voice.** Without earbuds the mic heard the answer: it
+cut itself off, transcribed its own answer as the learner's turn and argued
+with it, and the chopped audio produced a flood of "corrupted audio" errors.
+Scraps too short to be speech are never sent; unreadable audio is treated as
+silence, not an error; anything heard while it was talking that matches what
+it just said is recognised as itself and ignored; and after hearing itself
+twice it switches to speaker mode — it doesn't listen while it talks, and ⏸ is
+how to stop it. Settings has אוזניות / רמקול.

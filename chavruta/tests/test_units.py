@@ -366,6 +366,24 @@ class SmallTalk(unittest.TestCase):
         self.assertLessEqual(max(r for _, r in LLM.LEASH.values()), 1)
 
 
+class Voice(unittest.TestCase):
+    def test_it_knows_its_own_voice(self):
+        from chavruta import server
+        server.SPOKEN[:] = [set(server.word_list(
+            "בערבין? I have «בערבין» here—the Mishnah opens with the evening Shema, and only later asks about the morning."))]
+        # Heard back through the speakers, as in the third sitting.
+        self.assertTrue(server.echo_of_itself(
+            "בערבין. I have. בערבין. Here, the Mishnah opens with the evening Shema and only later asks about the morning."))
+        self.assertFalse(server.echo_of_itself("so what does Rashi say about the first watch?"))
+
+    def test_one_voice_never_a_substitute(self):
+        import inspect
+        from chavruta import llm
+        self.assertNotIn("alloy", inspect.getsource(llm.LLM.speak_stream))
+        self.assertNotIn("alloy", inspect.getsource(llm.LLM.speak))
+        self.assertIn("never two speakers", llm.VOICE_DIRECTION)
+
+
 class Server(unittest.TestCase):
     def test_only_berakhot(self):
         from chavruta import server

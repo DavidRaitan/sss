@@ -186,8 +186,14 @@ def main():
             said("/hear you/")
             check("a mic check gets a few words", True)
             shot("04-answer")
-            spoken = [e for e in json.loads(urllib.request.urlopen(control + "/control/log").read())
-                      if e["path"] == "speech"]
+            # Replies wait for a pause in the learner's speech, and the fake
+            # microphone talks a lot: give them time to be said.
+            for _ in range(40):
+                spoken = [e for e in json.loads(urllib.request.urlopen(control + "/control/log").read())
+                          if e["path"] == "speech"]
+                if len(spoken) >= 4:
+                    break
+                time.sleep(0.5)
             check("replies are spoken", len(spoken) >= 4, "(%d)" % len(spoken))
             check("the fetching line is spoken before the answer",
                   any("pull up" in e["input"] for e in spoken))

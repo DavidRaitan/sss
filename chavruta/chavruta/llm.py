@@ -36,9 +36,12 @@ DEFAULTS = {
 }
 
 # How a chavruta sounds. Short, per OpenAI's own advice for this parameter.
+# One person, one voice: in use, asking for an Israeli accent on the Hebrew and
+# plain English made each switch of language sound like a different speaker.
 VOICE_DIRECTION = ("A warm, sharp study partner in a beit midrash. Natural and "
-                   "conversational, unhurried, never theatrical. Hebrew with an "
-                   "Israeli accent; English plainly.")
+                   "conversational, unhurried, never theatrical. Keep exactly the same "
+                   "voice, pitch, pace and warmth throughout -- one person who moves "
+                   "between English and Hebrew mid-sentence, never two speakers.")
 
 
 class ModelError(RuntimeError):
@@ -268,9 +271,7 @@ class LLM:
                 if "instructions" in kwargs and _rejects(exc, "instructions"):
                     kwargs.pop("instructions")
                     continue
-                if kwargs.get("voice") not in ("alloy", None) and _rejects(exc, "voice"):
-                    kwargs["voice"] = "alloy"
-                    continue
+                # Never another voice as a fallback: one voice, or none.
                 raise ModelError("%s: %s" % (self.tts, exc))
         raise ModelError("%s: could not speak" % self.tts)
 
@@ -297,9 +298,6 @@ class LLM:
                     raise ModelError("%s: cut off: %s" % (self.tts, exc))
                 if "instructions" in kwargs and _rejects(exc, "instructions"):
                     kwargs.pop("instructions")
-                    continue
-                if kwargs.get("voice") not in ("alloy", None) and _rejects(exc, "voice"):
-                    kwargs["voice"] = "alloy"
                     continue
                 raise ModelError("%s: %s" % (self.tts, exc))
         raise ModelError("%s: could not speak" % self.tts)

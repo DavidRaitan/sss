@@ -25,6 +25,7 @@ import json
 import logging
 import os
 import posixpath
+import re
 import threading
 import time
 import traceback
@@ -33,7 +34,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from . import align, library, retrieve, sefaria, smalltalk
 from .commentators import MASECHTOT
-from .llm import LLM, ModelError, speakable
+from .llm import LLM, VOICE_DIRECTION, ModelError, speakable
 from .masechta_index import Index
 from .pack import Pack
 from .partner import Partner, unit_nudge
@@ -45,6 +46,37 @@ LOG_PATH = os.path.join(ROOT, "chavruta.log")
 SESSIONS_DIR = os.path.join(ROOT, "sessions")
 VOICE_DIR = os.path.join(PACKS, "_voice")
 VOICES = {}   # id -> text waiting to be spoken
+SPOKEN = []   # the words of what it said last, to know its own voice when it hears it
+ECHO = 0.6    # this much of what was "heard" being its own last words means it heard itself
+
+
+def voice_key(llm, text):
+    """Kept audio is keyed by everything that shapes the voice, so a change of
+    voice or direction never mixes old clips with new ones."""
+    raw = "%s|%s|%s|%s" % (llm.tts, llm.voice, VOICE_DIRECTION, text)
+    return hashlib.sha1(raw.encode("utf-8")).hexdigest()[:20]
+
+
+def word_list(text):
+    """Words of either language, reduced so a transcript and a script compare."""
+    plain = align.NIKUD.sub("", text.lower()).translate(align.FINALS)
+    return [w for w in re.findall(r"[a-z]+|[א-ת]+", plain) if len(w) > 1]
+
+
+def echo_of_itself(said):
+    """Whether what was heard is the partner's own voice, picked up by the mic.
+
+    With speakers instead of earbuds the microphone hears the answer, and in
+    use it transcribed its own answer as the learner's turn and argued with
+    it ("Not 'Ruma'"). English words count as well as Hebrew here.
+    """
+    mine = word_list(said)
+    if len(mine) < 3:
+        return False
+    for spoken in SPOKEN:
+        if spoken and sum(1 for w in mine if w in spoken) >= ECHO * len(mine):
+            return True
+    return False
 
 
 def record(kind, **fields):
@@ -311,9 +343,18 @@ class Handler(BaseHTTPRequestHandler):
         mime = self.headers.get("Content-Type", "audio/webm")
 
         pack = load_pack(ref)
-        said = LLM().hear(audio, hint=hint_for(pack, line), keywords=KEYWORDS, mime=mime)
+        try:
+            said = LLM().hear(audio, hint=hint_for(pack, line), keywords=KEYWORDS, mime=mime)
+        except ModelError as exc:
+            # A scrap of sound too short or broken to decode is nothing said,
+            # not a failure to put in front of the learner.
+            if re.search(r"corrupt|unsupported|too short|invalid_value", str(exc), re.I):
+                log.info("hear: dropped unreadable audio (%d bytes): %s", length, str(exc)[:120])
+                return self.send_json({"said": "", "mode": "silence"})
+            raise
         checks = (q.get("checks") or ["1"])[0] != "0"
-        return self.after_hearing(pack, ref, line, sid, language, said, checks)
+        overlap = (q.get("overlap") or ["0"])[0] == "1"
+        return self.after_hearing(pack, ref, line, sid, language, said, checks, overlap)
 
     def heard(self):
         """The same, for words the browser already recognised itself."""
@@ -325,9 +366,15 @@ class Handler(BaseHTTPRequestHandler):
                                   body.get("session"), body.get("language") or "auto",
                                   (body.get("said") or "").strip(), body.get("checks", True) is not False)
 
-    def after_hearing(self, pack, ref, line, sid, language, said, checks=True):
+    def after_hearing(self, pack, ref, line, sid, language, said, checks=True, overlap=False):
         if not said:
             return self.send_json({"said": "", "mode": "silence"})
+        # Only what was picked up while it was talking can be its own voice;
+        # anything else that sounds like its last answer is the learner
+        # repeating it, which is theirs to do.
+        if overlap and echo_of_itself(said):
+            record("echo", session=sid, ref=ref, said=said)
+            return self.send_json({"said": said, "mode": "echo"})
         heard = align.listen(page_of(pack), said)
         record("heard", session=sid, ref=ref, line=line, said=said, heard=heard)
         state = session(sid)
@@ -462,8 +509,14 @@ class Handler(BaseHTTPRequestHandler):
         if not text.strip(" …"):
             return self.fail(400, "nothing_to_say")
         llm = LLM()
-        key = hashlib.sha1(("%s|%s|%s" % (llm.tts, llm.voice, text)).encode("utf-8")).hexdigest()[:20]
+        key = voice_key(llm, text)
         VOICES[key] = text
+        while len(VOICES) > 64:            # kept for a retry, but not forever
+            VOICES.pop(next(iter(VOICES)))
+        # What it says, so that hearing it back through the speakers is
+        # recognised as its own voice and not taken for the learner's.
+        SPOKEN.append(set(word_list(text)))
+        del SPOKEN[:-6]
         return self.send_json({"id": key})
 
     def voice(self, key):
@@ -506,7 +559,6 @@ class Handler(BaseHTTPRequestHandler):
             with open(tmp, "wb") as handle:
                 handle.write(b"".join(kept))
             os.replace(tmp, path)
-        VOICES.pop(key, None)
 
     def speak(self):
         text = self.spoken_text(self.body_json())
@@ -542,7 +594,7 @@ def prewarm():
         return
     os.makedirs(VOICE_DIR, exist_ok=True)
     for text in smalltalk.FIXED:
-        key = hashlib.sha1(("%s|%s|%s" % (llm.tts, llm.voice, text)).encode("utf-8")).hexdigest()[:20]
+        key = voice_key(llm, text)
         path = os.path.join(VOICE_DIR, key + ".mp3")
         if os.path.exists(path):
             continue
