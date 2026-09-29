@@ -528,3 +528,9 @@ to the mishna the gemara is on, brings its text, and recaps the pages since.
   and its edge dragged for more or less room. Each card follows the line.
 - None of it is saved -- not the cards, not the layout: a reload clears it.
   Settings are for what holds; the desk is for this sitting.
+- Saved layouts, by choice: "＋ שמור" on the desk offers a name (the
+  commentators on it) and Enter keeps it -- which commentators, their order,
+  width and height, where the desk sits, its size and the letter size. Saved
+  layouts are a row of names on the desk: one tap opens one. The one you are
+  in shows ☆ (open it by itself with the first page) and ✕; saving under the
+  same name updates it. Kept in this browser only.

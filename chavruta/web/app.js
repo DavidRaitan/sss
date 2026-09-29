@@ -287,6 +287,10 @@ function render() {
   applyToggles();
   markRead(null);
   drawNotes();
+  if (DESK.page === undefined) {         // the first page: the ★ layout, if there is one
+    const auto = layouts().find((l) => l.auto);
+    if (auto) applyLayout(auto);
+  }
   if (DESK.page !== S.pack.ref) {        // the same commentators, on the new page
     DESK.page = S.pack.ref;
     for (const c of DESK.cards) delete c.scroll;
@@ -1846,13 +1850,88 @@ function deskCard(c, i) {
   return card;
 }
 
+/* Saved layouts: the desk as you arranged it, kept under a name. One tap
+   opens it; the one you are in shows ★ (open it by itself with every page)
+   and ✕. Only what is saved is kept -- the desk itself stays for the sitting. */
+function layouts() {
+  try { return JSON.parse(recall("layouts") || "[]"); } catch (e) { return []; }
+}
+function keepLayouts(list) { remember("layouts", JSON.stringify(list)); }
+function deskName() {
+  const names = DESK.cards.map((c) => (c.name ? heName(c.name) : chipFor(c.ref).label)).slice(0, 3);
+  return names.join(" · ") || "סידור";
+}
+function saveLayout(name) {
+  const main = document.querySelector("main").style;
+  const list = layouts().filter((l) => l.name !== name);
+  const old = layouts().find((l) => l.name === name);
+  list.push({ name, auto: !!(old && old.auto), place: DESK.place, swap: DESK.swap, size: DESK.size,
+    w: main.getPropertyValue("--desk-w"), h: main.getPropertyValue("--desk-h"),
+    cards: DESK.cards.map((c) => ({ name: c.name, ref: c.ref, wide: !!c.wide, height: c.height })) });
+  keepLayouts(list);
+  DESK.layout = name;
+}
+function applyLayout(l) {
+  const main = document.querySelector("main").style;
+  Object.assign(DESK, { place: l.place || "side", swap: !!l.swap, size: l.size || 16, layout: l.name, open: true,
+    focus: null, cards: (l.cards || []).map((c) => Object.assign({}, c)) });
+  for (const [k, v] of [["--desk-w", l.w], ["--desk-h", l.h]]) v ? main.setProperty(k, v) : main.removeProperty(k);
+  $("desk-pick").hidden = true;
+  renderDesk();
+}
+
+function drawLayouts() {
+  const row = $("desk-layouts");
+  row.replaceChildren();
+  const list = layouts();
+  for (const l of list) {
+    const on = l.name === DESK.layout;
+    const chip = el("span", "lay" + (on ? " on" : ""));
+    const go = el("button", "lay-go", (l.auto ? "★ " : "") + l.name);
+    go.title = "לפתוח את הסידור הזה";
+    go.onclick = () => applyLayout(l);
+    chip.append(go);
+    if (on) {
+      const star = el("button", "lay-x", l.auto ? "★" : "☆");
+      star.title = l.auto ? "לא לפתוח מעצמו" : "לפתוח מעצמו עם כל דף";
+      star.onclick = () => {
+        keepLayouts(layouts().map((x) => Object.assign(x, { auto: x.name === l.name ? !l.auto : false })));
+        drawLayouts();
+      };
+      const del = el("button", "lay-x", "✕");
+      del.title = "למחוק את הסידור";
+      del.onclick = () => { keepLayouts(layouts().filter((x) => x.name !== l.name)); DESK.layout = null; drawLayouts(); };
+      chip.append(star, del);
+    }
+    row.append(chip);
+  }
+  if (!DESK.cards.length) return;
+  // Save: one tap, a name offered, Enter to keep it.
+  const save = el("button", "lay-save", list.length ? "＋ שמור" : "＋ שמור את הסידור");
+  save.title = "לשמור את השולחן כמו שהוא עכשיו";
+  save.onclick = () => {
+    const form = el("form", "lay-form");
+    const input = el("input"); input.value = DESK.layout || deskName(); input.setAttribute("aria-label", "שם הסידור");
+    const ok = el("button", "lay-go", "✓");
+    form.append(input, ok);
+    form.onsubmit = (e) => { e.preventDefault(); const n = input.value.trim(); if (n) saveLayout(n); drawLayouts(); };
+    input.onkeydown = (e) => { if (e.key === "Escape") drawLayouts(); };
+    save.replaceWith(form);
+    input.focus(); input.select();
+  };
+  row.append(save);
+}
+
 function renderDesk() {
   deskLayout();
   const box = $("desk-cards");
   if (!DESK.open) return;
+  drawLayouts();
   box.replaceChildren();
   if (!DESK.cards.length)
-    box.append(el("div", "desk-empty", "השולחן ריק. ＋ מפרש כדי להוסיף — או תגיד: ״תפתח את הרשב״א בצד״."));
+    box.append(el("div", "desk-empty", layouts().length
+      ? "בחר סידור שמור למעלה, או ＋ מפרש כדי להוסיף."
+      : "השולחן ריק. ＋ מפרש כדי להוסיף — או תגיד: ״תפתח את הרשב״א בצד״."));
   DESK.cards.forEach((c, i) => box.append(deskCard(c, i)));
   const focus = DESK.focus && box.querySelector('.dc-entry[data-ref="' + CSS.escape(DESK.focus) + '"]');
   if (focus) focus.classList.add("focus");

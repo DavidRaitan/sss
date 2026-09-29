@@ -346,3 +346,21 @@ main[data-place="full"] .dc-body { height: 60vh; }
   main.with-desk.swap .desk-grip { inset-block: auto -8px; }
   .desk-title { display: none; }
 }
+
+/* Saved layouts: a row of names; the one you are in shows ☆ and ✕. */
+.desk-layouts { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 10px; border-bottom: 1px solid var(--rule); }
+.desk-layouts:empty { display: none; }
+.lay { display: inline-flex; align-items: center; border: 1px solid var(--edge); border-radius: 20px;
+  background: var(--paper); overflow: hidden; }
+.lay.on { background: var(--ink); border-color: var(--ink); }
+.lay.on button { color: var(--paper); }
+.lay-go, .lay-x, .lay-save { border: 0; background: none; cursor: pointer; font-size: 12.5px; padding: 3px 10px; }
+.lay-go { font-family: var(--square); font-size: 14px; }
+.lay-x { padding: 3px 7px; opacity: .8; }
+.lay-x:hover, .lay-go:hover { opacity: 1; text-decoration: underline; }
+.lay-save { color: var(--dim); border: 1px dashed var(--edge); border-radius: 20px; }
+.lay-save:hover { color: var(--ink); border-color: var(--ink); }
+.lay-form { display: inline-flex; gap: 4px; }
+.lay-form input { font: inherit; font-family: var(--square); font-size: 14px; border: 1px solid var(--ink);
+  border-radius: 20px; padding: 2px 10px; background: var(--paper); color: var(--ink); width: 14em; }
+.lay-form .lay-go { border: 1px solid var(--ink); border-radius: 20px; }
