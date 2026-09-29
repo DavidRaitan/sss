@@ -17,6 +17,7 @@
 
 * { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; }
+@supports (height: 100dvh) { body { height: 100dvh; } }   /* the visible screen, as the phone's bars come and go */
 body { background: var(--desk); color: var(--ink); font-family: var(--ui);
   display: grid; grid-template-rows: auto 1fr auto; overflow: hidden; }
 button, select { font: inherit; color: inherit; }
@@ -31,7 +32,6 @@ header { display: flex; align-items: center; gap: 10px; padding: 8px 14px;
 .pick label { font-size: 11px; color: var(--faint); }
 select, .btn { font-size: 13.5px; background: var(--paper); border: 1px solid var(--rule);
   border-radius: 7px; padding: 5px 9px; cursor: pointer; }
-select:hover, .btn:hover { border-color: var(--edge); }
 select#daf { font-family: var(--square); font-size: 17px; padding: 2px 8px; min-width: 64px; }
 select#mas { font-family: var(--square); font-size: 16px; padding: 3px 8px; }
 .seg2 { display: flex; }
@@ -76,7 +76,6 @@ main { overflow: hidden; display: flex; justify-content: center; padding: 14px; 
 .gtext { font-family: var(--square); font-size: 23px; line-height: 1.9; text-align: justify;
   text-align-last: right; }
 .seg { cursor: pointer; border-radius: 4px; transition: background .25s; padding: 1px 0; }
-.seg:hover { background: color-mix(in srgb, var(--glow) 45%, transparent); }
 .seg.on { background: var(--glow); box-shadow: 0 0 0 3px var(--glow); }
 .note-mark { border: 0; background: none; cursor: pointer; font-size: 13px; padding: 0 3px; vertical-align: super; }
 /* Read words fade a little, like a karaoke line: where it thinks you are,
@@ -139,7 +138,6 @@ footer { background: var(--paper); border-top: 1px solid var(--rule); padding: 1
 #mic[data-state="speaking"], #mic[data-state="paused"] { background: var(--glow); }
 .hold { position: absolute; bottom: -4px; inset-inline-end: -12px; width: 32px; height: 32px; border-radius: 50%;
   border: 1px solid var(--edge); background: var(--paper); cursor: pointer; font-size: 14px; line-height: 1; padding: 0; }
-.hold:hover { background: var(--glow); }
 .chip.again { font-family: var(--ui); padding: 1px 8px; }
 .turn.err { color: var(--bad); font-size: 13px; }
 .talk { min-width: 0; max-height: 34vh; overflow-y: auto; }
@@ -166,7 +164,6 @@ footer { background: var(--paper); border-top: 1px solid var(--rule); padding: 1
 .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 7px; }
 .chip { font-size: 12.5px; border: 1px solid var(--edge); border-radius: 20px; padding: 2px 10px;
   background: var(--paper); cursor: pointer; font-family: var(--square); }
-.chip:hover { background: var(--glow); }
 .chip.warn { border-color: var(--bad); color: var(--bad); font-family: var(--ui); }
 /* A citation where it stands in the sentence: small, tappable, not a hole. */
 .chip.inline { font-size: 11.5px; padding: 0 7px; margin: 0 2px; vertical-align: 1px; unicode-bidi: isolate; }
@@ -181,8 +178,11 @@ footer { background: var(--paper); border-top: 1px solid var(--rule); padding: 1
 
 /* ---- panels sit beside the page, so the gemara stays in view ------------- */
 :root { --side: min(440px, 40vw); --sheet: 52vh; }
-.over { position: fixed; inset-block: 0; inset-inline-start: 0; width: var(--side); z-index: 40; display: none; }
-.over.open { display: block; }
+.over { position: fixed; inset-block: 0; inset-inline-start: 0; width: var(--side); z-index: 40;
+  visibility: hidden; transform: translateX(calc(100% + 24px));
+  transition: transform var(--t-out), visibility 0s linear var(--t-dur); }
+/* In from the side it lives on, and back out the same way. */
+.over.open { visibility: visible; transform: none; transition: transform var(--t-in), visibility 0s; }
 body.docked { padding-inline-start: var(--side); }
 body.resizing, body.resizing * { cursor: col-resize !important; user-select: none; }
 .panel { position: absolute; inset: 0;
@@ -197,11 +197,11 @@ body.resizing, body.resizing * { cursor: col-resize !important; user-select: non
   cursor: col-resize; touch-action: none; }
 .over .grip::after { content: ""; position: absolute; inset-block: calc(50% - 26px); inset-inline-start: 3px;
   width: 4px; border-radius: 2px; background: var(--edge); opacity: .55; }
-.over .grip:hover::after { opacity: 1; }
 @media (max-width: 760px) {
   /* A phone has no room beside the page: the panel is a sheet from below,
      and the page above it still scrolls; its top edge is the handle. */
-  .over { inset-block-start: auto; height: var(--sheet); width: 100vw; }
+  .over { inset-block-start: auto; height: var(--sheet); width: 100vw; transform: translateY(calc(100% + 24px)); }
+  .over.open { transform: none; }
   .over .panel { border-inline-end: 0; border-top: 1px solid var(--rule); border-radius: 12px 12px 0 0; padding-top: 24px; }
   .over .grip { inset-inline: 0; inset-block: -6px auto; width: auto; height: 22px; cursor: row-resize; }
   .over .grip::after { inset-block: 8px auto; inset-inline: calc(50% - 26px); width: 52px; height: 4px; }
@@ -223,7 +223,6 @@ body.resizing, body.resizing * { cursor: col-resize !important; user-select: non
 .more, .lnk { border: 0; background: none; padding: 0; font-size: 12px; color: var(--dim);
   cursor: pointer; text-decoration: none; }
 .lnk { direction: ltr; }
-.more:hover, .lnk:hover { color: var(--mark); }
 .shape { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 5px; }
 .mv { font-size: 10.5px; border-radius: 3px; padding: 1px 6px; border: 1px solid var(--rule); color: var(--dim); }
 .mv.difficulty { color: var(--mark); border-color: var(--mark); }
@@ -233,7 +232,6 @@ body.resizing, body.resizing * { cursor: col-resize !important; user-select: non
 .others { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
 .rel .tref { display: block; font-size: 12.5px; color: var(--dim); direction: ltr; text-align: left;
   padding: 2px 0; border: 0; background: none; cursor: pointer; font-family: var(--ui); width: 100%; }
-.rel .tref:hover, .tl > .tref:hover { color: var(--mark); }
 .tl > .tref { border: 0; background: none; cursor: pointer; color: var(--dim); font-size: 12.5px; padding: 2px 0; }
 .tl .body { font-family: var(--square); font-size: 14px; line-height: 1.65; margin: 4px 0 10px;
   padding: 8px 10px; background: var(--paper); border: 1px solid var(--rule); border-radius: 6px; }
@@ -259,7 +257,6 @@ kbd { font-family: var(--ui); font-size: 11px; border: 1px solid var(--rule); bo
 .unit { font-family: var(--ui); font-size: 10.5px; letter-spacing: .04em; color: var(--mark);
   background: none; border: 1px solid var(--mark); border-radius: 3px; padding: 0 5px;
   vertical-align: 4px; cursor: pointer; line-height: 1.5; }
-.unit:hover { background: var(--glow); }
 
 /* Three opinions or more come as a table. */
 .positions { border-collapse: collapse; margin: 6px 0 8px; font-size: 14px; max-width: 100%; }
@@ -296,7 +293,6 @@ main[data-place="full"] .desk-grip { display: none; }
 .desk-grip::after { content: ""; position: absolute; inset-block: calc(50% - 26px); inset-inline-start: 3px;
   width: 4px; border-radius: 2px; background: var(--edge); opacity: .55; }
 main[data-place="below"] .desk-grip::after { inset-block: 3px auto; inset-inline: calc(50% - 26px); width: 52px; height: 4px; }
-.desk-grip:hover::after { opacity: 1; }
 .desk-bar { display: flex; align-items: center; gap: 6px; padding: 7px 10px; border-bottom: 1px solid var(--rule);
   flex-wrap: wrap; }
 .desk-title { font-family: var(--square); font-size: 16px; color: var(--dim); margin-inline-end: 4px; }
@@ -315,8 +311,6 @@ main[data-place="below"] .desk-grip::after { inset-block: 3px auto; inset-inline
 .dc { flex: 1 1 240px; min-width: 0; border: 1px solid var(--rule); border-radius: 6px; background: var(--paper);
   display: flex; flex-direction: column; }
 .dc.wide { flex-basis: 100%; }
-.dc.dragging { opacity: .45; }
-.dc.drop { outline: 2px dashed var(--mark); outline-offset: 2px; }
 .dc-head { display: flex; align-items: center; gap: 6px; padding: 5px 8px; border-bottom: 1px solid var(--rule);
   background: var(--desk); border-radius: 6px 6px 0 0; }
 .dc-grip { cursor: grab; color: var(--faint); letter-spacing: -2px; user-select: none; padding: 0 2px; }
@@ -324,17 +318,15 @@ main[data-place="below"] .desk-grip::after { inset-block: 3px auto; inset-inline
 .dc-tools { display: flex; gap: 2px; }
 .dc-btn { border: 0; background: none; cursor: pointer; color: var(--dim); font-size: 13px; padding: 2px 5px;
   border-radius: 4px; }
-.dc-btn:hover { background: var(--glow); color: var(--ink); }
 .dc-body { height: 300px; min-height: 90px; overflow-y: auto; resize: vertical; padding: 8px 12px;
   font-family: var(--rashi); font-size: var(--desk-font); line-height: 1.65; }
 main[data-place="full"] .dc-body { height: 60vh; }
 .dc-entry { padding: 6px 4px 8px; border-bottom: 1px dotted var(--rule); border-radius: 3px; }
-.dc-entry.here { background: color-mix(in srgb, var(--glow) 55%, transparent); }
+.dc-entry.here { background: color-mix(in srgb, var(--glow) 35%, transparent); }
 .dc-entry.focus { border-inline-start: 3px solid var(--mark); }
 .dc-top { display: flex; gap: 8px; align-items: baseline; margin-bottom: 2px; }
 .dc-line { font-family: var(--ui); font-size: 11px; color: var(--faint); border: 1px solid var(--rule);
   background: none; border-radius: 10px; padding: 0 7px; cursor: pointer; }
-.dc-line:hover { border-color: var(--edge); color: var(--ink); }
 .dc-dib { font-weight: 600; font-family: var(--square); }
 .dc-none { color: var(--faint); font-family: var(--ui); font-size: 13px; padding: 10px 0; }
 .dw.quoted { background: var(--quote); border-radius: 2px; transition: background .4s; }
@@ -357,10 +349,110 @@ main[data-place="full"] .dc-body { height: 60vh; }
 .lay-go, .lay-x, .lay-save { border: 0; background: none; cursor: pointer; font-size: 12.5px; padding: 3px 10px; }
 .lay-go { font-family: var(--square); font-size: 14px; }
 .lay-x { padding: 3px 7px; opacity: .8; }
-.lay-x:hover, .lay-go:hover { opacity: 1; text-decoration: underline; }
 .lay-save { color: var(--dim); border: 1px dashed var(--edge); border-radius: 20px; }
-.lay-save:hover { color: var(--ink); border-color: var(--ink); }
 .lay-form { display: inline-flex; gap: 4px; }
 .lay-form input { font: inherit; font-family: var(--square); font-size: 14px; border: 1px solid var(--ink);
   border-radius: 20px; padding: 2px 10px; background: var(--paper); color: var(--ink); width: 14em; }
 .lay-form .lay-go { border: 1px solid var(--ink); border-radius: 20px; }
+
+
+/* ---- touch, the phone, and motion ---------------------------------------
+   The platform layer: what makes it feel like an app on the phone and not a
+   website -- and the motion rules everything above uses. */
+:root {
+  --ease: cubic-bezier(.32, .72, 0, 1);          /* critically damped: arrives, no bounce */
+  --t-dur: 260ms;
+  --t-in: var(--t-dur) var(--ease);
+  --t-out: 200ms cubic-bezier(.4, 0, 1, 1);
+}
+html { -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%; overscroll-behavior: none;
+  overflow: clip; }   /* the panel waiting off-screen must not make a phone zoom out to show it */
+body { overscroll-behavior: none; }
+/* Scroll stays in the box it started in: the page behind it never moves. */
+.panel, .desk-cards, .dc-body, .desk-pick, .col, .linear, .talk { overscroll-behavior: contain; }
+/* A control is not text: no selection or callout on a long press, no double-tap wait. */
+button, .btn, .chip, select, [role="button"], .dc-grip, .desk-grip, .grip {
+  touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+/* Under 16px, iPhone zooms into the field and never zooms back. */
+@media (pointer: coarse) { input, textarea, select { font-size: 16px !important; } }
+/* The notch, the home bar, a phone on its side. */
+header { padding-top: max(8px, env(safe-area-inset-top, 0px));
+  padding-inline: max(14px, env(safe-area-inset-right, 0px)) max(14px, env(safe-area-inset-left, 0px)); }
+footer { padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
+@media (max-width: 760px) { .over .panel { padding-bottom: calc(40px + env(safe-area-inset-bottom, 0px)); } }
+
+/* Pressed is felt on the press, not on the release. */
+.btn, .chip, .hold, .dc-btn, .dc-line, .lay-go, .lay-x, .lay-save, .flip, #mic, .more, .tref {
+  transition: transform 110ms ease-out, background-color 160ms, border-color 160ms, color 160ms; }
+.btn:active, .chip:active, .hold:active, .dc-btn:active, .dc-line:active, .lay-go:active, .lay-x:active,
+.lay-save:active, .more:active, .tref:active { transform: scale(.96); }
+#mic:active { transform: scale(.94); }
+#mic { transition: transform 110ms ease-out, background-color 200ms, color 200ms, border-color 200ms; }
+:focus-visible { outline: 2px solid var(--mark); outline-offset: 2px; border-radius: 4px; }
+button:focus:not(:focus-visible) { outline: none; }
+
+/* Hover only where there is a mouse: on a phone the first tap would leave it stuck. */
+@media (hover: hover) and (pointer: fine) {
+  select:hover, .btn:hover { border-color: var(--edge); }
+  .seg:hover { background: color-mix(in srgb, var(--glow) 45%, transparent); }
+  .hold:hover { background: var(--glow); }
+  .chip:hover { background: var(--glow); }
+  .over .grip:hover::after { opacity: 1; }
+  .more:hover, .lnk:hover { color: var(--mark); }
+  .rel .tref:hover, .tl > .tref:hover { color: var(--mark); }
+  .unit:hover { background: var(--glow); }
+  .desk-grip:hover::after { opacity: 1; }
+  .dc-btn:hover { background: var(--glow); color: var(--ink); }
+  .dc-line:hover { border-color: var(--edge); color: var(--ink); }
+  .lay-x:hover, .lay-go:hover { opacity: 1; text-decoration: underline; }
+  .lay-save:hover { color: var(--ink); border-color: var(--ink); }
+}
+
+/* The desk and its cards arrive as things, not as a jump. */
+.desk { transition: opacity var(--t-in), transform var(--t-in); }
+@starting-style { .desk { opacity: 0; transform: scale(.985); } }
+.dc { transition: box-shadow 200ms ease; }
+.desk-pick, .desk-layouts { transition: opacity 180ms ease; }
+@starting-style { .desk-pick, .desk-layouts { opacity: 0; } }
+/* A card being carried: lifted off the desk, following the finger. */
+.dc.lifted { z-index: 5; position: relative; box-shadow: 0 18px 40px -16px rgba(40, 25, 5, .45);
+  cursor: grabbing; transition: box-shadow 200ms ease; }
+.dc.lifted .dc-body { pointer-events: none; }
+.dc.leaving { opacity: 0; transform: scale(.96); transition: opacity 160ms ease, transform 160ms ease; }
+.dc-grip { touch-action: none; cursor: grab; }
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --t-in: 120ms linear; --t-out: 120ms linear; }
+  .over, .over.open { transform: none !important; transition: opacity 120ms linear, visibility 0s; }
+  .over { opacity: 0; } .over.open { opacity: 1; }
+  .btn:active, .chip:active, #mic:active, .hold:active, .dc-btn:active { transform: none; }
+  @starting-style { .desk { transform: none; } }
+  .c.flash, .src.flash { animation-duration: .01s; }
+}
+@media (prefers-contrast: more) {
+  :root { --rule: #8a7d68; --edge: #5e5241; --faint: #5e5241; }
+}
+
+/* One column as wide as the screen -- never as wide as the widest header row. */
+body { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 760px) {
+  header { gap: 8px; row-gap: 6px; }
+  .picker { order: 3; flex: 1 1 100%; min-width: 0; gap: 6px; }
+  .picker .pick:first-of-type { flex: 1; min-width: 0; }
+  .picker select#mas { width: 100%; min-width: 0; }
+  .pick label { display: none; }
+  main { padding: 8px; }
+  main.with-desk { gap: 8px; }
+  /* On a phone the desk is always under (or over) the page: "beside" has no room. */
+  #desk-side, #desk-below { display: none; }
+  .desk-bar { gap: 4px; padding: 6px 8px; }
+}
+/* A fingertip needs room: small controls grow on touch screens. */
+@media (pointer: coarse) {
+  .dc-btn { padding: 6px 9px; font-size: 15px; }
+  .dc-grip { padding: 6px 6px; font-size: 16px; }
+  .lay-go, .lay-x, .lay-save { padding-block: 7px; }
+  .chip { padding: 5px 12px; }
+  .chip.inline { padding: 1px 8px; }
+  .desk-bar .btn, .btn.icon { min-height: 36px; min-width: 36px; }
+}

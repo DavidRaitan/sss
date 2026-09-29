@@ -329,7 +329,24 @@ def main():
             page.locator("#desk-pick .chip:not(.on)").first.click()
             check("＋ adds from everyone on the amud", page.locator("#desk .dc").count() == 4)
             page.locator("#desk .dc").nth(3).locator(".dc-btn", has_text="✕").click()
-            check("✕ takes one off", page.locator("#desk .dc").count() == 3)
+            page.wait_for_function("document.querySelectorAll('#desk .dc').length === 3", timeout=3000)
+            check("✕ takes one off", True)
+            # Carried by the hand: ⋮⋮ onto another card, and they change places.
+            page.click("#desk-add")            # the list closed, for room
+            page.evaluate("document.querySelector('#desk-cards').scrollTop = 0")
+            page.locator("#desk .dc").nth(2).locator(".dc-grip").scroll_into_view_if_needed()
+            grip = page.locator("#desk .dc").nth(2).locator(".dc-grip").bounding_box()
+            target = page.locator("#desk .dc").nth(1).bounding_box()
+            page.mouse.move(grip["x"] + 4, grip["y"] + 4)
+            page.mouse.down()
+            page.mouse.move(grip["x"] + 14, grip["y"] + 4)                      # past the tap threshold
+            page.mouse.move(target["x"] + target["width"] / 2, target["y"] + 30)
+            page.mouse.move(target["x"] + target["width"] / 2 + 3, target["y"] + 32)
+            check("…lifted while carried", page.locator("#desk .dc.lifted").count() == 1)
+            page.mouse.up()
+            page.wait_for_function("!document.querySelector('#desk .dc.lifted')", timeout=3000)
+            page.wait_for_timeout(400)
+            check("dragged into a new place", names()[1:] == ["מאירי", "רשב״א"], str(names()))
             # Saved: one tap, a name, Enter.
             page.click(".lay-save")
             page.fill(".lay-form input", "הלימוד שלי")

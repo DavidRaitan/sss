@@ -534,3 +534,20 @@ to the mishna the gemara is on, brings its text, and recaps the pages since.
   layouts are a row of names on the desk: one tap opens one. The one you are
   in shows ☆ (open it by itself with the first page) and ✕; saving under the
   same name updates it. Kept in this browser only.
+
+**56. Feel: the phone, the press, and motion.**
+- The phone: one column exactly as wide as the screen (the header row had
+  pushed it wider, and a panel waiting off-screen made the phone zoom out to
+  half size); the header wraps; the notch and home bar are padded; the body is
+  the visible screen (dvh); fields are 16px so iPhone does not zoom into them;
+  no tap flash, no text selection on a long press, no double-tap wait; scroll
+  stays in the box it started in; the status bar matches, light and dark.
+- Hover only where there is a mouse -- on a phone a tapped button stayed lit.
+  Every control answers on the press (a small give), and keyboard focus is
+  always visible. Small controls grow under a finger.
+- Motion that means something: the panel slides in from its side and back
+  out the same way (up from below on a phone); the desk and a new card arrive
+  instead of appearing; cards glide to their new places when moved, widened
+  or removed. A card is carried by ⋮⋮ with the finger or the mouse, stays
+  under the finger, and the others make room. One curve, no bounce. With
+  "reduce motion" on, only quick fades.

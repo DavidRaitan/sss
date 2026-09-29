@@ -1579,9 +1579,10 @@ $("close-panel").onclick = closePanel;
       const v = getComputedStyle(document.documentElement).getPropertyValue(narrow() ? "--sheet" : "--side");
       remember(narrow() ? "sheet" : "side", parseInt(v, 10) || "");
     };
-    grip.addEventListener("pointermove", move);
-    grip.addEventListener("pointerup", up, { once: true });
-    grip.addEventListener("pointercancel", up, { once: true });
+    // On the window, not the grip: moving the card in the page drops the grip's capture.
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
   });
 })();
 
@@ -1745,7 +1746,7 @@ function openText(ref) {
 // Add whom you like, drag them into the order you like, wide or narrow; the
 // desk beside the page, under it, or on its own. Only for this sitting:
 // nothing here is saved, and a reload clears it.
-const DESK = { open: false, place: "side", swap: false, size: 16, cards: [], focus: null, drag: null };
+const DESK = { open: false, place: "side", swap: false, size: 16, cards: [], focus: null };
 
 const deskKey = (c) => (c.name ? "n:" + c.name : "r:" + c.ref);
 function deskAdd(card, focus) {
@@ -1754,7 +1755,7 @@ function deskAdd(card, focus) {
   DESK.open = true;
   renderDesk();
 }
-function deskClose() { DESK.open = false; $("desk-pick").hidden = true; renderDesk(); }
+function deskClose() { DESK.open = false; DESK.shown = null; $("desk-pick").hidden = true; renderDesk(); }
 
 function deskLayout() {
   const main = document.querySelector("main");
@@ -1787,34 +1788,120 @@ function deskWords(text) {
   return box;
 }
 
+// Cards glide to their new places instead of jumping: measure where each is
+// now (mid-flight included), change the desk, and animate each from there.
+const REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)");
+function deskFlip(change) {
+  const before = new Map();
+  for (const card of $("desk-cards").querySelectorAll(".dc"))
+    before.set(card.dataset.key, card.getBoundingClientRect());
+  change();
+  if (REDUCED.matches) return;
+  for (const card of $("desk-cards").querySelectorAll(".dc")) {
+    const was = before.get(card.dataset.key);
+    if (!was || card.classList.contains("lifted")) continue;
+    const now = card.getBoundingClientRect();
+    const dx = was.left - now.left, dy = was.top - now.top;
+    if (Math.abs(dx) < 1 && Math.abs(dy) < 1) continue;
+    for (const a of card.getAnimations()) a.cancel();
+    card.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: "none" }],
+      { duration: 300, easing: "cubic-bezier(.32, .72, 0, 1)" });
+  }
+}
+
 function deskMove(i, to) {
   if (to < 0 || to >= DESK.cards.length || to === i) return;
-  const [c] = DESK.cards.splice(i, 1);
-  DESK.cards.splice(to, 0, c);
-  renderDesk();
+  deskFlip(() => {
+    const [c] = DESK.cards.splice(i, 1);
+    DESK.cards.splice(to, 0, c);
+    renderDesk();
+  });
+}
+
+// Carry a card by ⋮⋮ -- finger or mouse. It stays under the finger where it
+// was taken hold of; the others make room as it passes over them; let go and
+// it settles into its place.
+function deskCarry(card, grip) {
+  grip.addEventListener("pointerdown", (e) => {
+    if (e.button > 0) return;
+    e.preventDefault();
+    const start = { x: e.clientX, y: e.clientY };
+    let lifted = false, grab = null;
+    const place = (ev) => {
+      const base = (card.style.transform = "", card.getBoundingClientRect());
+      card.style.transform = `translate(${ev.clientX - grab.x - base.left}px, ${ev.clientY - grab.y - base.top}px)`;
+    };
+    const move = (ev) => {
+      if (ev.pointerId !== e.pointerId) return;
+      if (!lifted) {
+        if (Math.hypot(ev.clientX - start.x, ev.clientY - start.y) < 6) return;   // a tap is not a drag
+        lifted = true;
+        const r = card.getBoundingClientRect();
+        grab = { x: start.x - r.left, y: start.y - r.top };
+        for (const a of card.getAnimations()) a.cancel();
+        card.classList.add("lifted");
+        if (navigator.vibrate) navigator.vibrate(8);
+      }
+      // Over another card: this one takes its place, and the rest move up.
+      // A card still gliding to its place is not a target yet: it would swap straight back.
+      const others = [...$("desk-cards").querySelectorAll(".dc")]
+        .filter((c) => c !== card && !c.getAnimations().some((a) => a.playState === "running"));
+      const over = others.find((c) => {
+        const r = c.getBoundingClientRect();
+        return ev.clientX > r.left && ev.clientX < r.right && ev.clientY > r.top && ev.clientY < r.bottom;
+      });
+      if (over) {
+        const all = [...$("desk-cards").querySelectorAll(".dc")];
+        const from = all.indexOf(card), to = all.indexOf(over);
+        deskFlip(() => over.parentNode.insertBefore(card, from < to ? over.nextSibling : over));
+      }
+      place(ev);
+    };
+    const up = (ev) => {
+      if (ev.pointerId !== e.pointerId) return;
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+      if (!lifted) return;
+      // Settle from where it is into its slot, then keep the order.
+      const at = card.getBoundingClientRect();
+      card.style.transform = "";
+      const home = card.getBoundingClientRect();
+      card.classList.remove("lifted");
+      const order = [...$("desk-cards").querySelectorAll(".dc")].map((c) => c.dataset.key);
+      DESK.cards.sort((a, b) => order.indexOf(deskKey(a)) - order.indexOf(deskKey(b)));
+      const settle = REDUCED.matches ? null : card.animate(
+        [{ transform: `translate(${at.left - home.left}px, ${at.top - home.top}px)` }, { transform: "none" }],
+        { duration: 280, easing: "cubic-bezier(.32, .72, 0, 1)" });
+      const done = () => renderDesk();
+      if (settle) settle.onfinish = done; else done();
+    };
+    // On the window, not the grip: moving the card in the page drops the grip's capture.
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+  });
 }
 
 function deskCard(c, i) {
   const card = el("article", "dc" + (c.wide ? " wide" : ""));
-  card.dataset.i = i;
+  card.dataset.i = i; card.dataset.key = deskKey(c);
   const head = el("div", "dc-head");
   const grip = el("span", "dc-grip", "⋮⋮");
-  grip.title = "גרור כדי לסדר מחדש"; grip.draggable = true;
-  grip.addEventListener("dragstart", (e) => {
-    DESK.drag = i; card.classList.add("dragging");
-    e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(i));
-  });
-  grip.addEventListener("dragend", () => { DESK.drag = null; card.classList.remove("dragging"); });
-  card.addEventListener("dragover", (e) => { if (DESK.drag !== null) { e.preventDefault(); card.classList.add("drop"); } });
-  card.addEventListener("dragleave", () => card.classList.remove("drop"));
-  card.addEventListener("drop", (e) => { e.preventDefault(); card.classList.remove("drop"); deskMove(DESK.drag, i); });
+  grip.title = "גרור כדי לסדר מחדש"; grip.setAttribute("aria-hidden", "true");
+  deskCarry(card, grip);
   const title = el("span", "dc-name", c.name ? heName(c.name) : chipFor(c.ref).label);
   const tools = el("span", "dc-tools");
   const btn = (text, tip, go) => { const b = el("button", "dc-btn", text); b.title = tip; b.onclick = go; tools.append(b); return b; };
   btn("→", "להזיז קודם", () => deskMove(i, i - 1));
   btn("←", "להזיז אחר כך", () => deskMove(i, i + 1));
-  btn(c.wide ? "⇥⇤" : "⇤⇥", c.wide ? "צר" : "רחב", () => { c.wide = !c.wide; renderDesk(); });
-  btn("✕", "להוריד מהשולחן", () => { DESK.cards.splice(i, 1); renderDesk(); });
+  btn(c.wide ? "⇥⇤" : "⇤⇥", c.wide ? "צר" : "רחב", () => deskFlip(() => { c.wide = !c.wide; renderDesk(); }));
+  btn("✕", "להוריד מהשולחן", () => {
+    // It fades where it is, then the others close the gap.
+    card.classList.add("leaving");
+    setTimeout(() => deskFlip(() => { DESK.cards = DESK.cards.filter((x) => x !== c); renderDesk(); }),
+      REDUCED.matches ? 0 : 150);
+  });
   head.append(grip, title, tools);
   const body = el("div", "dc-body");
   if (c.height) body.style.height = c.height + "px";
@@ -1933,6 +2020,14 @@ function renderDesk() {
       ? "בחר סידור שמור למעלה, או ＋ מפרש כדי להוסיף."
       : "השולחן ריק. ＋ מפרש כדי להוסיף — או תגיד: ״תפתח את הרשב״א בצד״."));
   DESK.cards.forEach((c, i) => box.append(deskCard(c, i)));
+  // A card just put on the desk arrives; the ones already there are only redrawn.
+  const shown = new Set(DESK.cards.map(deskKey));
+  if (!REDUCED.matches && DESK.shown)
+    for (const card of box.querySelectorAll(".dc"))
+      if (!DESK.shown.has(card.dataset.key))
+        card.animate([{ opacity: 0, transform: "scale(.97)" }, { opacity: 1, transform: "none" }],
+          { duration: 260, easing: "cubic-bezier(.32, .72, 0, 1)" });
+  DESK.shown = shown;
   const focus = DESK.focus && box.querySelector('.dc-entry[data-ref="' + CSS.escape(DESK.focus) + '"]');
   if (focus) focus.classList.add("focus");
   // Redrawn cards stay where they were read to; a new one opens at the line,
@@ -2047,9 +2142,10 @@ $("desk-bigger").onclick = () => { DESK.size = Math.min(26, DESK.size + 1); desk
       }
     };
     const up = () => { grip.removeEventListener("pointermove", move); document.body.classList.remove("resizing"); };
-    grip.addEventListener("pointermove", move);
-    grip.addEventListener("pointerup", up, { once: true });
-    grip.addEventListener("pointercancel", up, { once: true });
+    // On the window, not the grip: moving the card in the page drops the grip's capture.
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
   });
 })();
 
