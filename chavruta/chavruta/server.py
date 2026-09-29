@@ -209,6 +209,64 @@ def progress_text(p, lang):
     return " ".join(parts) or ("עוד לא למדנו יחד." if he else "We haven't learned together yet.")
 
 
+# "Put the Rashba on the side", "תפתח את המאירי בצד": the reading desk, by voice.
+# Only with a word for where -- "open the Rashba" alone is a question about him.
+DESK_OPEN = re.compile(
+    r"^\W*(?:(?:can you|could you|please|and)\s+)*(?:open|put|add|bring|pin|show)(?: up)?(?: me)? (?P<en>.+?)"
+    r" (?:on|to|onto|in|at|next to|beside|alongside|by)(?: the| my)? (?:screen|side|desk|table)\W*$|"
+    r"^\W*(?:תפתח|פתח|תשים|שים|תוסיף|הוסף|תעלה|תביא|תצמיד)(?: לי)? (?P<he>.+?)"
+    r" (?:על |ב|ל)?ה?(?:מסך|צד|שולחן)\W*$", re.I)
+DESK_CLOSE = re.compile(r"\b(close|hide|clear)( the| my)? (desk|side screen|screen on the side|side)\b|"
+                        r"(סגור|תסגור|תנקה|נקה|תוריד) את (השולחן|המסך בצד|הצד)", re.I)
+
+
+def desk_who(words, pack):
+    """The commentators on this page named in `words` ("the Rashba and the Meiri")."""
+    present = pack.commentators()
+    table = {}
+    for name in present:
+        table[retrieve._key(name)] = name
+        he = commentators.WHO.get(name, {}).get("he")
+        if he:
+            table[retrieve._key(he)] = name
+    for alias, target in retrieve.ALIASES.items():
+        found = commentators.filed(target, present)
+        if found:
+            table.setdefault(retrieve._key(alias), found[0])
+    out = []
+    for piece in re.split(r",|\band\b|\s+ו(?=את\b|ה|[א-ת])|\s+גם\s+", words):
+        piece = re.sub(r"^\s*(the|את|also)\s+", "", piece.strip(), flags=re.I)
+        key = retrieve._key(piece)
+        for k in (key, key[1:] if key[:1] in "הול" else None):
+            if k and k in table:
+                if table[k] not in out:
+                    out.append(table[k])
+                break
+    return out
+
+
+def desk_command(said, pack, lang):
+    """{"mode": "desk", ...} for "put the Meiri on the side", or None."""
+    he = lang == "he" or (lang == "auto" and re.search(r"[א-ת]", said))
+    if DESK_CLOSE.search(said):
+        return {"mode": "desk", "close": True, "text": "סגרתי את השולחן." if he else "Closed the desk."}
+    m = DESK_OPEN.search(said)
+    if not m:
+        return None
+    names = desk_who(m.group("en") or m.group("he") or "", pack)
+    if not names:
+        return None
+    bare = ("Rashi", "Tosafot", "Steinsaltz")
+    if he:
+        said_names = [("" if n in bare or n.startswith("Rabbeinu") else "ה") + commentators.WHO.get(n, {}).get("he", n)
+                      for n in names]
+        spoken = " ו".join(said_names) if len(said_names) <= 2 else ", ".join(said_names)
+    else:
+        spoken = " and ".join(("" if n in bare else "the ") + n for n in names)
+    return {"mode": "desk", "add": names,
+            "text": ("פתחתי את %s בצד." % spoken) if he else ("Opened %s on the side." % spoken)}
+
+
 def onto_next_page(pack, said, heard, line):
     """(next amud, its reading) when they have read on from the last lines of
     this amud into the next -- or None. Only a page already built is checked:
@@ -585,6 +643,11 @@ class Handler(BaseHTTPRequestHandler):
         llm = LLM()
         heard = body.get("heard") or state.get("heard")
 
+        desk = None if body.get("about_reading") else desk_command(said, pack, body.get("language") or "en")
+        if desk:
+            record("answer", session=body.get("session"), ref=ref, line=line, said=said, text=desk["text"],
+                   grounded=True, trace={"kind": "desk", "quick": True, "seconds": 0})
+            return self.send_json(desk)
         if body.get("about_reading") and heard:
             # A question about one word, not about where they stopped: the
             # next utterance usually carries on the same sentence.
@@ -656,7 +719,9 @@ class Handler(BaseHTTPRequestHandler):
         read_out = bool(READ_TO_ME.search(said)) or \
             offer_choice(state.get("memory", {}).get("offered"), said) == "read"
         if read_out and stream:
-            emit({"mode": "read"})
+            # Reading a comment together: it opens on the desk, to be read along.
+            offered = (state.get("memory") or {}).get("offered") or []
+            emit({"mode": "read", "desk": [{"name": name, "ref": e["ref"]} for name, e in offered]})
         started = time.time()
         try:
             text, verdict, state["history"], trace = partner.ask(

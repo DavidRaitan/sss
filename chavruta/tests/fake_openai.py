@@ -86,8 +86,10 @@ def partner(system, messages):
     # A question a commentator asks: whose it is, and the offer; then the reading.
     chose = re.search(r"Read the whole comment \[\[([^\]]+)\]\]", last)
     if chose:
-        return ("«לכאורה יש לדקדק למה הוצרך לומר הכהנים» -- he asks why the priests are named at all "
-                "[[%s]]. What do you make of it?" % chose.group(1))
+        body = re.search(r"^\[\[%s\]\][^\n]*\n([^\n]+)" % re.escape(chose.group(1)), last, re.M)
+        opening = " ".join(re.sub(r"[^\u05d0-\u05ea\" ]", " ", body.group(1)).split()[:5]) if body else "לכאורה"
+        return ("«%s» -- he asks why the priests are named at all [[%s]]. What do you make of it?"
+                % (opening, chose.group(1)))
     theirs = re.search(r"read it together or give the gist: ([^\[;]+?) \[\[([^\]]+)\]\]", last)
     if theirs and "priests" in last.rsplit("\n", 1)[-1]:
         return ("That's a real question -- it's exactly the %s's [[%s]]. "

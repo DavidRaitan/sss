@@ -515,3 +515,16 @@ to the mishna the gemara is on, brings its text, and recaps the pages since.
   ("let's read it", "just tell me", "yes") is taken as the answer to the
   offer, not routed as a new question: reading goes phrase by phrase through
   the whole comment, spoken in full; the gist is told and then offered inside.
+
+**55. The desk: commentaries beside the page, arranged to taste, for the sitting.**
+- "Let's read it together" opens that comment on a desk beside the page, at
+  the comment itself; the words the partner quotes are lit as it reads them.
+- ＋ מפרש lists everyone on the amud by kind (a dot for who speaks on this
+  line); "לשולחן ⇱" in the sources panel and on an off-page source (the Tur)
+  pins it too; by voice: "put the Rashba on the side", "תפתח את המאירי בצד",
+  "close the desk". "Open the Rashba" alone stays a question about him.
+- Arranged by hand: drag a card by ⋮⋮ (or → ←), wide or narrow, drag a card
+  taller, the desk beside / under the page or on its own, ⇄ sides, א−/א+,
+  and its edge dragged for more or less room. Each card follows the line.
+- None of it is saved -- not the cards, not the layout: a reload clears it.
+  Settings are for what holds; the desk is for this sitting.

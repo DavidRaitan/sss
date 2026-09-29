@@ -287,6 +287,11 @@ function render() {
   applyToggles();
   markRead(null);
   drawNotes();
+  if (DESK.page !== S.pack.ref) {        // the same commentators, on the new page
+    DESK.page = S.pack.ref;
+    for (const c of DESK.cards) delete c.scroll;
+  }
+  renderDesk();
 }
 
 // Your notes: 📝 on the line each belongs to; tap to read it.
@@ -437,6 +442,7 @@ function selectLine(n, opts) {
   else if (node && opts.scroll !== "side" && !visible(node, main))
     node.scrollIntoView({ block: "center", behavior: "smooth" });
 
+  deskHere();
   if (S.settings.view === "daf") {
     for (const col of [$("col-inner"), $("col-outer")]) {
       const cs = [...col.querySelectorAll(".c")];
@@ -1399,7 +1405,9 @@ async function respond(batch, g) {
         if (g !== S.gen) return;
         if (msg.mode === "read") {
           // "Can you read it for me?" -- the page's words are spoken whole.
+          // Reading a comment together: it opens on the desk to read along.
           turn.whole = true;
+          for (const d of msg.desk || []) deskAdd({ name: d.name }, d.ref);
           return;
         }
         if (msg.mode === "interim") {
@@ -1413,6 +1421,7 @@ async function respond(batch, g) {
           turn.text += (turn.text ? (msg.text.startsWith("|") ? "\n" : " ") : "") + msg.text;
           if (turn.status !== "skipped") turn.status = "answering";
           say(lead + msg.text, turn);
+          markDesk(msg.text);
           lead = "";
         }
         renderBar();
@@ -1443,6 +1452,16 @@ async function respond(batch, g) {
     finishTurns(); renderBar();
     return;
   }
+  if (answer.mode === "desk") {
+    // "Put the Rashba on the side" -- done, and said in a word.
+    if (answer.close) deskClose();
+    for (const name of answer.add || []) deskAdd({ name });
+    turn.complete = true; turn.text = answer.text;
+    logPush({ me: false, text: turn.text, trace: { kind: "desk", quick: true } });
+    say(turn.text, turn);
+    finishTurns(); renderBar();
+    return;
+  }
   if (answer.mode === "navigate") {
     turn.complete = true; turn.text = "עובר ל" + runnerText(answer.ref) + ".";
     finishTurns(); renderBar();
@@ -1453,6 +1472,7 @@ async function respond(batch, g) {
   const said_ = tr.streamed && !tr.retried;
   turn.text = answer.text; turn.grounded = answer.grounded; turn.complete = true;
   markQuotes(answer.text);
+  markDesk(answer.text);
   const entry = logPush({ me: false, text: answer.text, trace: tr, grounded: answer.grounded,
     ms_answer: Math.round(performance.now() - t1), ms_first: first ? Math.round(first - t1) : null });
   S.lastSaid = answer.text;
@@ -1633,7 +1653,10 @@ function openSources(n, focus) {
         const more = el("button", "more", "הכל");
         more.onclick = () => { box.classList.toggle("open"); more.textContent = box.classList.contains("open") ? "פחות" : "הכל"; };
         const link = el("a", "lnk", e.ref); link.href = sefariaUrl(e.ref); link.target = "_blank"; link.rel = "noopener";
-        meta.append(more, link); box.append(meta);
+        const pin = el("button", "more", "לשולחן ⇱");
+        pin.title = "לפתוח את " + heName(name) + " לצד הדף";
+        pin.onclick = () => deskAdd({ name }, e.ref);
+        meta.append(more, pin, link); box.append(meta);
         if (e.ref === focus) { target = box; box.classList.add("open", "flash"); more.textContent = "פחות"; }
         panel.append(box);
       }
@@ -1705,10 +1728,251 @@ function openText(ref) {
   openPanel((panel) => {
     panel.append(el("h2", null, chipFor(ref).label || ref), el("div", "sub", ref));
     const link = textLink(ref);
-    panel.append(link);
+    const pin = el("button", "btn", "לשולחן ⇱");
+    pin.onclick = () => { deskAdd({ ref }); closePanel(); };
+    panel.append(link, pin);
     link.querySelector(".tref").click();
   });
 }
+
+/* ------------------------------------------- the desk: commentaries to read */
+
+// Commentaries laid out beside the page, to read with the partner or alone.
+// Add whom you like, drag them into the order you like, wide or narrow; the
+// desk beside the page, under it, or on its own. Only for this sitting:
+// nothing here is saved, and a reload clears it.
+const DESK = { open: false, place: "side", swap: false, size: 16, cards: [], focus: null, drag: null };
+
+const deskKey = (c) => (c.name ? "n:" + c.name : "r:" + c.ref);
+function deskAdd(card, focus) {
+  if (!DESK.cards.some((x) => deskKey(x) === deskKey(card))) DESK.cards.push(card);
+  if (focus) { DESK.focus = focus; DESK.toFocus = true; }
+  DESK.open = true;
+  renderDesk();
+}
+function deskClose() { DESK.open = false; $("desk-pick").hidden = true; renderDesk(); }
+
+function deskLayout() {
+  const main = document.querySelector("main");
+  $("desk").hidden = !DESK.open;
+  main.classList.toggle("with-desk", DESK.open);
+  main.classList.toggle("swap", DESK.swap);
+  main.dataset.place = DESK.place;
+  $("desk").style.setProperty("--desk-font", DESK.size + "px");
+  for (const p of ["side", "below", "full"]) $("desk-" + p).setAttribute("aria-pressed", String(DESK.place === p));
+  $("open-desk").setAttribute("aria-pressed", String(DESK.open));
+}
+
+// A work's comments on this amud, in the book's own order.
+function commentsOf(name) {
+  const out = [];
+  for (const seg of S.pack.segments) for (const e of seg.commentaries[name] || []) out.push({ seg, e });
+  return out.sort((a, b) => byRef(a.e.ref, b.e.ref));
+}
+
+// The words as spans, so what the partner quotes can be lit as it is read.
+function deskWords(text) {
+  const box = el("div", "dc-text");
+  for (const w of text.split(/(\s+)/)) {
+    if (!w) continue;
+    if (/^\s+$/.test(w)) { box.append(w); continue; }
+    const k = norm(w), s = el("span", "dw", w);
+    if (k) s.dataset.k = k;
+    box.append(s);
+  }
+  return box;
+}
+
+function deskMove(i, to) {
+  if (to < 0 || to >= DESK.cards.length || to === i) return;
+  const [c] = DESK.cards.splice(i, 1);
+  DESK.cards.splice(to, 0, c);
+  renderDesk();
+}
+
+function deskCard(c, i) {
+  const card = el("article", "dc" + (c.wide ? " wide" : ""));
+  card.dataset.i = i;
+  const head = el("div", "dc-head");
+  const grip = el("span", "dc-grip", "⋮⋮");
+  grip.title = "גרור כדי לסדר מחדש"; grip.draggable = true;
+  grip.addEventListener("dragstart", (e) => {
+    DESK.drag = i; card.classList.add("dragging");
+    e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(i));
+  });
+  grip.addEventListener("dragend", () => { DESK.drag = null; card.classList.remove("dragging"); });
+  card.addEventListener("dragover", (e) => { if (DESK.drag !== null) { e.preventDefault(); card.classList.add("drop"); } });
+  card.addEventListener("dragleave", () => card.classList.remove("drop"));
+  card.addEventListener("drop", (e) => { e.preventDefault(); card.classList.remove("drop"); deskMove(DESK.drag, i); });
+  const title = el("span", "dc-name", c.name ? heName(c.name) : chipFor(c.ref).label);
+  const tools = el("span", "dc-tools");
+  const btn = (text, tip, go) => { const b = el("button", "dc-btn", text); b.title = tip; b.onclick = go; tools.append(b); return b; };
+  btn("→", "להזיז קודם", () => deskMove(i, i - 1));
+  btn("←", "להזיז אחר כך", () => deskMove(i, i + 1));
+  btn(c.wide ? "⇥⇤" : "⇤⇥", c.wide ? "צר" : "רחב", () => { c.wide = !c.wide; renderDesk(); });
+  btn("✕", "להוריד מהשולחן", () => { DESK.cards.splice(i, 1); renderDesk(); });
+  head.append(grip, title, tools);
+  const body = el("div", "dc-body");
+  if (c.height) body.style.height = c.height + "px";
+  // A card drawn taller or shorter keeps its height while the desk is open.
+  new ResizeObserver(() => { if (body.offsetHeight) c.height = body.offsetHeight; }).observe(body);
+  body.addEventListener("scroll", () => { c.scroll = body.scrollTop; }, { passive: true });
+  card.append(head, body);
+  if (c.name) {
+    const list = commentsOf(c.name);
+    if (!list.length) body.append(el("div", "dc-none", "אין ל" + heName(c.name) + " כאן, בעמוד הזה."));
+    for (const { seg, e } of list) {
+      const entry = el("div", "dc-entry" + (seg.n === S.line ? " here" : ""));
+      entry.dataset.ref = e.ref; entry.dataset.n = seg.n;
+      const top = el("div", "dc-top");
+      const ln = el("button", "dc-line", "שורה " + seg.n);
+      ln.onclick = () => selectLine(seg.n);
+      top.append(ln);
+      if (e.dibur) top.append(el("span", "dc-dib", e.dibur));
+      entry.append(top, deskWords(e.he));
+      body.append(entry);
+    }
+  } else {
+    // A source off the page (the Tur the partner cited), fetched once.
+    if (c.text) body.append(deskWords(c.text));
+    else {
+      body.append(el("div", "dc-none", "פותח…"));
+      fetch("/api/text?ref=" + encodeURIComponent(c.ref)).then((r) => r.json()).then((d) => {
+        c.text = d.he || "לא הצלחתי להביא את זה מהספרייה.";
+        body.replaceChildren(deskWords(c.text));
+      }).catch(() => { body.replaceChildren(el("div", "dc-none", "לא הצלחתי להביא את זה מהספרייה.")); });
+    }
+  }
+  return card;
+}
+
+function renderDesk() {
+  deskLayout();
+  const box = $("desk-cards");
+  if (!DESK.open) return;
+  box.replaceChildren();
+  if (!DESK.cards.length)
+    box.append(el("div", "desk-empty", "השולחן ריק. ＋ מפרש כדי להוסיף — או תגיד: ״תפתח את הרשב״א בצד״."));
+  DESK.cards.forEach((c, i) => box.append(deskCard(c, i)));
+  const focus = DESK.focus && box.querySelector('.dc-entry[data-ref="' + CSS.escape(DESK.focus) + '"]');
+  if (focus) focus.classList.add("focus");
+  // Redrawn cards stay where they were read to; a new one opens at the line,
+  // and the comment being read is brought into view once.
+  const bodies = [...box.querySelectorAll(".dc-body")];
+  bodies.forEach((body, i) => {
+    const c = DESK.cards[i];
+    if (focus && DESK.toFocus && body.contains(focus)) deskScroll(body, focus, "auto");
+    else if (c.scroll !== undefined) body.scrollTop = c.scroll;
+    else deskHere(null, [body], "auto");
+  });
+  DESK.toFocus = false;
+}
+
+function deskScroll(body, target, behavior) {
+  body.scrollTo({ top: target.offsetTop - body.offsetTop - 8, behavior: behavior || "smooth" });
+}
+
+// Each card to the comment on the line they are at, as they move through the page.
+function deskHere(_, bodies, behavior) {
+  if (!DESK.open) return;
+  for (const body of bodies || $("desk-cards").querySelectorAll(".dc-body")) {
+    const entries = [...body.querySelectorAll(".dc-entry")];
+    for (const x of entries) x.classList.toggle("here", +x.dataset.n === S.line);
+    const target = entries.find((x) => +x.dataset.n === S.line) || entries.filter((x) => +x.dataset.n < S.line).pop();
+    if (target && !visible(target, body)) deskScroll(body, target, behavior);
+  }
+}
+
+// What the partner quotes while it reads a comment with them, lit on the desk.
+function markDesk(text) {
+  if (!DESK.open) return;
+  const quotes = [...(text || "").matchAll(/«([^»]+)»/g)].map((m) => m[1].split(/\s+/).map(norm).filter(Boolean));
+  if (!quotes.length) return;
+  for (const n of $("desk-cards").querySelectorAll(".dw.quoted")) n.classList.remove("quoted");
+  for (const body of $("desk-cards").querySelectorAll(".dc-body")) {
+    const all = [...body.querySelectorAll(".dw[data-k]")];
+    let first = null;
+    for (const q of quotes) {
+      for (let i = 0; i + q.length <= all.length; i++) {
+        if (q.every((k, j) => all[i + j].dataset.k === k)) {
+          for (let j = 0; j < q.length; j++) all[i + j].classList.add("quoted");
+          first = first || all[i];
+          break;
+        }
+      }
+    }
+    if (first && !visible(first, body))
+      body.scrollTo({ top: first.offsetTop - body.offsetTop - body.clientHeight / 3, behavior: "smooth" });
+  }
+}
+
+// ＋ מפרש: everyone on this amud, by kind; a dot for who speaks on this line.
+function deskPicker() {
+  const pick = $("desk-pick");
+  if (!pick.hidden) { pick.hidden = true; $("desk-add").setAttribute("aria-expanded", "false"); return; }
+  pick.replaceChildren();
+  const count = {};
+  for (const seg of S.pack.segments)
+    for (const [name, list] of Object.entries(seg.commentaries))
+      count[name] = (count[name] || 0) + list.length;
+  const onLine = new Set(Object.keys((S.pack.segments.find((s) => s.n === S.line) || {}).commentaries || {}));
+  const weight = (name) => (S.pack.weights || {})[name] || 0;
+  const groups = {};
+  for (const name of Object.keys(count)) (groups[tier(name)] = groups[tier(name)] || []).push(name);
+  for (const g of ["על הדף", "ראשונים", "אחרונים", "עוד"]) {
+    const names = (groups[g] || []).sort((a, b) => weight(b) - weight(a) || a.localeCompare(b));
+    if (!names.length) continue;
+    const row = el("div", "dp-row");
+    row.append(el("span", "dp-grp", g));
+    for (const name of names) {
+      const on = DESK.cards.some((c) => c.name === name);
+      const b = el("button", "chip" + (on ? " on" : ""), (onLine.has(name) ? "• " : "") + heName(name) + " " + count[name]);
+      b.title = onLine.has(name) ? "יש לו מה לומר בשורה הזאת" : "";
+      b.onclick = () => {
+        if (on) DESK.cards = DESK.cards.filter((c) => c.name !== name); else DESK.cards.push({ name });
+        pick.hidden = true; renderDesk(); deskPicker();
+      };
+      row.append(b);
+    }
+    pick.append(row);
+  }
+  pick.append(el("div", "dp-hint", "• — יש לו מה לומר בשורה " + S.line + ". לחיצה שנייה מורידה."));
+  pick.hidden = false;
+  $("desk-add").setAttribute("aria-expanded", "true");
+}
+
+$("open-desk").onclick = () => (DESK.open ? deskClose() : (DESK.open = true, renderDesk()));
+$("desk-close").onclick = deskClose;
+$("desk-add").onclick = deskPicker;
+for (const p of ["side", "below", "full"]) $("desk-" + p).onclick = () => { DESK.place = p; renderDesk(); };
+$("desk-swap").onclick = () => { DESK.swap = !DESK.swap; renderDesk(); };
+$("desk-smaller").onclick = () => { DESK.size = Math.max(12, DESK.size - 1); deskLayout(); };
+$("desk-bigger").onclick = () => { DESK.size = Math.min(26, DESK.size + 1); deskLayout(); };
+
+// The edge toward the page: drag it for more or less desk. Not remembered.
+(function sizeDesk() {
+  const grip = $("desk-grip");
+  grip.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    grip.setPointerCapture(e.pointerId);
+    document.body.classList.add("resizing");
+    const move = (ev) => {
+      const d = $("desk").getBoundingClientRect(), p = document.querySelector(".sheet").getBoundingClientRect();
+      const main = document.querySelector("main");
+      if (getComputedStyle(main).flexDirection.startsWith("column")) {
+        const px = p.top < d.top ? d.bottom - ev.clientY : ev.clientY - d.top;
+        main.style.setProperty("--desk-h", Math.round(Math.min(Math.max(px, 140), innerHeight * 0.85)) + "px");
+      } else {
+        const px = p.left > d.left ? ev.clientX - d.left : d.right - ev.clientX;
+        main.style.setProperty("--desk-w", Math.round(Math.min(Math.max(px, 240), innerWidth * 0.8)) + "px");
+      }
+    };
+    const up = () => { grip.removeEventListener("pointermove", move); document.body.classList.remove("resizing"); };
+    grip.addEventListener("pointermove", move);
+    grip.addEventListener("pointerup", up, { once: true });
+    grip.addEventListener("pointercancel", up, { once: true });
+  });
+})();
 
 function openLog() {
   openPanel((panel) => {

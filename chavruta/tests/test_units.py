@@ -677,6 +677,19 @@ class TheirQuestion(unittest.TestCase):
         self.assertIn("[[%s]] Tzelach" % self.TZELACH, seen[-1])       # the whole comment, opened
         self.assertNotIn("offered", memory)                              # asked once, answered once
 
+    def test_the_desk_by_voice(self):
+        from chavruta import server
+        cmd = lambda said, lang="auto": server.desk_command(said, self.pack, lang)
+        self.assertEqual(cmd("put the Rashba on the side")["add"], ["Rashba"])
+        self.assertEqual(cmd("can you open the Meiri and the Tzelach on the screen")["add"], ["Meiri", "Tzelach"])
+        got = cmd('תשים את המאירי ואת הצל"ח על המסך')
+        self.assertEqual(got["add"], ["Meiri", "Tzelach"])
+        self.assertEqual(got["text"], 'פתחתי את המאירי והצל"ח בצד.')
+        self.assertEqual(cmd('תוסיף את הרש"ש לשולחן')["add"], ["Rashash"])
+        self.assertTrue(cmd("close the desk")["close"])
+        self.assertIsNone(cmd("open the Rashba"))                 # a question about him, not the desk
+        self.assertIsNone(cmd("put the Ramban on the side"))      # not on this page
+
     def test_no_offer_when_it_just_answers(self):
         memory = {}
         p = partner.Partner(self.pack, LLM())

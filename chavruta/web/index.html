@@ -46,6 +46,25 @@
     <div id="linear" class="linear" hidden></div>
     <div id="loading" class="loading">פותח את הדף…</div>
   </div>
+  <section class="desk" id="desk" hidden aria-label="שולחן: מפרשים לקרוא לצד הדף">
+    <div class="desk-grip" id="desk-grip" role="separator" title="גרור כדי לשנות את הגודל"></div>
+    <div class="desk-bar">
+      <span class="desk-title">שולחן</span>
+      <button class="btn" id="desk-add" aria-expanded="false">＋ מפרש</button>
+      <span class="grow"></span>
+      <span class="seg2 small" role="group" aria-label="איפה השולחן">
+        <button class="btn" id="desk-side" title="לצד הדף">בצד</button>
+        <button class="btn" id="desk-below" title="מתחת לדף">למטה</button>
+        <button class="btn" id="desk-full" title="רק השולחן, בלי הדף">מלא</button>
+      </span>
+      <button class="btn icon" id="desk-swap" title="להחליף צד">⇄</button>
+      <button class="btn icon" id="desk-smaller" title="אותיות קטנות יותר">א−</button>
+      <button class="btn icon" id="desk-bigger" title="אותיות גדולות יותר">א+</button>
+      <button class="btn icon" id="desk-close" title="לסגור את השולחן">✕</button>
+    </div>
+    <div class="desk-pick" id="desk-pick" hidden></div>
+    <div class="desk-cards" id="desk-cards"></div>
+  </section>
 </main>
 
 <footer>
@@ -65,6 +84,7 @@
     </div>
     <div class="tools">
       <button class="btn" id="open-sources">מפרשים</button>
+      <button class="btn" id="open-desk" aria-pressed="false" title="מפרשים לצד הדף, לקריאה">שולחן</button>
       <button class="btn" id="open-log">תמליל</button>
     </div>
   </div>
