@@ -1063,6 +1063,52 @@ class TrustedSites(unittest.TestCase):
         self.assertIn("Halacha Yomit: זמן קריאת שמע של ערבית", trace["fetched"])
 
 
+class CuttingIn(unittest.TestCase):
+    """Spoken over an answer still being said: an aside, a correction, a new question, or for later."""
+    CUT = {"asked": "was this codified in the Tur?", "said": "The Tur brings the Rosh", "unsaid": "and the Beit Yosef"}
+
+    def judged(self, said, model=None):
+        class Model:
+            def json(self, system, messages, heavy=False):
+                assert "cut_in" in system and messages[-1]["content"].startswith("[you were answering")
+                return dict({"kind": "meaning"}, **(model or {}))
+        return retrieve.classify(Model(), said, self.CUT)["cut_in"]
+
+    def test_the_plain_cases_need_no_judgment(self):
+        self.assertEqual(self.judged("no, I mean in the Rambam", {"cut_in": "new"}), "merge")
+        self.assertEqual(self.judged("לא, התכוונתי לרמב״ם"), "merge")
+        self.assertEqual(self.judged("and what about the Rama?"), "merge")
+        self.assertEqual(self.judged("let's come back to that later", {"cut_in": "aside"}), "later")
+        self.assertEqual(self.judged("נחזור לזה אחר כך"), "later")
+
+    def test_the_rest_is_the_models_call_and_short_means_an_aside(self):
+        self.assertEqual(self.judged("who was Rabban Gamliel?", {"cut_in": "new"}), "new")
+        self.assertEqual(self.judged("wait, what does chatzot mean?"), "aside")
+        self.assertEqual(self.judged("so I have a completely separate thing I have been wondering about the "
+                                     "structure of the whole tractate and its order"), "new")
+
+    def test_no_cut_no_judgment(self):
+        class Model:
+            def json(self, system, messages, heavy=False):
+                assert "cut_in" not in system
+                return {"kind": "meaning"}
+        self.assertIsNone(retrieve.classify(Model(), "what does chatzot mean?")["cut_in"])
+
+    def test_the_partner_is_told_how_far_it_got(self):
+        seen = []
+        p = partner.Partner(Pack(PACK), LLM())
+        p.llm = type("M", (), {"effort": None, "say": lambda self_, s, m, **k: seen.append(m[-1]["content"]) or
+                               "Midnight [[Rashi on Berakhot 2a:1:1]]."})()
+        p.ask(1, [], "what does chatzot mean?", route={"kind": "meaning", "names": []},
+              cut=dict(self.CUT, kind="aside"))
+        self.assertIn("quick aside", seen[-1])
+        self.assertIn("The Tur brings the Rosh", seen[-1])
+        self.assertIn("one or two sentences", seen[-1])
+        p.ask(1, [], "no, I mean in the Rambam", route={"kind": "meaning", "names": []},
+              cut=dict(self.CUT, kind="merge"))
+        self.assertIn("did not hear: «and the Beit Yosef»", seen[-1])
+
+
 class Server(unittest.TestCase):
     def test_all_of_shas_and_nothing_else(self):
         from chavruta import server

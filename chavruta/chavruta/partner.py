@@ -495,7 +495,7 @@ class Partner:
         return self.language
 
     def ask(self, n, history, said, heard=None, route=None, recent=None, spoke=None, announce=None,
-            on_part=None, memory=None):
+            on_part=None, memory=None, cut=None):
         """One turn: route cheaply, reach for what it needs, answer carefully,
         check before it ships.
 
@@ -511,6 +511,12 @@ class Partner:
         kind = route.get("kind")
         lang = self.speaks(route)
         note = listener_note(self.pack, n, heard, recent, spoke)
+        # They spoke while it was still answering: how far it got, and what to do.
+        if cut and cut.get("kind") in CUT_NOTE:
+            note += " " + CUT_NOTE[cut["kind"]] % {
+                "asked": (cut.get("asked") or "")[:300],
+                "said": " ".join((cut.get("said") or "").split())[-400:] or "(nothing yet)",
+                "unsaid": " ".join((cut.get("unsaid") or "").split())[:300]}
         # "So answer it" -- about the question before, which is what they want.
         pending = pending_question(history, said)
         if pending:
@@ -647,6 +653,8 @@ class Partner:
             elsewhere = self.index.related(unit, exclude=self.pack.ref) or []
         known = self.known | {hit["ref"] for hit in elsewhere} | {e["ref"] for _, e in fetched + carried}
         texts = dict(self.texts, **{e["ref"]: e.get("he") or "" for _, e in chosen + fetched + carried})
+        if cut and cut.get("kind") in CUT_SIZE:
+            size_now = CUT_SIZE[cut["kind"]]
         size = size_now or ("whatever that earlier question needs, up to about 100 words" if pending
                             else SIZE.get(kind, SIZE["other"]))
         note += " [%s Depth: %s. Length: %s.]" % (LANGUAGE[self.language], retrieve.DEPTHS[self.depth], size)
@@ -829,6 +837,21 @@ def pending_question(history, said):
             return asked[:400]
     return None
 
+
+# Spoken over its own answer. An aside is answered in a breath and the answer
+# picks up where it stopped (the app says it); a correction replaces the rest;
+# a new question is answered and the old answer waits.
+CUT_NOTE = {
+    "aside": "[they cut in while you were answering «%(asked)s» -- you had got as far as «...%(said)s». "
+             "This is a quick aside about what you were saying: answer just it, in a sentence or two, and "
+             "stop -- do not go back to the earlier answer; the app picks it up where it stopped.]",
+    "merge": "[they cut in while you were answering «%(asked)s». They heard: «...%(said)s»; they did not "
+             "hear: «%(unsaid)s». What they say now corrects or adds to that question: answer the question "
+             "as it now stands -- carry on from what they heard, do not repeat it.]",
+    "new": "[they cut in while you were answering «%(asked)s» (that answer waits, unfinished). This is a "
+           "different question: answer it.]",
+}
+CUT_SIZE = {"aside": "one or two sentences"}
 
 # The questions a commentator's question can be.
 ASKING = [k for k in who.ROUTES if k != "halacha"] + ["other"]

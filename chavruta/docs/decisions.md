@@ -569,3 +569,25 @@ to the mishna the gemara is on, brings its text, and recaps the pages since.
   two worded buttons: "דלג" and "לשאלה האחרונה" (icons alone on a phone).
 - The conversation area's top edge is a handle: drag it up for more of the
   conversation, down for more page; a double-click puts it back. Kept.
+
+**58. Cutting in: answered now, judged against what it cut into.**
+- In use a clarifying question waited behind the whole of a long answer. Now
+  speaking over an answer stops it at once and holds its place; the router,
+  in the same quick call that sorts every question, is shown what was being
+  answered and how far it got, and says what the new words are to it:
+  - aside ("wait, what's chatzot?"): answered in a sentence or two, then "so,
+    as I was saying --" and on from the sentence it stopped in (said again
+    whole, not from mid-word). When unsure, this: most interruptions are
+    about what is being said.
+  - merge ("no, I mean in the Rambam", "and the Rama?"): the rest of the old
+    answer is dropped and the question as it now stands is answered, told
+    what was heard and what was not, so it carries on instead of repeating.
+  - new: answered now; the unfinished answer waits in the queue, and it asks
+    "want me to go back to what I was saying?" -- yes brings it back.
+  - later ("let's come back to that"): kept in the queue as "לאחר כך" (tap to
+    ask it), and the answer goes on.
+  "Go back" / "תמשיך במה שאמרת" / "where were we" brings back a held answer
+  at any time, and tapping it in the queue does too. An "um", a cough or a
+  mic check over it: that sentence again, and on. Reading on over it: it waits.
+- The plain cases ("no, I mean", "later") are decided by pattern, not the
+  model; the export records each cut-in's verdict.

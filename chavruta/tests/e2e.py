@@ -388,20 +388,67 @@ def main():
             check("a follow-up while it thinks is answered with the question, once",
                   page.evaluate("S.turns.filter(t => /^and was this codified/.test(t.asked) && open(t)).length") == 0,
                   page.evaluate("JSON.stringify(S.turns.map(t => [t.asked.slice(0, 30), t.status]))"))
-            # Asked while an answer is being said: the bar shows the one being
-            # answered, the new one waits in the queue, and ⏩ goes straight to it.
+            # Spoken over an answer: it stops and holds its place, and what was
+            # said is judged against that answer.
+            # An aside ("what does chatzot mean?"): answered at once, briefly,
+            # then back to where it was.
             page.wait_for_function("saying && saying.turn && /codified/.test(saying.turn.asked)", timeout=20000)
             page.fill("#panel input", "what does chatzot mean here?")
             page.press("#panel input", "Enter")
-            page.wait_for_selector("#queue .qitem", timeout=15000)
-            check("a question asked while it speaks waits in a visible queue",
-                  "chatzot" in page.inner_text("#queue") and "chatzot" not in page.inner_text("#asked"),
-                  page.inner_text("#asked")[:40] + " | " + page.inner_text("#queue")[:60])
+            page.wait_for_function("S.turns.some(t => /codified/.test(t.asked) && t.held)", timeout=8000)
+            check("speaking over an answer holds it where it was", True)
+            check("…and it shows as waiting to go on", "להמשיך" in page.inner_text("#queue"), page.inner_text("#queue"))
             shot("08-queue")
-            page.click("#queue .qbtn:last-child")
-            page.wait_for_function("/chatzot/.test(document.querySelector('#asked').textContent)", timeout=15000)
+            page.wait_for_function("S.log.some(t => !t.me && /Chatzot is midnight/.test(t.text))", timeout=15000)
+            check("a quick aside is answered at once, briefly", True)
+            page.wait_for_function("(() => { const t = S.turns.filter(t => /codified/.test(t.asked)).pop();"
+                                   " return t && !t.held && (saying && saying.turn === t || t.status === 'done'); })()",
+                                   timeout=20000)
+            check("…then it goes back to the answer it cut into", True)
             latency(0)
-            check("⏩ jumps to the latest question", page.locator("#queue .qitem").count() == 0)
+            page.wait_for_function("!saying && !speechQ.length", timeout=30000)
+            long_answer = ("The Tur brings the Rosh, who rules like Rabban Gamliel even at the outset, and the "
+                           "Beit Yosef explains why the Shulchan Aruch follows him; the Rama adds nothing here. ") * 2
+            # A correction ("no, I mean ..."): the rest is dropped, the question as it now stands answered.
+            page.evaluate("answered('what does the Tur say?', %s)" % json.dumps(long_answer))
+            page.wait_for_function("saying && saying.turn && /what does the Tur say/.test(saying.turn.asked)", timeout=10000)
+            page.evaluate("pauseSpeaking()")          # held on a word, then something is said
+            page.fill("#panel input", "no, I mean in the Rambam")
+            page.press("#panel input", "Enter")
+            page.wait_for_function("S.log.some(t => !t.me && /For that it is the same/.test(t.text))", timeout=15000)
+            check("a correction replaces the answer it cut into",
+                  page.evaluate("S.turns.some(t => /what does the Tur say.*Rambam/.test(t.asked)) && "
+                                "S.turns.find(t => t.asked === 'what does the Tur say?').status === 'skipped'"),
+                  page.evaluate("JSON.stringify(S.turns.slice(-3).map(t => [t.asked.slice(0, 40), t.status]))"))
+            page.wait_for_function("!saying && !speechQ.length", timeout=30000)
+            # For later ("let's come back to that"): kept in the queue, and on it goes.
+            page.evaluate("answered('what does the Tur say?', %s)" % json.dumps(long_answer))
+            page.wait_for_function("saying && saying.turn && /what does the Tur say/.test(saying.turn.asked)", timeout=10000)
+            page.evaluate("pauseSpeaking()")          # held on a word, then something is said
+            page.fill("#panel input", "remind me later to ask about the Rama")
+            page.press("#panel input", "Enter")
+            page.wait_for_function("S.later.length === 1", timeout=15000)
+            check("something for later is kept in the queue", "לאחר כך" in page.inner_text("#queue"), page.inner_text("#queue"))
+            page.wait_for_function("(() => { const t = S.turns.filter(t => t.asked === 'what does the Tur say?').pop();"
+                                   " return t && !t.held && saying && saying.turn === t; })()", timeout=15000)
+            check("…and the answer goes on", True)
+            page.evaluate("skipCurrent()")
+            page.wait_for_function("!saying && !speechQ.length", timeout=30000)
+            # A new question: answered now; the other waits, and "yes" brings it back.
+            page.evaluate("answered('what does the Tur say?', %s)" % json.dumps(long_answer))
+            page.wait_for_function("saying && saying.turn && /what does the Tur say/.test(saying.turn.asked)", timeout=10000)
+            page.evaluate("pauseSpeaking()")          # held on a word, then something is said
+            page.fill("#panel input", "a different question: what does chatzot mean here?")
+            page.press("#panel input", "Enter")
+            page.wait_for_function("S.offerResume && S.offerResume.held", timeout=20000)
+            check("a new question is answered, and it offers to go back", True)
+            page.fill("#panel input", "yes")
+            page.press("#panel input", "Enter")
+            page.wait_for_function("(() => { const t = S.offerResume === null && S.turns.filter(t => t.asked === 'what does the Tur say?').pop();"
+                                   " return t && !t.held; })()", timeout=15000)
+            check("…and goes back when asked", True)
+            page.evaluate("skipCurrent()")
+            page.evaluate("S.later.length = 0; renderBar()")
             box = page.evaluate("(() => { const g = document.querySelector('#col-gemara').getBoundingClientRect();"
                                 " const p = document.querySelector('#panel').getBoundingClientRect();"
                                 " return [g.left, g.right, p.left, p.right]; })()")

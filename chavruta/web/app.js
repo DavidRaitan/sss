@@ -1023,7 +1023,7 @@ function stopListening() {
   answering = false;
   stopSpeaking();
   for (const item of speechQ.splice(0)) item.resolve();
-  for (const t of S.turns) if (open(t)) t.status = "skipped";
+  for (const t of S.turns) if (open(t)) dropTurn(t);
   renderBar();
   hearChain = Promise.resolve();
   showMine("");
@@ -1035,9 +1035,13 @@ function micDenied() {
   setMode("idle", "צריך אישור למיקרופון — לחץ על סמל המנעול בשורת הכתובת ואפשר מיקרופון.", true);
 }
 
-// Talking over it stops it (and what they say is heard); so does talking
-// while it is paused -- they have moved on.
-function onBarge() { stopSpeaking(); }
+// Talking over it stops it at once -- and holds its place. What they said
+// decides what happens next (see "cutting in", below): an "um" or a cough
+// and it says that sentence again and goes on.
+function onBarge() {
+  if (saying && saying.turn && open(saying.turn) && !saying.turn.held) holdTurn(saying.turn, "barge");
+  else stopSpeaking();
+}
 
 function onUtterance(u) {
   const g = S.gen, t0 = performance.now();
@@ -1076,7 +1080,7 @@ async function postStream(path, body, onLine, signal) {
     if (!line.trim()) return;
     const msg = JSON.parse(line);
     if (msg.error) throw Object.assign(new Error(msg.error), { code: msg.error });
-    if (msg.mode === "interim" || msg.mode === "part" || msg.mode === "read") onLine(msg); else last = msg;
+    if (["interim", "part", "read", "cut_in"].includes(msg.mode)) onLine(msg); else last = msg;
   };
   for (;;) {
     const { value, done } = await reader.read();
@@ -1119,10 +1123,10 @@ async function hearOne(u, g, t0) {
     heard = u.blob ? await post("/api/hear?" + q, u.blob, u.blob.type || "audio/webm", ctl.signal)
       : await post("/api/heard", { ref: S.pack.ref, line: S.line, session: S.session,
           language: S.settings.language, said: u.text, checks: S.settings.checks }, null, ctl.signal);
-  } catch (e) { if (g === S.gen) failed(e, "hear", t0); return; }
+  } catch (e) { if (g === S.gen) { failed(e, "hear", t0); goOn(); } return; }
   finally { aborts.delete(ctl); }
   if (g !== S.gen) return;
-  if (!heard.said || heard.mode === "silence") return idleMode();
+  if (!heard.said || heard.mode === "silence") { goOn(); return idleMode(); }
   if (heard.mode === "echo") {
     // It heard its own voice through the speakers. Twice, and it stops
     // listening while it talks (speaker mode); ⏸ is how to stop it then.
@@ -1133,6 +1137,7 @@ async function hearOne(u, g, t0) {
       logPush({ me: false, error: true, stage: "echo", text: "עברתי למצב רמקול (בלי אוזניות).", detail: "heard itself twice",
         ms: 0, at: new Date().toLocaleTimeString() });
     }
+    goOn();
     return idleMode();
   }
 
@@ -1142,24 +1147,31 @@ async function hearOne(u, g, t0) {
     heard: heard.heard, ms_hear: Math.round(performance.now() - t0), at: new Date().toLocaleTimeString() });
   if (heard.line) selectLine(heard.line, { scroll: "side" });
   markRead(heard.heard);
+  // "Go back to what you were saying" -- the answer that was held.
+  const offered = S.offerResume; S.offerResume = null;
+  if (heard.mode === "talking" && (RESUME.test(heard.said) || (offered && offered.held && YES.test(heard.said)))) {
+    const t = (offered && offered.held) ? offered : S.turns.filter((x) => x.held && open(x)).pop();
+    if (t) { resumeTurn(t, true); return; }
+  }
   if (S.pendingSettings && heard.mode === "talking") {
     // The answer to "turn my voice off?"
     const changes = S.pendingSettings; S.pendingSettings = null;
     const he = S.settings.language === "he";
     if (/^\W*(yes|yeah|yep|sure|ok(ay)?|confirm|do it|כן|בטח|אישור|תכבה)\b/i.test(heard.said)) {
       answered(heard.said, applySettings(changes, he), { kind: "settings" });
-      return;
+      return goOn();
     }
     if (/^\W*(no|nope|cancel|don'?t|never mind|לא|עזוב|בטל)\b/i.test(heard.said)) {
       answered(heard.said, he ? "בסדר, משאיר את הקול." : "OK, I'll keep talking.", { kind: "settings" });
-      return;
+      return goOn();
     }
   }
-  if (heard.ignore) return idleMode();   // "um", "okay": nothing to answer
+  if (heard.ignore) { goOn(); return idleMode(); }   // "um", "okay": nothing to answer
 
   if (heard.skip) {
     // "Enough" / "skip" -- talking already stopped the voice; drop the rest.
     skipCurrent();
+    for (const h of S.turns.filter((x) => x.held === "barge")) dropTurn(h);
     const t = S.turns.find(open);
     if (t && t.status !== "thinking" && t.status !== "waiting") dropTurn(t);
     renderBar();
@@ -1169,21 +1181,24 @@ async function hearOne(u, g, t0) {
     // "Talk a bit faster" / "slower".
     const text = setRate(heard.rate);
     answered(heard.said, text, { kind: "speed" });
-    return;
+    return goOn();
   }
   if (heard.again) {
     // "What?" / "I didn't hear you": say the last answer again.
     const last = S.lastSaid || (S.settings.language === "he" ? "עוד לא אמרתי כלום." : "I haven't said anything yet.");
     answered(heard.said, last, { kind: "said again" });
-    return;
+    return goOn();
   }
   if (heard.note) { (S.notes = S.notes || []).push(heard.note); drawNotes(true); }
   if (heard.quick) {
     // "Hey", "can you hear me?", "go ahead": answered at once, no thinking.
     answered(heard.said, heard.quick, { kind: "small talk" });
-    return;
+    return goOn();
   }
   if (heard.mode === "reading") {
+    // Reading on over it: they have moved on. The answer waits in the queue.
+    for (const h of S.turns.filter((x) => x.held === "barge")) h.held = "park";
+    renderBar();
     showMine(heard.said, false, "reading");
     if (heard.respond) return ask({ heard, extra: { about_reading: true }, line: heard.line });
     idleMode("עוקב אחרי הקריאה — שורה " + heard.line + ".");
@@ -1196,6 +1211,70 @@ async function hearOne(u, g, t0) {
   }
   showMine("");
   ask({ heard, line: S.line });
+}
+
+/* ------------------------------------------------------------ cutting in */
+
+// Speaking over an answer that is still being said. It stops at once and
+// holds its place; what was said is then judged, with the answer it cut into
+// (the router does it, in the same quick call that sorts every question):
+//   aside  -- "wait, what's chatzot?": answered in a breath, then "as I was
+//             saying" and on from the sentence it stopped in;
+//   merge  -- "no, I mean in the Rambam": the rest is dropped, and the question
+//             as it now stands is answered, carrying on from what was heard;
+//   new    -- another question: answered now; the unfinished answer waits in
+//             the queue ("go back" / "תמשיך במה שאמרת", or tap it);
+//   later  -- "let's come back to that": kept in the queue, and on it goes.
+// In use a clarifying question waited behind the whole of a long answer.
+const RESUME = /\b(go back|where were we|back to (it|that|what you were saying)|(continue|finish) (what you were saying|your answer|that)|as you were saying)\b|תמשיך (במה|את מה|מאיפה) ש|תחזור ל(מה ש|זה)|איפה היינו|נחזור למה ש|תסיים את מה ש/i;
+const YES = /^\W*(yes|yeah|yep|sure|ok(ay)?|please|go ahead|go on|continue|כן|בטח|יאללה|סבבה|תמשיך|קדימה)\b/i;
+S.later = [];
+
+// Is this turn still being said -- now, next, or still being written?
+function unsaid(t) {
+  return open(t) && t.held !== "park" && (t.held || (saying && saying.turn === t) ||
+    speechQ.some((i) => i.turn === t) || ((t.status === "answering" || t.status === "thinking") && !t.complete));
+}
+
+// Stop it where it is and keep the rest, the interrupted sentence first.
+function holdTurn(t, why) {
+  t.held = why || "cut";
+  t.parked = t.parked || [];
+  for (let i = 0; i < speechQ.length; i++)
+    if (speechQ[i].turn === t) { t.parked.push(speechQ.splice(i, 1)[0]); i--; }
+  if (saying && saying.turn === t) { saying.cut = true; stopSpeaking(); }
+  renderBar();
+}
+
+// Pick it up again: from the sentence it stopped in, with a word of bridge.
+function resumeTurn(t, bridge) {
+  if (!t || !t.held) return;
+  t.held = false;
+  const items = t.parked || [];
+  t.parked = [];
+  if (bridge && items.length) {
+    const he = S.settings.language === "he" || (S.settings.language === "auto" && /[א-ת]/.test(t.text));
+    const b = { text: he ? "אז, כמו שאמרתי —" : "So, as I was saying —", turn: t, g: S.gen, bridge: true };
+    b.done = new Promise((r) => { b.resolve = r; });
+    items.unshift(b);
+  }
+  speechQ.push(...items);
+  if (!items.length) finishTurns();
+  renderBar();
+  pump();
+}
+
+// After a barge that turned out to be nothing to answer: go on.
+function goOn() {
+  for (const t of S.turns.filter((x) => x.held === "barge")) resumeTurn(t, false);
+}
+
+// "Want me to go back to what I was saying?" -- after a new question.
+function offerResume(t) {
+  if (!t || !t.held) return;
+  const he = S.settings.language === "he" || (S.settings.language === "auto" && /[א-ת]/.test(t.text));
+  S.offerResume = t;
+  say(he ? "רוצה שאחזור למה שאמרתי קודם?" : "Want me to go back to what I was saying?");
 }
 
 /* ------------------------------------------------------------------ turns */
@@ -1218,6 +1297,8 @@ function newTurn(asked, status) {
 const open = (t) => t && !["done", "skipped"].includes(t.status);
 
 // Something with its answer already in hand: a greeting, a speed change, a nudge.
+function goOnFrom(t) { if (t && t.held) resumeTurn(t, true); }
+
 function answered(asked, text, trace) {
   const t = newTurn(asked, "answering");
   t.text = text; t.complete = true;
@@ -1231,7 +1312,7 @@ function answered(asked, text, trace) {
 // The turn in the bar: the one being said, or else the oldest still coming.
 function shownTurn() {
   if (saying && saying.turn) return saying.turn;
-  return S.turns.find(open) || S.turns[S.turns.length - 1];
+  return S.turns.find((t) => open(t) && !t.held) || S.turns.find(open) || S.turns[S.turns.length - 1];
 }
 
 function renderBar() {
@@ -1244,12 +1325,34 @@ function renderBar() {
     else if (t.interim) showReply(t.interim, { hint: true });
     else if (open(t)) showReply(S.settings.language === "he" ? "חושב…" : "Thinking…", { hint: true });
   }
-  const waiting = S.turns.filter((x) => open(x) && x !== t);
+  const waiting = S.turns.filter((x) => open(x) && x !== t && !x.held);
+  const held = S.turns.filter((x) => open(x) && x !== t && x.held);
   const q = $("queue");
   q.replaceChildren();
-  q.hidden = !waiting.length && !(saying && saying.turn);
+  q.hidden = !waiting.length && !held.length && !S.later.length && !(saying && saying.turn);
   if (q.hidden) return;
   const items = el("div", "qitems");
+  // An answer that was cut into: tap to hear the rest.
+  // The label in Hebrew, the question in its own direction: mixed in one run they scrambled.
+  const labelled = (cls, name, label, text, title) => {
+    const chip = el("button", cls);
+    chip.title = title; chip.setAttribute("aria-label", label + " " + text);
+    const q = el("span", "qtext", text.slice(0, 40) + (text.length > 40 ? "…" : ""));
+    q.dir = "auto";
+    chip.append(icon(name), el("b", null, label), q);
+    return chip;
+  };
+  for (const h of held) {
+    const chip = labelled("qitem held", "play", "להמשיך", h.asked || "", "להמשיך את התשובה מאיפה שעצרתי");
+    chip.onclick = () => { if (saying && saying.turn && saying.turn !== h) holdTurn(saying.turn, "park"); resumeTurn(h, true); };
+    items.append(chip);
+  }
+  // Kept for later: tap to ask it now.
+  for (const [i, k] of S.later.entries()) {
+    const chip = labelled("qitem later", "note", "לאחר כך", k, "לשאול את זה עכשיו");
+    chip.onclick = () => { S.later.splice(i, 1); renderBar(); onUtterance({ text: k }); };
+    items.append(chip);
+  }
   if (waiting.length) items.append(el("span", "qlabel", "בתור · " + waiting.length));
   for (const w of waiting) {
     const chip = el("span", "qitem" + (w.text ? " ready" : ""));
@@ -1259,9 +1362,11 @@ function renderBar() {
     items.append(chip);
   }
   const acts = el("div", "qacts");
-  const skip = ibtn("qbtn", "skip", "דלג", "לדלג על התשובה הזאת");
-  skip.onclick = skipCurrent;
-  acts.append(skip);
+  if (saying && saying.turn) {
+    const skip = ibtn("qbtn", "skip", "דלג", "לדלג על התשובה הזאת");
+    skip.onclick = skipCurrent;
+    acts.append(skip);
+  }
   if (waiting.length) {
     const last = ibtn("qbtn", "latest", "לשאלה האחרונה", "ישר לשאלה האחרונה");
     last.onclick = toLatest;
@@ -1272,13 +1377,15 @@ function renderBar() {
 
 function finishTurns() {
   for (const t of S.turns) {
-    if (t.complete && open(t) && !speechQ.some((i) => i.turn === t) && !(saying && saying.turn === t))
+    if (t.complete && open(t) && !t.held && !speechQ.some((i) => i.turn === t) && !(saying && saying.turn === t))
       t.status = "done";
   }
 }
 
 function dropTurn(t) {
   t.status = "skipped";
+  t.held = false;
+  for (const i of (t.parked || []).splice(0)) i.resolve();
   for (let i = speechQ.length - 1; i >= 0; i--) if (speechQ[i].turn === t) speechQ.splice(i, 1)[0].resolve();
 }
 
@@ -1379,11 +1486,24 @@ function ask(q) {
   // its follow-up five seconds later got two answers, the second repeating
   // the first.
   const c = current;
+  let merged = false;
   if (c && !c.merged && c.turn.status === "thinking" && !c.turn.text && !c.turn.interim &&
       !q.extra && !c.batch.some((x) => x.extra)) {
-    c.merged = true;
+    c.merged = merged = true;
     c.ctl.abort();
     asks.unshift(...c.batch);
+    if (!answering) { asks.push(q); runAnswers(S.gen); return; }   // it was a cut-in's own answer
+  }
+  // Spoken over an answer still being said: judged against it, and answered
+  // now -- not after the rest of it.
+  const into = q.extra || merged ? null : S.turns.filter((t) => t !== q.turn && unsaid(t)).pop();
+  if (into) {
+    if (!into.held) holdTurn(into, "cut");
+    else if (into.held === "barge") into.held = "cut";
+    q.cut = { turn: into, asked: into.asked, said: into.said || "",
+      unsaid: (into.parked || []).filter((i) => !i.bridge).map((i) => i.text).join(" ") };
+    respond([q], S.gen);
+    return;
   }
   asks.push(q);
   if (!answering) runAnswers(S.gen);
@@ -1422,12 +1542,15 @@ async function respond(batch, g) {
   let first = null;
   const ctl = new AbortController(); aborts.add(ctl);
   const mine = current = { batch, ctl, turn, merged: false };
+  turn.ctl = ctl;
+  const into = last.cut && last.cut.turn;
   let answer;
   try {
     answer = await postStream("/api/say", Object.assign({ ref: S.pack.ref, line: last.line || S.line, session: S.session,
       said, heard: last.heard.heard, depth: S.settings.depth, language: S.settings.language,
       favor: S.settings.favor, voices: S.settings.voices,
-      sites: S.settings.sites, sites_halacha: S.settings.sites_halacha }, extra),
+      sites: S.settings.sites, sites_halacha: S.settings.sites_halacha,
+      cut_in: last.cut ? { asked: last.cut.asked, said: last.cut.said, unsaid: last.cut.unsaid } : undefined }, extra),
       (msg) => {
         if (g !== S.gen) return;
         if (msg.mode === "read") {
@@ -1435,6 +1558,18 @@ async function respond(batch, g) {
           // Reading a comment together: it opens on the desk to read along.
           turn.whole = true;
           for (const d of msg.desk || []) deskAdd({ name: d.name }, d.ref);
+          return;
+        }
+        if (msg.mode === "cut_in") {
+          turn.cutKind = msg.kind;
+          if (msg.kind === "merge" && into) {
+            // The question as it now stands replaces the answer it cut into.
+            into.replaced = true;
+            if (into.ctl) into.ctl.abort();
+            dropTurn(into);
+            turn.asked = into.asked + "  ·  " + turn.asked;
+          } else if (msg.kind === "new" && into) into.held = "park";
+          renderBar();
           return;
         }
         if (msg.mode === "interim") {
@@ -1454,12 +1589,21 @@ async function respond(batch, g) {
         renderBar();
       }, ctl.signal);
   } catch (e) {
-    if (mine.merged) return;     // asked again, together with what came after
+    if (mine.merged || turn.replaced) return;     // asked again, together with what came after
     if (g === S.gen) { dropTurn(turn); failed(e, "answer", t1); }
     return;
   } finally { aborts.delete(ctl); if (current === mine) current = null; }
-  if (g !== S.gen || mine.merged) return;
-  if (!answer) { dropTurn(turn); return failed(null, "answer", t1); }
+  if (g !== S.gen || mine.merged || turn.replaced) return;
+  if (!answer) { dropTurn(turn); goOnFrom(into); return failed(null, "answer", t1); }
+  if (answer.mode === "later") {
+    // "Let's come back to that": kept in the queue, and on from where it was.
+    S.later.push(answer.keep);
+    turn.complete = true; turn.text = answer.text;
+    logPush({ me: false, text: answer.text, trace: { kind: "later", quick: true } });
+    say(answer.text, turn).then(() => resumeTurn(into, true));
+    finishTurns(); renderBar();
+    return;
+  }
   if (answer.mode === "settings") {
     // "Talk faster", "answer in Hebrew": done at once, and said in a word.
     // Turning the voice off is asked first.
@@ -1475,7 +1619,7 @@ async function respond(batch, g) {
       turn.text = applySettings(answer.changes, he);
     }
     logPush({ me: false, text: turn.text, trace: { kind: "settings", quick: true } });
-    say(turn.text, turn);
+    say(turn.text, turn).then(() => resumeTurn(into, false));
     finishTurns(); renderBar();
     return;
   }
@@ -1485,11 +1629,12 @@ async function respond(batch, g) {
     for (const name of answer.add || []) deskAdd({ name });
     turn.complete = true; turn.text = answer.text;
     logPush({ me: false, text: turn.text, trace: { kind: "desk", quick: true } });
-    say(turn.text, turn);
+    say(turn.text, turn).then(() => resumeTurn(into, false));
     finishTurns(); renderBar();
     return;
   }
   if (answer.mode === "navigate") {
+    if (into && into.held) into.held = "park";
     turn.complete = true; turn.text = "עובר ל" + runnerText(answer.ref) + ".";
     finishTurns(); renderBar();
     turnTo(answer.ref);
@@ -1508,7 +1653,13 @@ async function respond(batch, g) {
   // whole thing if the answer had to be written again.
   const rest = said_ ? tr.unsaid : lead + answer.text;
   const spoken = rest ? say(rest, turn) : Promise.resolve();
-  spoken.then(() => { entry.ms_spoken = Math.round(performance.now() - t2); });
+  spoken.then(() => {
+    entry.ms_spoken = Math.round(performance.now() - t2);
+    if (g !== S.gen || !into || !into.held) return;
+    // An aside is a breath: back to the answer it cut into. A new question
+    // leaves that answer waiting, and asks.
+    if (turn.cutKind === "new") offerResume(into); else resumeTurn(into, true);
+  });
   finishTurns();
   renderBar();
 }
@@ -1520,6 +1671,7 @@ function say(text, turn) {
   if (!text || (turn && turn.status === "skipped")) return Promise.resolve();
   const item = { text, turn, g: S.gen };
   item.done = new Promise((r) => { item.resolve = r; });
+  if (turn && turn.held) { turn.parked.push(item); return item.done; }   // written while it waits
   speechQ.push(item);
   pump();
   return item.done;
@@ -1545,6 +1697,15 @@ async function pump() {
     if (ears) ears.guard = false;
   }
   saying = null;
+  if (item.cut && item.turn && item.turn.held && live()) {
+    // Stopped mid-sentence: that sentence is said again, whole, when it goes on.
+    item.cut = false; item.ready = null;
+    item.turn.parked.unshift(item);
+    renderBar();
+    pump();                      // whatever else is waiting (the aside's answer) goes on
+    return;
+  }
+  if (live() && item.turn && !item.bridge) item.turn.said = ((item.turn.said || "") + " " + item.text).trim();
   item.resolve();
   finishTurns();
   renderBar();
@@ -2246,6 +2407,7 @@ function renderTurns() {
     else if (t.error) row.textContent = "⚠ " + t.text;
     else renderRich(row, t.text);
     if (t.trace) row.append(el("span", "trace", "routed: " + t.trace.kind + (t.trace.claim ? " · claim" : "") +
+      (t.trace.cut_in ? " · cut in: " + t.trace.cut_in : "") +
       (t.trace.opened && t.trace.opened.length ? " · opened: " + t.trace.opened.join(", ") : "") +
       (t.trace.fetched && t.trace.fetched.length ? " · fetched: " + t.trace.fetched.join(", ") : "") +
       (t.trace.elsewhere && t.trace.elsewhere.length ? " · elsewhere: " + t.trace.elsewhere.join(", ") : "")));
@@ -2283,6 +2445,7 @@ function sessionReport() {
       lines.push(t.text);
       const tr = t.trace || {};
       if (tr.kind) lines.push("   [routed: " + tr.kind + (tr.claim ? ", claim" : "") +
+        (tr.cut_in ? " · said over the last answer: " + tr.cut_in : "") +
         (tr.names && tr.names.length ? ", named " + tr.names.join("/") : "") +
         (tr.quick ? " · quick reply" : "") +
         (tr.opened && tr.opened.length ? " · opened " + tr.opened.join(", ") : "") +

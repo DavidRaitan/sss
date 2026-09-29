@@ -122,13 +122,58 @@ Hebrew numerals for pages: ב=2, י=10, יא=11, טו=15, כ=20, ל=30, מ=40, �
     "\n".join("- %s: %s" % (k, v) for k, v in list(who.ROUTES.items()) + list(LIGHT.items())))
 
 
-def classify(llm, said):
-    """One short call to the budget model. On any failure, consult broadly."""
+# They spoke while it was still answering: what is this to the answer?
+CUT_IN_SYSTEM = """
+
+They spoke while you were still answering something else. The message starts
+with what you were answering and how far you got. Add a field:
+ "cut_in": "aside" -- a quick question about something in what you were just
+             saying or reading to them: a word, a name, "wait, who's that?",
+             "what does that mean?". It will be answered briefly and then you
+             go back to where you were. When unsure, this.
+           "merge" -- they are correcting, narrowing or adding to what they
+             asked: "no, I meant ...", "and in the Rambam?", "what about when
+             ...", "I'm asking about the night". The question as it now stands
+             is answered instead.
+           "new" -- a different question, not about what you were saying.
+           "later" -- they want to keep something for later: "remind me to
+             ask ...", "let's come back to that", "נחזור לזה אחר כך"."""
+CUT_INS = ("aside", "merge", "new", "later")
+LATER = re.compile(r"\b(later|come back to (it|that|this)|remind me|hold (on to )?that|park (it|that)|"
+                   r"for another time)\b|אחר כך|נחזור לזה|תזכיר לי|תזכור את זה|בהמשך", re.I)
+MERGE = re.compile(r"^\W*(no,? (i|what i) mean|i mean|i meant|actually|rather|not that|"
+                   r"(and|but) (what about|also|in|according to)|what about|how about|"
+                   r"לא,? (התכוונתי|אני מתכוון|הכוונה)|התכוונתי|בעצם|ומה עם|ומה לגבי|וגם)", re.I)
+
+
+def cut_in_context(cut):
+    """The line the router reads before their words, when they cut in."""
+    said = " ".join((cut.get("said") or "").split())[-300:]
+    unsaid = " ".join((cut.get("unsaid") or "").split())[:200]
+    return "[you were answering «%s»; you had said: «...%s»; still to say: «%s...»]\n" % (
+        (cut.get("asked") or "")[:200], said, unsaid)
+
+
+def classify(llm, said, cut=None):
+    """One short call to the budget model. On any failure, consult broadly.
+
+    `cut`: what it was saying when they spoke ({asked, said, unsaid}); then the
+    answer also says what their words are to it (see CUT_IN_SYSTEM)."""
+    system = ROUTER_SYSTEM + (CUT_IN_SYSTEM if cut else "")
+    content = (cut_in_context(cut) if cut else "") + said
     try:
-        out = llm.json(ROUTER_SYSTEM, [{"role": "user", "content": said}], heavy=False)
+        out = llm.json(system, [{"role": "user", "content": content}], heavy=False)
     except Exception:
+        out = None
+    cut_kind = None
+    if cut:
+        # The plain cases need no judgment; the rest are the model's call.
+        cut_kind = "later" if LATER.search(said) else "merge" if MERGE.search(said) else \
+            (out or {}).get("cut_in") if (out or {}).get("cut_in") in CUT_INS else \
+            ("aside" if len(said.split()) <= 12 else "new")
+    if out is None:
         return {"kind": "other", "claim": False, "names": [], "navigate": None, "language": None,
-                "reply": None, "settings": []}
+                "reply": None, "settings": [], "cut_in": cut_kind}
     kind = out.get("kind")
     nav = out.get("navigate")
     names = {m["name"] for m in who.MASECHTOT}
@@ -147,6 +192,7 @@ def classify(llm, said):
         "language": out.get("language") if out.get("language") in ("he", "en") else None,
         "reply": str(out["reply"])[:160] if kind == "ping" and out.get("reply") else None,
         "settings": settings_changes(out.get("settings")) if kind == "settings" else [],
+        "cut_in": cut_kind,
     }
 
 

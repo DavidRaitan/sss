@@ -664,8 +664,19 @@ class Handler(BaseHTTPRequestHandler):
                      "reply": None}
             recent = state["recent"]
         else:
-            route = retrieve.classify(llm, said)
+            # Spoken over an answer still being said: the router also says
+            # what these words are to that answer (an aside, a correction, a
+            # new question, or something for later).
+            cut = body.get("cut_in") if isinstance(body.get("cut_in"), dict) else None
+            route = retrieve.classify(llm, said, cut)
             recent = state["recent"]
+        if route.get("cut_in") == "later":
+            # "Let's come back to that": kept on the page, and on it goes.
+            lang = body.get("language") if body.get("language") in ("he", "en") else route.get("language") or "en"
+            text = "בסדר, שמרתי את זה לאחר כך." if lang == "he" else "Sure — I'll keep that for later."
+            record("answer", session=body.get("session"), ref=ref, line=line, said=said, text=text,
+                   grounded=True, trace={"kind": "later", "quick": True, "seconds": 0})
+            return self.send_json({"mode": "later", "keep": said, "text": text})
         nav = route.get("navigate")
         if route["kind"] == "navigate" and nav:
             if nav.get("daf_yomi"):
@@ -722,6 +733,8 @@ class Handler(BaseHTTPRequestHandler):
             # Reading a comment together: it opens on the desk, to be read along.
             offered = (state.get("memory") or {}).get("offered") or []
             emit({"mode": "read", "desk": [{"name": name, "ref": e["ref"]} for name, e in offered]})
+        if route.get("cut_in") and stream:
+            emit({"mode": "cut_in", "kind": route["cut_in"]})
         started = time.time()
         try:
             text, verdict, state["history"], trace = partner.ask(
@@ -729,7 +742,8 @@ class Handler(BaseHTTPRequestHandler):
                 recent=recent, spoke=state.get("spoke"), announce=announce,
                 # Each sentence as it is written, to be spoken while the rest is.
                 on_part=(lambda text: emit({"mode": "part", "text": text})) if stream else None,
-                memory=state.setdefault("memory", {}))
+                memory=state.setdefault("memory", {}),
+                cut=dict(body["cut_in"], kind=route["cut_in"]) if route.get("cut_in") else None)
         except (BrokenPipeError, ConnectionResetError):
             # The page asked again, together with what was said next.
             log.info("say: the page stopped waiting for this answer")
@@ -744,6 +758,8 @@ class Handler(BaseHTTPRequestHandler):
                 pass
             return
         trace["seconds"] = round(time.time() - started, 1)
+        if route.get("cut_in"):
+            trace["cut_in"] = route["cut_in"]      # what their words were to the answer they cut into
         trace["interim"] = interim[0] if interim else None
         record("answer", session=body.get("session"), ref=ref, line=line, said=said,
                depth=body.get("depth"), language=body.get("language"), text=text,

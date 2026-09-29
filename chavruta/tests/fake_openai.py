@@ -32,6 +32,12 @@ def wav(seconds=0.4, rate=16000):
 
 
 def router(said):
+    # Cut in over an answer: the line about that answer comes first.
+    if said.startswith("[you were answering"):
+        said = said.split("\n", 1)[1]
+        out = router(said)
+        out["cut_in"] = "new" if re.search(r"different question|another thing", said, re.I) else "aside"
+        return out
     low = said.lower()
     nav = re.search(r"(?:daf|דף)\s*(\d+)\s*([ab])?", low)
     if nav or re.search(r"\bgo to (?:daf|page)\b", low):
@@ -95,6 +101,10 @@ def partner(system, messages):
         return ("That's a real question -- it's exactly the %s's [[%s]]. "
                 "Shall we read it together, or would you like the gist?" % theirs.groups())
     rashi = re.search(r"\[\[(Rashi on [^\]]+)\]\]", system)
+    if "This is a quick aside" in last and "chatzot" in last.rsplit("\n", 1)[-1].lower():
+        return "Chatzot is midnight -- the middle of the night [[%s]]." % (rashi.group(1) if rashi else "Berakhot 2a:1")
+    if "corrects or adds to that question" in last:
+        return "For that it is the same: until dawn, after the fact -- as Rashi reads it [[%s]]." % (rashi.group(1) if rashi else "Berakhot 2a:1")
     ref = rashi.group(1) if rashi else "Berakhot 2a:1"
     if "UNGROUNDED" in last and not any("[from the app" in m["content"] for m in messages):
         return "The Rashba says the opposite, and so does Rashi."

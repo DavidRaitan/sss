@@ -516,3 +516,11 @@ body { grid-template-columns: minmax(0, 1fr); }
 @media (prefers-reduced-motion: reduce) {
   .ring { animation: none !important; }
 }
+
+/* What waits: an answer that was cut into (tap to go on), and what was kept for later. */
+button.qitem { cursor: pointer; font: inherit; background: var(--paper); }
+.qitem b { font-weight: 600; color: var(--ink); flex: none; }
+.qitem .qtext { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; unicode-bidi: isolate; }
+.qitem.held { border-color: var(--edge); }
+.qitem.held .ic { color: var(--mark); }
+.qitem.later { border-style: dashed; }
