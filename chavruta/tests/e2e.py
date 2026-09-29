@@ -294,6 +294,20 @@ def main():
             page.wait_for_function("/hear you|I'm here/.test(document.querySelector('#turns').textContent)",
                                    timeout=15000)
             check("typing answers in the open transcript", page.locator("#over.open").count() == 1)
+            # Their question is a commentator's: whose, and read it together or the gist.
+            page.fill("#panel input", "why does the mishna need to say the priests at all?")
+            page.press("#panel input", "Enter")
+            page.wait_for_function("/it's exactly the/.test(document.querySelector('#turns').textContent)",
+                                   timeout=15000)
+            check("their question is a commentator's, and it offers to read it", True)
+            page.fill("#panel input", "let's read it together")
+            page.press("#panel input", "Enter")
+            page.wait_for_function("/why the priests are named/.test(document.querySelector('#turns').textContent)",
+                                   timeout=15000)
+            chose = [json.loads(l) for f in os.listdir(os.environ["CHAVRUTA_SESSIONS"]) if f.endswith(".jsonl")
+                     for l in open(os.path.join(os.environ["CHAVRUTA_SESSIONS"], f))
+                     if '"chose"' in l]
+            check("…and reads it with them, in full", chose and chose[-1]["trace"]["chose"] == "read")
             # Settings by voice: done at once, and said in a few words.
             page.fill("#panel input", "answer in Hebrew from now on")
             page.press("#panel input", "Enter")

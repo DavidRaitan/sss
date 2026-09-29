@@ -38,7 +38,7 @@ from .commentators import MASECHTOT
 from .llm import LLM, VOICE_DIRECTION, ModelError, speakable
 from .masechta_index import Index
 from .pack import Pack
-from .partner import READ_TO_ME, Partner, unit_nudge
+from .partner import READ_TO_ME, Partner, offer_choice, unit_nudge
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WEB = os.path.join(ROOT, "web")
@@ -517,6 +517,8 @@ class Handler(BaseHTTPRequestHandler):
             (m["content"] for m in reversed(state["history"]) if m["role"] == "assistant"), "")
         asked = last.rstrip().endswith("?")
         quick = smalltalk.reply(said, language, asked) if heard["mode"] == "talking" else None
+        if offer_choice(state.get("memory", {}).get("offered"), said):
+            quick = None    # "let's read it" after "read it together, or the gist?"
         if quick and quick[0] == "filler":
             # "Um", "okay": heard, shown, and let be.
             record("heard_filler", session=sid, ref=ref, said=said)
@@ -592,7 +594,7 @@ class Handler(BaseHTTPRequestHandler):
             route = {"kind": "check_reading", "claim": False, "names": [], "navigate": None,
                      "language": "he" if (heard or {}).get("hebrew", 0) > 0.5 else None, "reply": None}
             recent = state["recent"][:-1]  # the last one is this reading itself
-        elif smalltalk.acknowledges(said):
+        elif smalltalk.acknowledges(said) or offer_choice(state.get("memory", {}).get("offered"), said):
             # "Okay" / "yes" to something it offered: a request to go on, and
             # the router, which sees only these words, would call it a ping.
             route = {"kind": "other", "claim": False, "names": [], "navigate": None, "language": None,
@@ -651,7 +653,8 @@ class Handler(BaseHTTPRequestHandler):
                           sites=body.get("sites") if isinstance(body.get("sites"), list) else None,
                           sites_halacha=body.get("sites_halacha", True))
         # "Can you read it for me?" -- the page's words may be spoken in full.
-        read_out = bool(READ_TO_ME.search(said))
+        read_out = bool(READ_TO_ME.search(said)) or \
+            offer_choice(state.get("memory", {}).get("offered"), said) == "read"
         if read_out and stream:
             emit({"mode": "read"})
         started = time.time()

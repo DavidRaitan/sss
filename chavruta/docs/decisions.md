@@ -500,3 +500,18 @@ to the mishna the gemara is on, brings its text, and recaps the pages since.
 - The phone: `--phone` serves over https on the local network with a
   certificate made once, behind a private link whose key becomes a cookie;
   the Mac itself needs no key. The handshake runs per connection.
+
+**54. "That's the Tzelach's question -- read it together, or the gist?"**
+- Every page holds every commentary the library links to it (22 works on
+  Berakhot 2a). The partner always sees the whole amud with Rashi and
+  Tosafot; the rest are opened a few at a time, by what the question needs.
+- On each question about the page, every comment near the line is scanned
+  locally -- no call -- for the difficulty it raises (קשה, וא"ת, תימה, לכאורה,
+  יש לדקדק, צ"ע...), and the question in the commentator's words goes to the
+  partner. The gemara's own "אם כן למה", quoted, and a Tosafot's name
+  ("בתד"ה קשיא") are not counted.
+- When the learner's question is the same one, it says whose it is, cited,
+  and asks: read it together, or the gist? -- then waits. The answer to that
+  ("let's read it", "just tell me", "yes") is taken as the answer to the
+  offer, not routed as a new question: reading goes phrase by phrase through
+  the whole comment, spoken in full; the gist is told and then offered inside.

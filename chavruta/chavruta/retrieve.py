@@ -162,6 +162,53 @@ def _near(pack, n, name, reach):
     return [(name_, entry) for _, _, name_, entry in found]
 
 
+# Where a comment raises a difficulty. "That's the Tzelach's question" can only
+# be said about questions it knows are on the page, so every comment near the
+# line is scanned for one -- locally, with no call -- and the question itself
+# is what the partner sees, not the whole comment.
+# "אם כן למה" is the gemara's own question, quoted, not the commentator's.
+ASKS = re.compile(r'קשה|קשיא|ק"ל|וא"ת|ואם תאמר|ואת"ל|תימה|תימא|תמוה|יש לדקדק|יש להקשות|יש לתמוה|'
+                  r'צ"ע|צריך עיון|צ"ב|צריך ביאור|לכאורה|הקשה|מקשים|(?<!כן )(?<!א"כ )ו?למה|מדוע|'
+                  r'מאי טעמא|מה טעם|ואין לומר|היאך')
+# Not someone who asks: a translation, and a digest of Tosafot's rulings.
+NOT_ASKING = ("Steinsaltz", "Piskei Tosafot")
+
+
+def _in_order(entries):
+    """A work's comments in the book's own order (Sefaria lists them otherwise)."""
+    return sorted(entries, key=lambda e: [int(x) if x.isdigit() else 0
+                                          for x in re.findall(r"\d+", e["ref"].rsplit(" ", 1)[-1])])
+
+
+def asked_here(pack, n, most=12, words=36):
+    """(name, entry, the question in its words) for comments near line n that
+    raise a difficulty -- nearest first, at most three per work."""
+    sec = next((x for x in pack.data.get("sections") or [] if x["from"] <= n <= x["to"]), None)
+    lines = [s for s in pack.segments
+             if (sec["from"] <= s["n"] <= sec["to"] if sec else abs(s["n"] - n) <= 2)]
+    lines.sort(key=lambda s: (abs(s["n"] - n), s["n"]))
+    out, per = [], {}
+    for segment in lines:
+        for name, entries in segment["commentaries"].items():
+            if name in NOT_ASKING:
+                continue
+            for entry in _in_order(entries):
+                text = " ".join((entry.get("he") or "").split())
+                # Not "בתד"ה קשיא" -- the name of a Tosafot, not a question.
+                hit = next((h for h in ASKS.finditer(text)
+                            if not text[:h.start()].rstrip().endswith('ד"ה')), None)
+                if not hit or per.get(name, 0) >= 3:
+                    continue
+                start = text.rfind(" ", 0, hit.start()) + 1      # from the word it is in
+                before = text[:start].split()[-8:]
+                after = text[start:].split()[:words - len(before)]
+                out.append((name, entry, " ".join(before + after)))
+                per[name] = per.get(name, 0) + 1
+                if len(out) >= most:
+                    return out
+    return out
+
+
 # How people actually say the names, mapped to what Sefaria calls them. Matched
 # whole, never by prefix: a prefix match heard "Rashba" and fetched Rashi.
 ALIASES = {

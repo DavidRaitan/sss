@@ -83,6 +83,15 @@ def partner(system, messages):
                         for r in recaps) + " Want to go back into one?"
     if "Want a few quick questions" in last or re.search(r"\btest me\b|quiz", last, re.I):
         return "First question: why does the Mishnah open with the evening Shema?"
+    # A question a commentator asks: whose it is, and the offer; then the reading.
+    chose = re.search(r"Read the whole comment \[\[([^\]]+)\]\]", last)
+    if chose:
+        return ("«לכאורה יש לדקדק למה הוצרך לומר הכהנים» -- he asks why the priests are named at all "
+                "[[%s]]. What do you make of it?" % chose.group(1))
+    theirs = re.search(r"read it together or give the gist: ([^\[;]+?) \[\[([^\]]+)\]\]", last)
+    if theirs and "priests" in last.rsplit("\n", 1)[-1]:
+        return ("That's a real question -- it's exactly the %s's [[%s]]. "
+                "Shall we read it together, or would you like the gist?" % theirs.groups())
     rashi = re.search(r"\[\[(Rashi on [^\]]+)\]\]", system)
     ref = rashi.group(1) if rashi else "Berakhot 2a:1"
     if "UNGROUNDED" in last and not any("[from the app" in m["content"] for m in messages):

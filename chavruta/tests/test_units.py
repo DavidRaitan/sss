@@ -623,6 +623,71 @@ class SixthSitting(unittest.TestCase):
         self.assertFalse(partner.READ_TO_ME.search("I'm gonna read the Mishnah"))
 
 
+class TheirQuestion(unittest.TestCase):
+    """The learner asks what a commentator asks: say whose it is, and offer to read it or tell it."""
+    pack = Pack(PACK)
+    TZELACH = "Tziyyun LeNefesh Chayyah on Berakhot 2a:6"
+
+    def test_every_commentary_near_the_line_is_scanned_for_its_question(self):
+        asked = retrieve.asked_here(self.pack, 1)
+        refs = [e["ref"] for _, e, _ in asked]
+        self.assertIn(self.TZELACH, refs)
+        q = next(q for _, e, q in asked if e["ref"] == self.TZELACH)
+        self.assertIn("למה הוצרך לומר הכהנים", q)
+        self.assertNotIn("Steinsaltz", {name for name, _, _ in asked})
+        # The gemara's own question, quoted, is not the commentator's.
+        self.assertFalse(retrieve.ASKS.search("אם כן למה קורין אותה בבית הכנסת"))
+        # Nor is the name of a Tosafot: "בתד"ה קשיא".
+        rashash = next(q for _, e, q in asked if e["ref"] == "Rashash on Berakhot 2a:1")
+        self.assertIn('ק"ל דמאי יענה', rashash)
+
+    def test_it_offers_then_does_what_they_chose(self):
+        seen = []
+        answers = iter([
+            "That's a real question -- it's the Tzelach's [[%s]]. Read it together, or the gist?" % self.TZELACH,
+            "«לכאורה יש לדקדק למה הוצרך לומר הכהנים» -- he asks why the priests are named [[%s]]. "
+            "What do you make of it?" % self.TZELACH])
+
+        class Model:
+            effort = None
+
+            def say(self, system, messages, **k):
+                seen.append(messages[-1]["content"])
+                return next(answers)
+
+        memory = {}
+        p = partner.Partner(self.pack, LLM())
+        p.llm = Model()
+        _, verdict, history, trace = p.ask(1, [], "why does the mishna need to say the priests at all?",
+                                           route={"kind": "meaning", "names": []}, memory=memory)
+        self.assertTrue(verdict.ok)
+        self.assertIn("questions the commentaries around this line raise", seen[-1])
+        self.assertEqual(trace["offered"], [self.TZELACH])
+        self.assertEqual(partner.offer_choice(memory["offered"], "let's read it together"), "read")
+        self.assertEqual(partner.offer_choice(memory["offered"], "just give me the gist"), "gist")
+        self.assertEqual(partner.offer_choice(memory["offered"], "no need to read it, just tell me"), "gist")
+        self.assertEqual(partner.offer_choice(memory["offered"], "בוא נקרא ביחד"), "read")
+        self.assertEqual(partner.offer_choice(memory["offered"], "yes please"), "yes")
+        self.assertIsNone(partner.offer_choice(memory["offered"], "what does Rashi say about midnight?"))
+        _, verdict, _, trace = p.ask(1, history, "let's read it together", route={"kind": "other", "names": []},
+                                     memory=memory)
+        self.assertTrue(verdict.ok)
+        self.assertEqual(trace["chose"], "read")
+        self.assertIn("chose to read it together", seen[-1])
+        self.assertIn("[[%s]] Tzelach" % self.TZELACH, seen[-1])       # the whole comment, opened
+        self.assertNotIn("offered", memory)                              # asked once, answered once
+
+    def test_no_offer_when_it_just_answers(self):
+        memory = {}
+        p = partner.Partner(self.pack, LLM())
+        p.llm = type("M", (), {"effort": None, "say": lambda self_, s, m, **k: "Rashi [[Rashi on Berakhot 2a:1:1]] "
+                               "reads it as the evening."})()
+        _, _, _, trace = p.ask(1, [], "what does the evening mean here?", route={"kind": "meaning", "names": []},
+                               memory=memory)
+        self.assertEqual(trace["offered"], [])
+        self.assertNotIn("offered", memory)
+
+
 class Shelf(unittest.TestCase):
     """The map of the sources: which kind of work answers which kind of question."""
     pack = Pack(PACK)

@@ -192,6 +192,14 @@ On depth. When a source would take a while, ask whether they want to read it
 inside or want it summarised, and wait. Reading inside means: tell them where
 on the page it is and let them read it.
 
+When their question is one a commentator asks. The notes list the difficulties
+the commentaries around their line raise, in the commentators' own words. When
+what they just asked is the same difficulty -- the same, not merely nearby --
+tell them so first, warmly and briefly: it is a real question, and it is the
+Tzelach's (or Tosafot's, or the Penei Yehoshua's), cited. Then ask whether
+they want to read it together or hear the gist, and stop there: do not answer
+it yet. Otherwise answer as usual and leave that list alone.
+
 What they ask for now beats every setting. The notes carry their settings --
 the language, the length, how deep to reach, who they left out -- but if they
 ask this turn for Hebrew, for more, for a commentator the settings leave out,
@@ -569,6 +577,24 @@ class Partner:
                     route["parallels"] = [r for r, _ in found_elsewhere[:2]]
 
         chosen = retrieve.extras(self.pack, n, route, self.depth)
+        # "That's the Tzelach's question -- read it together, or the gist?" --
+        # and then whichever they chose.
+        offered = memory.pop("offered", None)
+        choice = offer_choice(offered, said)
+        asked, size_now = [], None
+        if choice:
+            names = _join(sorted({name for name, _ in offered}), "en")
+            note += " " + CHOSE[choice] % {"who": names, "refs": " ".join("[[%s]]" % e["ref"] for _, e in offered)}
+            size_now = CHOSE_SIZE[choice]
+            for pair in offered:
+                if pair[1]["ref"] not in {e["ref"] for _, e in chosen}:
+                    chosen.insert(0, pair)
+        elif kind in ASKING and not pending and len(said.split()) > 3:
+            asked = retrieve.asked_here(self.pack, n)
+            if asked:
+                note += " [questions the commentaries around this line raise, in their words -- if theirs is " \
+                        "one of these, say whose it is and offer to read it together or give the gist: %s]" % \
+                        "; ".join("%s [[%s]]: «%s»" % (name, e["ref"], q) for name, e, q in asked)
         jobs = retrieve.plan(self.pack, n, route)
         fetched, missed, waited = [], [], 0.0
         if jobs:
@@ -621,8 +647,8 @@ class Partner:
             elsewhere = self.index.related(unit, exclude=self.pack.ref) or []
         known = self.known | {hit["ref"] for hit in elsewhere} | {e["ref"] for _, e in fetched + carried}
         texts = dict(self.texts, **{e["ref"]: e.get("he") or "" for _, e in chosen + fetched + carried})
-        size = "whatever that earlier question needs, up to about 100 words" if pending \
-            else SIZE.get(kind, SIZE["other"])
+        size = size_now or ("whatever that earlier question needs, up to about 100 words" if pending
+                            else SIZE.get(kind, SIZE["other"]))
         note += " [%s Depth: %s. Length: %s.]" % (LANGUAGE[self.language], retrieve.DEPTHS[self.depth], size)
 
         kept = {"role": "user", "content": note + "\n" + said}
@@ -660,6 +686,11 @@ class Partner:
                     text = fallback(chosen + fetched, lang)
                     verdict = ground.check(text, known, texts)
 
+        # An offer made: what they say next is an answer to it.
+        cited = {c.strip() for c in ground.CITE.findall(text)}
+        offer = [(name, e) for name, e, _ in asked if e["ref"] in cited]
+        if offer and text.rstrip().endswith("?"):
+            memory["offered"] = offer[:2]
         history = history + [kept, {"role": "assistant", "content": text}]
         trace = {"kind": kind, "claim": route.get("claim"),
                  "opened": [e["ref"] for _, e in chosen],
@@ -672,6 +703,9 @@ class Partner:
                  # is not the final answer, which is then said whole.
                  "streamed": spoken, "retried": bool(first_try) and spoken > 0,
                  "unsaid": "" if first_try else getattr(self, "unsaid", "")}
+        trace["offered"] = [e["ref"] for _, e in memory.get("offered") or []]
+        if choice:
+            trace["chose"] = choice
         return text, verdict, history[-24:], trace
 
     def stream(self, messages, cache_key, effort, known, on_part, texts=None):
@@ -793,6 +827,41 @@ def pending_question(history, said):
         asked = message["content"].rsplit("\n", 1)[-1].strip()
         if len(asked.split()) >= 5 and not ANSWER_IT.search(asked):
             return asked[:400]
+    return None
+
+
+# The questions a commentator's question can be.
+ASKING = [k for k in who.ROUTES if k != "halacha"] + ["other"]
+READ_TOGETHER = re.compile(r"\bread\b|\binside\b|together|\bopen (it|him|that)\b|go through|"
+                           r"נקרא|לקרוא|תקרא|תקריא|תפתח|נפתח|בפנים|ביחד|יחד", re.I)
+GIST = re.compile(r"summar|\bgist\b|\bbrief\b|\bshort\b|\bquick|just tell|tell me|explain|nutshell|oral|"
+                  r"in your (own )?words|סכם|סיכום|בקצרה|בקיצור|בעל פה|תסביר|תגיד|תספר", re.I)
+YES = re.compile(r"^\W*(yes|yeah|yep|sure|ok(ay)?|please|go ahead|כן|בטח|אוקיי|סבבה|יאללה)\b", re.I)
+CHOSE = {
+    "read": "[you offered to read %(who)s with them or give the gist, and they chose to read it together. "
+            "Read the whole comment %(refs)s with them, a phrase or a sentence at a time: each piece in «», then "
+            "a few words on what it is doing -- the question, the proof, the answer. Go to its end, then stop "
+            "and ask what they make of it.]",
+    "gist": "[you offered to read %(who)s with them or give the gist, and they want the gist: what it asks "
+            "and how it answers, in your own words, cited %(refs)s -- then offer to read it inside.]",
+    "yes": "[you offered to read %(who)s with them or give the gist, and they said yes without choosing: give "
+           "the gist, cited %(refs)s, then offer to read it inside.]",
+}
+CHOSE_SIZE = {"read": "as long as the comment needs, and no commentary beyond it",
+              "gist": "about 60-90 words", "yes": "about 60-90 words"}
+
+
+def offer_choice(offered, said):
+    """"read", "gist" or "yes" when they answer the offer; None when they have
+    moved on to something else."""
+    if not offered or len((said or "").split()) > 14:
+        return None
+    if READ_TOGETHER.search(said) and not re.search(r"\b(no need|don'?t|not) (to )?read\b|בלי לקרוא", said, re.I):
+        return "read"
+    if GIST.search(said) or re.search(r"\b(no need|don'?t|not) (to )?read\b|בלי לקרוא", said, re.I):
+        return "gist"
+    if YES.search(said):
+        return "yes"
     return None
 
 
