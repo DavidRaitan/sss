@@ -551,3 +551,21 @@ to the mishna the gemara is on, brings its text, and recaps the pages since.
   or removed. A card is carried by ⋮⋮ with the finger or the mouse, stays
   under the finger, and the others make room. One curve, no bounce. With
   "reduce motion" on, only quick fades.
+
+**57. A calmer bar and header.**
+- The ‹ › page arrows are gone: א / ב and the daf list turn pages, and the
+  arrow keys and a swipe still do. One way to do a thing on screen.
+- One set of line icons, drawn in the colour and weight of the text beside
+  them, instead of a mix of emoji, pictures and type: microphone, pause,
+  play, skip, to the last question, say again, the calendar, settings,
+  close, copy, the note mark, and the desk's controls.
+- The microphone is one round control whose ring says what is happening:
+  your voice while it listens, a turning arc while it thinks, a slow breath
+  while it speaks. Pause sits on its edge.
+- מפרשים · שולחן · תמליל are three tabs side by side at the top of the
+  conversation; what is open is filled, and a second tap closes it.
+- The question being answered is set off by a quiet rule, not an emoji; the
+  queue shows what waits (a clock, or a check when its answer is ready) and
+  two worded buttons: "דלג" and "לשאלה האחרונה" (icons alone on a phone).
+- The conversation area's top edge is a handle: drag it up for more of the
+  conversation, down for more page; a double-click puts it back. Kept.

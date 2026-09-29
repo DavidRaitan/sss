@@ -145,9 +145,9 @@ def main():
         check("picker opens ג ע״ב with its 32 lines", page.locator(".seg").count() == 32)
         check("amud bet puts Rashi on the left",
               "bet" in page.get_attribute("#page", "class"))
-        page.click("#next")
+        page.keyboard.press("ArrowLeft")
         page.wait_for_function("document.querySelector('#runner').textContent.includes('ד׳')", timeout=20000)
-        check("next flips to ד ע״א", "ד׳" in page.inner_text("#runner"), page.inner_text("#runner"))
+        check("← key flips on to ד ע״א", "ד׳" in page.inner_text("#runner"), page.inner_text("#runner"))
         page.wait_for_function("S.pack && S.pack.ref === 'Berakhot 4a'", timeout=20000)
         page.keyboard.press("ArrowRight")
         page.wait_for_function("document.querySelector('#runner').textContent.includes('דף ג׳ · עמוד ב׳')", timeout=20000)
@@ -270,10 +270,10 @@ def main():
             page.wait_for_selector("#hold:not([hidden])", timeout=15000)
             page.click("#hold")
             check("⏸ pauses the voice", page.get_attribute("#mic", "data-state") == "paused"
-                  and page.inner_text("#hold") == "▶")
+                  and page.get_attribute("#hold", "aria-label") == "להמשיך")
             page.click("#hold")
             check("▶ resumes it", page.get_attribute("#mic", "data-state") == "speaking"
-                  and page.inner_text("#hold") == "⏸", page.get_attribute("#mic", "data-state"))
+                  and page.get_attribute("#hold", "aria-label") == "לעצור", page.get_attribute("#mic", "data-state"))
             page.keyboard.press("Escape")
             page.wait_for_selector("#hold", state="hidden", timeout=5000)
             check("Esc stops it", True)
@@ -328,7 +328,7 @@ def main():
             page.click("#desk-add")
             page.locator("#desk-pick .chip:not(.on)").first.click()
             check("＋ adds from everyone on the amud", page.locator("#desk .dc").count() == 4)
-            page.locator("#desk .dc").nth(3).locator(".dc-btn", has_text="✕").click()
+            page.locator("#desk .dc").nth(3).locator(".dc-btn[title='להוריד מהשולחן']").click()
             page.wait_for_function("document.querySelectorAll('#desk .dc').length === 3", timeout=3000)
             check("✕ takes one off", True)
             # Carried by the hand: ⋮⋮ onto another card, and they change places.
@@ -472,6 +472,17 @@ def main():
         page.evaluate("onUtterance({ text: 'אמר רבה בר רב שילא אם כן לימא קרא ויטהר מאי וטהר טהר יומא' })")
         page.wait_for_function("S.pack && S.pack.ref === 'Berakhot 2b'", timeout=20000)
         check("reading on turns the page", page.evaluate("S.line") <= 3, "line %s" % page.evaluate("S.line"))
+        # The conversation area: drag its top edge up for more of it.
+        before = page.evaluate("document.querySelector('#talk').getBoundingClientRect().height")
+        g = page.locator("#foot-grip").bounding_box()
+        page.mouse.move(g["x"] + g["width"] / 2, g["y"] + 7)
+        page.mouse.down()
+        page.mouse.move(g["x"] + g["width"] / 2, g["y"] - 150, steps=5)
+        page.mouse.up()
+        check("the conversation area drags taller",
+              page.evaluate("parseInt(getComputedStyle(document.documentElement).getPropertyValue('--talk-h'))") > 150,
+              str(before))
+        page.dblclick("#foot-grip")
         # Back at the same line after closing and opening.
         page.evaluate("selectLine(7)")
         page.reload(wait_until="domcontentloaded")
@@ -481,7 +492,7 @@ def main():
         page.click("#open-desk")
         page.click(".lay-go:has-text('הלימוד שלי')")
         check("…but a saved layout opens in one tap", page.locator("#desk .dc").count() == 3)
-        page.click(".lay.on .lay-x:has-text('☆')")
+        page.click(".lay.on .lay-x[title='לפתוח מעצמו עם כל דף']")
         page.reload(wait_until="domcontentloaded")
         page.wait_for_function("S.pack && DESK.open && document.querySelectorAll('#desk .dc').length === 3",
                                timeout=20000)

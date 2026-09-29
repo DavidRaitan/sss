@@ -6,6 +6,24 @@
    is pointing at, the sources it cites. */
 
 const $ = (id) => document.getElementById(id);
+// One set of line icons (the sprite in index.html), sized and coloured like the text around them.
+function icon(name, cls) {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("class", "ic" + (cls ? " " + cls : ""));
+  svg.setAttribute("aria-hidden", "true");
+  const use = document.createElementNS("http://www.w3.org/2000/svg", "use");
+  use.setAttribute("href", "#i-" + name);
+  svg.append(use);
+  return svg;
+}
+// A button: an icon, and words when there is room for them.
+function ibtn(cls, name, text, title) {
+  const b = el("button", cls);
+  b.append(icon(name));
+  if (text) b.append(el("span", null, text));
+  if (title) { b.title = title; b.setAttribute("aria-label", title); }
+  return b;
+}
 function el(tag, cls, text) {
   const n = document.createElement(tag);
   if (cls) n.className = cls;
@@ -129,8 +147,6 @@ async function buildPickers() {
   $("daf").onchange = () => turnTo(pickedRef());
   $("am-a").onclick = () => { setAmud("a"); turnTo(pickedRef()); };
   $("am-b").onclick = () => { setAmud("b"); turnTo(pickedRef()); };
-  $("prev").onclick = () => flip(-1);
-  $("next").onclick = () => flip(1);
 }
 
 // The tractates you are learning first, then all of Shas by seder.
@@ -159,9 +175,9 @@ async function lastTime() {
     const he = S.settings.language === "he";
     const where = last.refs.slice(-1).map(runnerText)[0];
     showReply("בפעם הקודמת (" + last.date.split("-").reverse().join(".") + ") למדת עד " + where + ".", { hint: true });
-    const again = el("button", "chip", "↺ חזרה על מה שלמדנו");
+    const again = el("button", "chip", "חזרה על מה שלמדנו");
     again.onclick = () => onUtterance({ text: he ? "תזכיר לי מה למדנו בפעם הקודמת" : "Remind me what we learned last time" });
-    const test = el("button", "chip", "❓ שאלות חזרה");
+    const test = el("button", "chip", "שאלות חזרה");
     test.onclick = () => onUtterance({ text: he ? "תבחן אותי על מה שלמדנו בפעם הקודמת" : "Test me on what we learned last time" });
     $("chips").append(again, test);
   } catch (e) {}
@@ -298,7 +314,7 @@ function render() {
   renderDesk();
 }
 
-// Your notes: 📝 on the line each belongs to; tap to read it.
+// Your notes: a note mark on the line each belongs to; tap to read it.
 async function drawNotes(fresh) {
   if (!S.pack) return;
   const ref = S.pack.ref;
@@ -314,9 +330,11 @@ async function drawNotes(fresh) {
   for (const [line, list] of Object.entries(byLine)) {
     const node = main && main.querySelector('[data-n="' + line + '"]');
     if (!node) continue;
-    const mark = el("button", "note-mark", "📝");
+    const mark = el("button", "note-mark");
+    mark.append(icon("note"));
     mark.title = list.map((n) => n.text).join("\n—\n");
-    mark.onclick = (e) => { e.stopPropagation(); showReply(list.map((n) => "📝 " + n.text).join("\n\n"), { hint: true }); };
+    mark.setAttribute("aria-label", "ההערה שלך");
+    mark.onclick = (e) => { e.stopPropagation(); showReply(list.map((n) => "הערה: " + n.text).join("\n\n"), { hint: true }); };
     node.append(mark);
   }
 }
@@ -523,10 +541,11 @@ function setMode(mode, text, isError) {
   }
 }
 
-function showMine(text, interim) {
+function showMine(text, interim, reading) {
   const m = $("mine");
   m.hidden = !text; m.textContent = text || "";
   m.classList.toggle("interim", !!interim);
+  if (text && reading) m.prepend(icon("book"));      // read from the page, not said to it
 }
 
 function findEntry(ref) {
@@ -603,8 +622,8 @@ function showReply(text, opts) {
   renderRich(r, text);
   if (!opts.hint) {
     // Cut off by your own reading, or missed: hear it again.
-    const again = el("button", "chip again", "🔊");
-    again.title = "להשמיע שוב"; again.onclick = () => say(text);
+    const again = ibtn("chip again", "sound", "שוב", "להשמיע שוב");
+    again.onclick = () => say(text);
     chips.append(again);
   }
   if (opts.grounded === false) chips.append(el("span", "chip warn", "לא נמצא מקור — אל תסמוך על זה"));
@@ -703,14 +722,15 @@ function pauseSpeaking() {
   if (player) { if (paused) player.pause(); else player.play().catch(() => {}); }
   if (window.speechSynthesis) { if (paused) speechSynthesis.pause(); else speechSynthesis.resume(); }
   showHold();
-  setMode(paused ? "paused" : "speaking", paused ? "עצרתי — ▶ כדי להמשיך, או פשוט דבר." : "מדבר…");
+  setMode(paused ? "paused" : "speaking", paused ? "עצרתי — רווח כדי להמשיך, או פשוט דבר." : "מדבר…");
 }
 
 function showHold() {
   const b = $("hold");
   b.hidden = !speakingDone;
-  b.textContent = paused ? "▶" : "⏸";
+  b.replaceChildren(icon(paused ? "play" : "pause", paused ? "solid" : ""));
   b.title = paused ? "להמשיך (רווח)" : "לעצור (רווח)";
+  b.setAttribute("aria-label", paused ? "להמשיך" : "לעצור");
 }
 
 // Ask the server to make an item's voice, and start fetching the audio, before
@@ -1109,7 +1129,7 @@ async function hearOne(u, g, t0) {
     S.echoes = (S.echoes || 0) + 1;
     if (S.echoes >= 2 && !S.settings.speakers) {
       S.settings.speakers = true; saveSettings();
-      showReply("נשמע שאין אוזניות — שמעתי את עצמי. מעכשיו, בזמן שאני מדבר אני לא מקשיב; לעצור אותי: ⏸ או רווח.", { hint: true });
+      showReply("נשמע שאין אוזניות — שמעתי את עצמי. מעכשיו, בזמן שאני מדבר אני לא מקשיב; לעצור אותי: כפתור העצירה או רווח.", { hint: true });
       logPush({ me: false, error: true, stage: "echo", text: "עברתי למצב רמקול (בלי אוזניות).", detail: "heard itself twice",
         ms: 0, at: new Date().toLocaleTimeString() });
     }
@@ -1164,7 +1184,7 @@ async function hearOne(u, g, t0) {
     return;
   }
   if (heard.mode === "reading") {
-    showMine("📖 " + heard.said);
+    showMine(heard.said, false, "reading");
     if (heard.respond) return ask({ heard, extra: { about_reading: true }, line: heard.line });
     idleMode("עוקב אחרי הקריאה — שורה " + heard.line + ".");
     if (heard.nudge && S.settings.nudges) {
@@ -1229,22 +1249,25 @@ function renderBar() {
   q.replaceChildren();
   q.hidden = !waiting.length && !(saying && saying.turn);
   if (q.hidden) return;
-  if (waiting.length) q.append(el("span", "qlabel", "בתור (" + waiting.length + "):"));
+  const items = el("div", "qitems");
+  if (waiting.length) items.append(el("span", "qlabel", "בתור · " + waiting.length));
   for (const w of waiting) {
-    const icon = w.text ? "✓" : "⏳";
-    const chip = el("span", "qitem", icon + " " + (w.asked || "הערה").slice(0, 48) + (w.asked.length > 48 ? "…" : ""));
+    const chip = el("span", "qitem" + (w.text ? " ready" : ""));
+    chip.append(icon(w.text ? "check" : "wait"), el("span", null, (w.asked || "הערה").slice(0, 48) + (w.asked.length > 48 ? "…" : "")));
     chip.dir = "auto";
     chip.title = w.text ? "התשובה מוכנה, מחכה לתורה" : "עוד חושב";
-    q.append(chip);
+    items.append(chip);
   }
-  const skip = el("button", "btn qbtn", "⏭");
-  skip.title = "לדלג על התשובה הזאת"; skip.onclick = skipCurrent;
-  q.append(skip);
+  const acts = el("div", "qacts");
+  const skip = ibtn("qbtn", "skip", "דלג", "לדלג על התשובה הזאת");
+  skip.onclick = skipCurrent;
+  acts.append(skip);
   if (waiting.length) {
-    const last = el("button", "btn qbtn", "⏩");
-    last.title = "ישר לשאלה האחרונה"; last.onclick = toLatest;
-    q.append(last);
+    const last = ibtn("qbtn", "latest", "לשאלה האחרונה", "ישר לשאלה האחרונה");
+    last.onclick = toLatest;
+    acts.append(last);
   }
+  q.append(items, acts);
 }
 
 function finishTurns() {
@@ -1514,7 +1537,7 @@ async function pump() {
   while (live() && ears && ears.talking && performance.now() - since < 30000) await sleep(120);
   if (live()) {
     renderBar();
-    setMode("speaking", "מדבר… (⏸ לעצור · ⏭ לדלג)");
+    setMode("speaking", "מדבר… · רווח לעצור");
     if (ears) ears.guard = true;
     // The next sentence's voice is made while this one plays.
     if (naturalVoice() && speechQ[0] && S.settings.speak) prepare(speechQ[0]);
@@ -1543,12 +1566,43 @@ function openPanel(build, kind) {
   S.panel = kind || "other";
   $("over").classList.add("open");
   document.body.classList.add("docked");
+  syncTabs();
 }
 function closePanel() {
   S.panel = null;
   $("over").classList.remove("open");
   document.body.classList.remove("docked");
+  syncTabs();
 }
+// The tabs under the conversation show what is open; a second tap closes it.
+function syncTabs() {
+  $("open-sources").setAttribute("aria-pressed", String(S.panel === "sources"));
+  $("open-log").setAttribute("aria-pressed", String(S.panel === "log"));
+}
+
+// The conversation area: drag its top edge for more or less of it. Kept.
+(function sizeTalk() {
+  const grip = $("foot-grip"), root = document.documentElement.style;
+  const apply = (px) => root.setProperty("--talk-h", Math.round(Math.min(Math.max(px, 70), innerHeight * 0.7)) + "px");
+  const saved = +(recall("talk") || 0);
+  if (saved) apply(saved);
+  grip.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    grip.setPointerCapture(e.pointerId);
+    document.body.classList.add("resizing-v");
+    const talk = $("talk"), startY = e.clientY, startH = talk.getBoundingClientRect().height;
+    const move = (ev) => apply(startH + (startY - ev.clientY));
+    const up = () => {
+      grip.removeEventListener("pointermove", move);
+      document.body.classList.remove("resizing-v");
+      remember("talk", parseInt(getComputedStyle(document.documentElement).getPropertyValue("--talk-h"), 10) || "");
+    };
+    grip.addEventListener("pointermove", move);
+    grip.addEventListener("pointerup", up, { once: true });
+    grip.addEventListener("pointercancel", up, { once: true });
+  });
+  grip.addEventListener("dblclick", () => { root.removeProperty("--talk-h"); remember("talk", ""); });
+})();
 // ✕ sits outside the scrolling panel, so it is always in reach.
 $("close-panel").onclick = closePanel;
 
@@ -1658,8 +1712,7 @@ function openSources(n, focus) {
         const more = el("button", "more", "הכל");
         more.onclick = () => { box.classList.toggle("open"); more.textContent = box.classList.contains("open") ? "פחות" : "הכל"; };
         const link = el("a", "lnk", e.ref); link.href = sefariaUrl(e.ref); link.target = "_blank"; link.rel = "noopener";
-        const pin = el("button", "more", "לשולחן ⇱");
-        pin.title = "לפתוח את " + heName(name) + " לצד הדף";
+        const pin = ibtn("more", "desk", "לשולחן", "לפתוח את " + heName(name) + " לצד הדף");
         pin.onclick = () => deskAdd({ name }, e.ref);
         meta.append(more, pin, link); box.append(meta);
         if (e.ref === focus) { target = box; box.classList.add("open", "flash"); more.textContent = "פחות"; }
@@ -1698,7 +1751,7 @@ function openSources(n, focus) {
       panel.append(box);
     }
     if (target) setTimeout(() => target.scrollIntoView({ block: "center" }), 60);
-  });
+  }, "sources");
 }
 
 // A reference that opens its text right here, fetched from Sefaria through the
@@ -1733,7 +1786,7 @@ function openText(ref) {
   openPanel((panel) => {
     panel.append(el("h2", null, chipFor(ref).label || ref), el("div", "sub", ref));
     const link = textLink(ref);
-    const pin = el("button", "btn", "לשולחן ⇱");
+    const pin = ibtn("btn", "desk", "לשולחן");
     pin.onclick = () => { deskAdd({ ref }); closePanel(); };
     panel.append(link, pin);
     link.querySelector(".tref").click();
@@ -1887,16 +1940,17 @@ function deskCard(c, i) {
   const card = el("article", "dc" + (c.wide ? " wide" : ""));
   card.dataset.i = i; card.dataset.key = deskKey(c);
   const head = el("div", "dc-head");
-  const grip = el("span", "dc-grip", "⋮⋮");
+  const grip = el("span", "dc-grip");
+  grip.append(icon("grip"));
   grip.title = "גרור כדי לסדר מחדש"; grip.setAttribute("aria-hidden", "true");
   deskCarry(card, grip);
   const title = el("span", "dc-name", c.name ? heName(c.name) : chipFor(c.ref).label);
   const tools = el("span", "dc-tools");
-  const btn = (text, tip, go) => { const b = el("button", "dc-btn", text); b.title = tip; b.onclick = go; tools.append(b); return b; };
-  btn("→", "להזיז קודם", () => deskMove(i, i - 1));
-  btn("←", "להזיז אחר כך", () => deskMove(i, i + 1));
-  btn(c.wide ? "⇥⇤" : "⇤⇥", c.wide ? "צר" : "רחב", () => deskFlip(() => { c.wide = !c.wide; renderDesk(); }));
-  btn("✕", "להוריד מהשולחן", () => {
+  const btn = (name, tip, go) => { const b = ibtn("dc-btn", name, null, tip); b.onclick = go; tools.append(b); return b; };
+  btn("prev", "להזיז קודם", () => deskMove(i, i - 1));
+  btn("next", "להזיז אחר כך", () => deskMove(i, i + 1));
+  btn(c.wide ? "narrow" : "wide", c.wide ? "צר" : "רחב", () => deskFlip(() => { c.wide = !c.wide; renderDesk(); }));
+  btn("close", "להוריד מהשולחן", () => {
     // It fades where it is, then the others close the gap.
     card.classList.add("leaving");
     setTimeout(() => deskFlip(() => { DESK.cards = DESK.cards.filter((x) => x !== c); renderDesk(); }),
@@ -1974,19 +2028,19 @@ function drawLayouts() {
   for (const l of list) {
     const on = l.name === DESK.layout;
     const chip = el("span", "lay" + (on ? " on" : ""));
-    const go = el("button", "lay-go", (l.auto ? "★ " : "") + l.name);
+    const go = el("button", "lay-go", l.name);
+    if (l.auto) go.prepend(icon("star", "solid"));
     go.title = "לפתוח את הסידור הזה";
     go.onclick = () => applyLayout(l);
     chip.append(go);
     if (on) {
-      const star = el("button", "lay-x", l.auto ? "★" : "☆");
-      star.title = l.auto ? "לא לפתוח מעצמו" : "לפתוח מעצמו עם כל דף";
+      const star = ibtn("lay-x", "star", null, l.auto ? "לא לפתוח מעצמו" : "לפתוח מעצמו עם כל דף");
+      if (l.auto) star.firstChild.classList.add("solid");
       star.onclick = () => {
         keepLayouts(layouts().map((x) => Object.assign(x, { auto: x.name === l.name ? !l.auto : false })));
         drawLayouts();
       };
-      const del = el("button", "lay-x", "✕");
-      del.title = "למחוק את הסידור";
+      const del = ibtn("lay-x", "close", null, "למחוק את הסידור");
       del.onclick = () => { keepLayouts(layouts().filter((x) => x.name !== l.name)); DESK.layout = null; drawLayouts(); };
       chip.append(star, del);
     }
@@ -1994,12 +2048,12 @@ function drawLayouts() {
   }
   if (!DESK.cards.length) return;
   // Save: one tap, a name offered, Enter to keep it.
-  const save = el("button", "lay-save", list.length ? "＋ שמור" : "＋ שמור את הסידור");
+  const save = ibtn("lay-save", "plus", list.length ? "שמור" : "שמור את הסידור");
   save.title = "לשמור את השולחן כמו שהוא עכשיו";
   save.onclick = () => {
     const form = el("form", "lay-form");
     const input = el("input"); input.value = DESK.layout || deskName(); input.setAttribute("aria-label", "שם הסידור");
-    const ok = el("button", "lay-go", "✓");
+    const ok = ibtn("lay-go", "check", null, "לשמור");
     form.append(input, ok);
     form.onsubmit = (e) => { e.preventDefault(); const n = input.value.trim(); if (n) saveLayout(n); drawLayouts(); };
     input.onkeydown = (e) => { if (e.key === "Escape") drawLayouts(); };
@@ -2017,8 +2071,8 @@ function renderDesk() {
   box.replaceChildren();
   if (!DESK.cards.length)
     box.append(el("div", "desk-empty", layouts().length
-      ? "בחר סידור שמור למעלה, או ＋ מפרש כדי להוסיף."
-      : "השולחן ריק. ＋ מפרש כדי להוסיף — או תגיד: ״תפתח את הרשב״א בצד״."));
+      ? "בחר סידור שמור למעלה, או ״מפרש״ כדי להוסיף."
+      : "השולחן ריק. ״מפרש״ כדי להוסיף — או תגיד: ״תפתח את הרשב״א בצד״."));
   DESK.cards.forEach((c, i) => box.append(deskCard(c, i)));
   // A card just put on the desk arrives; the ones already there are only redrawn.
   const shown = new Set(DESK.cards.map(deskKey));
@@ -2154,10 +2208,10 @@ function openLog() {
     panel.append(el("h2", null, "תמליל"), el("div", "sub", "מה שנאמר בשיחה הזאת"));
     const turns = el("div"); turns.id = "turns";
     panel.append(turns);
-    const copy = el("button", "btn", "📋 העתק את כל השיחה");
+    const copy = ibtn("btn", "copy", "העתק את כל השיחה");
     copy.onclick = async () => {
       const text = sessionReport();
-      try { await navigator.clipboard.writeText(text); copy.textContent = "✓ הועתק — הדבק ל-Claude"; }
+      try { await navigator.clipboard.writeText(text); copy.replaceChildren(icon("check"), el("span", null, "הועתק — הדבק ל-Claude")); }
       catch (e) { const ta = el("textarea"); ta.value = text; ta.style.width = "100%"; ta.rows = 10;
         panel.append(ta); ta.select(); copy.textContent = "סמן והעתק מהתיבה"; }
     };
@@ -2188,7 +2242,7 @@ function renderTurns() {
   for (const t of S.log) {
     const row = el("div", "turn" + (t.me ? " me" : "") + (t.error ? " err" : ""));
     row.dir = "auto";
-    if (t.me) row.textContent = (t.mode === "reading" ? "📖 " : "") + t.text;
+    if (t.me) { row.textContent = t.text; if (t.mode === "reading") row.prepend(icon("book")); }
     else if (t.error) row.textContent = "⚠ " + t.text;
     else renderRich(row, t.text);
     if (t.trace) row.append(el("span", "trace", "routed: " + t.trace.kind + (t.trace.claim ? " · claim" : "") +
@@ -2252,8 +2306,8 @@ function progressBox() {
   fetch("/api/progress?mine=" + encodeURIComponent(S.settings.mine.join(","))).then((r) => r.json()).then((p) => {
     body.replaceChildren();
     const top = [];
-    if (p.streak) top.push("🔥 " + p.streak + " ימים ברצף");
-    if (p.daf_yomi && p.daf_yomi.ref) top.push("📅 " + p.daf_yomi.he + (p.daf_yomi.done ? " ✓" : " — עוד לא") +
+    if (p.streak) top.push(p.streak + " ימים ברצף");
+    if (p.daf_yomi && p.daf_yomi.ref) top.push("הדף היומי " + p.daf_yomi.he + (p.daf_yomi.done ? " ✓" : " — עוד לא") +
       (p.daf_yomi.streak > 1 ? " (" + p.daf_yomi.streak + " ימים ברצף בדף היומי)" : ""));
     body.append(el("div", "prog-top", top.join(" · ") || "עוד לא למדנו יחד."));
     for (const t of p.tractates) {
@@ -2423,7 +2477,7 @@ function openSettings() {
     panel.append(el("h2", null, "הגדרות"), el("div", "sub", "נשמר בדפדפן הזה"));
     panel.append(
       choice("open", "בפתיחה", [["last", "איפה שהפסקתי"], ["today", "הדף היומי"]],
-        "📅 למעלה תמיד מביא לדף היומי. הוא נבנה מראש כל בוקר (וגם של מחר) כל עוד האפליקציה פתוחה."),
+        "כפתור הדף היומי למעלה תמיד מביא אליו. הוא נבנה מראש כל בוקר (וגם של מחר) כל עוד האפליקציה פתוחה."),
       progressBox(),
       learningBox(),
       choice("depth", "עומק", [["daf", "הדף — רש״י ותוספות"], ["rishonim", "+ ראשונים"], ["acharonim", "+ אחרונים"]],
@@ -2449,7 +2503,7 @@ function openSettings() {
         "אפשר גם להגיד לו: ״תדבר יותר מהר״ / ״a bit slower״."),
       choice("voice", "קול", [["natural", "טבעי (OpenAI) — תמיד אותו קול"], ["browser", "הדפדפן (חינם, רובוטי)"]]),
       choice("speakers", "שמע", [[false, "אוזניות"], [true, "רמקול"]],
-        "ברמקול, בזמן שאני מדבר אני לא מקשיב (אחרת אני שומע את עצמי). לעצור: ⏸ או רווח."),
+        "ברמקול, בזמן שאני מדבר אני לא מקשיב (אחרת אני שומע את עצמי). לעצור: כפתור העצירה או רווח."),
       choice("hearing", "זיהוי דיבור", [["api", "מדויק, עברית ואנגלית יחד"], ["browser", "הדפדפן (חינם, שפה אחת)"]]),
     );
     const k = el("div", "set"); k.append(el("div", "lbl", "מקשים"));
@@ -2460,8 +2514,8 @@ function openSettings() {
   }, "settings");
 }
 
-$("open-sources").onclick = () => openSources(S.line);
-$("open-log").onclick = openLog;
+$("open-sources").onclick = () => (S.panel === "sources" ? closePanel() : openSources(S.line));
+$("open-log").onclick = () => (S.panel === "log" ? closePanel() : openLog());
 $("open-settings").onclick = openSettings;
 $("v-daf").onclick = () => { S.settings.view = "daf"; saveSettings(); if (S.pack) { render(); selectLine(S.line); } };
 $("v-lin").onclick = () => { S.settings.view = "lin"; saveSettings(); if (S.pack) { render(); selectLine(S.line); } };

@@ -40,8 +40,7 @@ select#mas { font-family: var(--square); font-size: 16px; padding: 3px 8px; }
 .seg2 .btn:first-child { border-start-start-radius: 7px; border-end-start-radius: 7px; margin: 0; }
 .seg2 .btn:last-child { border-start-end-radius: 7px; border-end-end-radius: 7px; }
 .btn[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
-.flip { font-size: 18px; padding: 1px 11px; line-height: 1.4; }
-.today { font-size: 13px; white-space: nowrap; }
+.today { font-size: 13px; white-space: nowrap; gap: 6px; }
 @media (max-width: 760px) { #today-label { display: none; } }
 .learning .opts .btn { font-size: 12px; padding: 3px 8px; }
 .prep { margin-top: 8px; display: grid; gap: 6px; font-size: 13px; }
@@ -77,7 +76,7 @@ main { overflow: hidden; display: flex; justify-content: center; padding: 14px; 
   text-align-last: right; }
 .seg { cursor: pointer; border-radius: 4px; transition: background .25s; padding: 1px 0; }
 .seg.on { background: var(--glow); box-shadow: 0 0 0 3px var(--glow); }
-.note-mark { border: 0; background: none; cursor: pointer; font-size: 13px; padding: 0 3px; vertical-align: super; }
+.note-mark { border: 0; background: none; cursor: pointer; font-size: 13px; padding: 0 3px; vertical-align: super; color: var(--mark); }
 /* Read words fade a little, like a karaoke line: where it thinks you are,
    never a mark on how you read. */
 .w.read { color: var(--dim); }
@@ -119,61 +118,113 @@ main { overflow: hidden; display: flex; justify-content: center; padding: 14px; 
   .picker { order: 3; width: 100%; justify-content: space-between; }
   .pick label { display: none; }
   .brand { font-size: 19px; }
-  .tools { gap: 8px; }
-  .tools .btn { padding: 4px 12px; }
   footer { padding: 8px 12px 10px; }
 }
 
 /* ---- the voice bar: this is the conversation ----------------------------- */
-footer { background: var(--paper); border-top: 1px solid var(--rule); padding: 10px 16px 12px; }
-.bar { max-width: 1100px; margin: 0 auto; display: grid; grid-template-columns: auto 1fr auto;
-  gap: 16px; align-items: start; }
-.micwrap { position: relative; width: 64px; height: 64px; }
-.level { position: absolute; inset: -6px; border-radius: 50%; border: 3px solid var(--mark);
-  opacity: 0; transform: scale(1); transition: transform .08s, opacity .2s; pointer-events: none; }
-#mic { width: 64px; height: 64px; border-radius: 50%; border: 1px solid var(--edge);
-  background: var(--paper); font-size: 25px; cursor: pointer; }
+:root { --talk-h: 30vh; }
+footer { position: relative; background: var(--paper); border-top: 1px solid var(--rule); padding: 12px 18px 12px; }
+/* Its top edge is a handle: drag it up for more conversation, down for more page. */
+.foot-grip { position: absolute; inset-inline: 0; top: -7px; height: 14px; cursor: row-resize; touch-action: none; z-index: 2; }
+.foot-grip::after { content: ""; position: absolute; top: 5px; inset-inline: calc(50% - 22px); width: 44px; height: 4px;
+  border-radius: 2px; background: var(--edge); opacity: .5; transition: opacity 160ms, width 160ms; }
+body.resizing-v, body.resizing-v * { cursor: row-resize !important; user-select: none; }
+.bar { max-width: 1100px; margin: 0 auto; display: grid; grid-template-columns: auto minmax(0, 1fr);
+  gap: 18px; align-items: start; }
+.talkcol { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.talk-top { display: flex; align-items: center; gap: 12px; min-height: 28px; }
+.talk { min-width: 0; max-height: var(--talk-h); overflow-y: auto; padding-inline-end: 2px; }
+
+/* The icons: drawn in the colour and weight of the text beside them. */
+.ic { width: 1.2em; height: 1.2em; flex: none; fill: none; stroke: currentColor; stroke-width: 1.7;
+  stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.24em; }
+.ic.solid { fill: currentColor; }
+#i-grip, .dc-grip .ic { stroke-width: 2.6; }
+button:has(> .ic) { display: inline-flex; align-items: center; justify-content: center; gap: .35em; }
+
+/* The microphone: one round control whose ring says what is happening --
+   your voice while it listens, a turning arc while it thinks, a slow breath while it speaks. */
+.micwrap { position: relative; width: 60px; height: 60px; margin-top: 2px; }
+#mic { position: relative; z-index: 1; width: 60px; height: 60px; border-radius: 50%; border: 1px solid var(--edge);
+  background: var(--paper); color: var(--ink); cursor: pointer; padding: 0;
+  box-shadow: 0 1px 0 rgba(255,255,255,.4) inset, 0 6px 16px -10px rgba(40,25,5,.5); }
+#mic .ic { width: 26px; height: 26px; stroke-width: 1.6; }
 #mic[data-state="listening"], #mic[data-state="capturing"] { background: var(--mark); border-color: var(--mark); color: #fff; }
-#mic[data-state="thinking"], #mic[data-state="hearing"] { background: var(--ink); color: var(--paper); }
-#mic[data-state="speaking"], #mic[data-state="paused"] { background: var(--glow); }
-.hold { position: absolute; bottom: -4px; inset-inline-end: -12px; width: 32px; height: 32px; border-radius: 50%;
-  border: 1px solid var(--edge); background: var(--paper); cursor: pointer; font-size: 14px; line-height: 1; padding: 0; }
-.chip.again { font-family: var(--ui); padding: 1px 8px; }
-.turn.err { color: var(--bad); font-size: 13px; }
-.talk { min-width: 0; max-height: 34vh; overflow-y: auto; }
-.state { font-size: 12px; color: var(--faint); letter-spacing: .03em; min-height: 17px; }
-.state.err { color: var(--bad); }
-.mine { font-size: 14px; color: var(--dim); font-style: italic; margin-top: 3px; }
+#mic[data-state="thinking"], #mic[data-state="hearing"] { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+#mic[data-state="speaking"], #mic[data-state="paused"] { background: var(--glow); border-color: var(--edge); }
+.level { position: absolute; inset: -5px; border-radius: 50%; border: 2.5px solid var(--mark);
+  opacity: 0; transform: scale(1); transition: transform .08s, opacity .2s; pointer-events: none; }
+.ring { position: absolute; inset: -4px; border-radius: 50%; pointer-events: none; opacity: 0;
+  transition: opacity 200ms; }
+.micwrap:has(#mic[data-state="thinking"]) .ring, .micwrap:has(#mic[data-state="hearing"]) .ring {
+  opacity: 1; border: 2px solid transparent; border-top-color: var(--ink); animation: spin .9s linear infinite; }
+.micwrap:has(#mic[data-state="speaking"]) .ring {
+  opacity: 1; border: 2px solid var(--quote); animation: breathe 2.4s ease-in-out infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes breathe { 0%, 100% { transform: scale(1); opacity: .9; } 50% { transform: scale(1.07); opacity: .35; } }
+.hold { position: absolute; z-index: 2; bottom: -4px; inset-inline-end: -10px; width: 28px; height: 28px; border-radius: 50%;
+  border: 1px solid var(--edge); background: var(--paper); color: var(--ink); cursor: pointer; padding: 0;
+  box-shadow: 0 3px 8px -4px rgba(40,25,5,.45); }
+.hold .ic { width: 15px; height: 15px; stroke-width: 2; }
+
+.state { flex: 1; min-width: 0; font-size: 12px; color: var(--faint); letter-spacing: .01em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.state.err { color: var(--bad); white-space: normal; }
+/* Three tabs, side by side: what is open is filled. */
+.tabs { display: flex; flex: none; border: 1px solid var(--rule); border-radius: 9px; padding: 2px; gap: 2px;
+  background: var(--desk); }
+.tab { border: 0; background: none; color: var(--dim); font-size: 12.5px; padding: 4px 12px; border-radius: 7px;
+  cursor: pointer; transition: background-color 160ms, color 160ms, transform 110ms ease-out; }
+.tab[aria-pressed="true"] { background: var(--paper); color: var(--ink);
+  box-shadow: 0 1px 3px -1px rgba(40,25,5,.35); }
+.tab:active { transform: scale(.96); }
+.mine { font-size: 14px; color: var(--dim); margin-top: 2px; display: flex; gap: 6px; align-items: baseline; }
+.mine .ic { color: var(--faint); }
 .mine.interim { opacity: .6; }
-.reply { font-size: 17px; line-height: 1.6; margin-top: 5px; }
+.reply { font-size: 17px; line-height: 1.65; margin-top: 4px; }
 /* Each caption takes its direction from its own words: an English answer in
    this right-to-left page must still read left to right. */
 .mine, .reply, .turn { unicode-bidi: plaintext; text-align: start; }
 .reply q { unicode-bidi: isolate; direction: rtl; quotes: none; font-family: var(--square); background: var(--quote); border-radius: 3px; padding: 0 3px; }
 .reply.hint { color: var(--dim); font-size: 15px; }
-/* The question the answer below is answering. */
-.asked { font-size: 13.5px; color: var(--dim); margin-top: 3px; unicode-bidi: plaintext; text-align: start; }
-.asked::before { content: "❓ "; opacity: .6; }
-/* What is waiting behind it. */
-.queue { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 8px;
-  padding-top: 6px; border-top: 1px dashed var(--rule); font-size: 12.5px; }
-.queue .qlabel { color: var(--faint); }
-.queue .qitem { border: 1px solid var(--rule); border-radius: 14px; padding: 1px 9px; color: var(--dim);
-  max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; unicode-bidi: plaintext; }
-.queue .qbtn { padding: 1px 10px; font-size: 13px; }
+/* The question the answer below is answering: quiet, set off by a rule. */
+.asked { font-size: 13.5px; color: var(--dim); margin-top: 4px; padding-inline-start: 9px;
+  border-inline-start: 2px solid var(--rule); unicode-bidi: plaintext; text-align: start; }
+/* What is waiting behind it, and the two ways past it. */
+.queue { display: flex; align-items: center; gap: 10px; margin-top: 6px; padding-top: 7px;
+  border-top: 1px solid var(--rule); font-size: 12.5px; }
+.qitems { flex: 1; min-width: 0; display: flex; gap: 6px; align-items: center; overflow: hidden; }
+.qlabel { color: var(--faint); flex: none; }
+.qitem { flex: 0 1 auto; min-width: 0; display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--rule);
+  border-radius: 14px; padding: 2px 10px; color: var(--dim); max-width: 260px; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; unicode-bidi: plaintext; }
+.qitem > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qitem .ic { color: var(--faint); }
+.qitem.ready .ic { color: var(--ok); }
+.qacts { display: flex; gap: 6px; flex: none; }
+.qbtn { border: 1px solid var(--edge); background: var(--paper); color: var(--ink); border-radius: 8px;
+  padding: 3px 10px; font-size: 12.5px; cursor: pointer; }
 .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 7px; }
 .chip { font-size: 12.5px; border: 1px solid var(--edge); border-radius: 20px; padding: 2px 10px;
-  background: var(--paper); cursor: pointer; font-family: var(--square); }
+  background: var(--paper); cursor: pointer; font-family: var(--square); color: var(--ink); }
 .chip.warn { border-color: var(--bad); color: var(--bad); font-family: var(--ui); }
+.chip.again { font-family: var(--ui); padding: 2px 10px; color: var(--dim); }
+.turn.err { color: var(--bad); font-size: 13px; }
 /* A citation where it stands in the sentence: small, tappable, not a hole. */
 .chip.inline { font-size: 11.5px; padding: 0 7px; margin: 0 2px; vertical-align: 1px; unicode-bidi: isolate; }
 .turn q { unicode-bidi: isolate; direction: rtl; quotes: none; font-family: var(--square); background: var(--quote); border-radius: 3px; padding: 0 3px; }
-.tools { display: flex; flex-direction: column; gap: 6px; }
-.tools .btn { font-size: 12.5px; }
+.turn .ic { color: var(--faint); margin-inline-end: 5px; }
 @media (max-width: 620px) {
-  .bar { grid-template-columns: auto 1fr; }
-  .tools { grid-column: 1 / -1; flex-direction: row; justify-content: center; }
+  :root { --talk-h: 24vh; }
+  footer { padding: 10px 12px 10px; }
+  .bar { gap: 12px; }
+  .micwrap, #mic { width: 52px; height: 52px; }
+  .talk-top { flex-wrap: wrap; row-gap: 4px; }
+  .state { flex-basis: 100%; order: 2; }
+  .tabs { width: 100%; }
+  .tab { flex: 1; }
   .reply { font-size: 16px; }
+  .qbtn span { display: none; }            /* on a phone the icons alone, with their names on long-press */
 }
 
 /* ---- panels sit beside the page, so the gemara stays in view ------------- */
@@ -382,10 +433,10 @@ footer { padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
 @media (max-width: 760px) { .over .panel { padding-bottom: calc(40px + env(safe-area-inset-bottom, 0px)); } }
 
 /* Pressed is felt on the press, not on the release. */
-.btn, .chip, .hold, .dc-btn, .dc-line, .lay-go, .lay-x, .lay-save, .flip, #mic, .more, .tref {
+.btn, .chip, .hold, .dc-btn, .dc-line, .lay-go, .lay-x, .lay-save, .qbtn, #mic, .more, .tref {
   transition: transform 110ms ease-out, background-color 160ms, border-color 160ms, color 160ms; }
 .btn:active, .chip:active, .hold:active, .dc-btn:active, .dc-line:active, .lay-go:active, .lay-x:active,
-.lay-save:active, .more:active, .tref:active { transform: scale(.96); }
+.lay-save:active, .more:active, .tref:active, .qbtn:active { transform: scale(.96); }
 #mic:active { transform: scale(.94); }
 #mic { transition: transform 110ms ease-out, background-color 200ms, color 200ms, border-color 200ms; }
 :focus-visible { outline: 2px solid var(--mark); outline-offset: 2px; border-radius: 4px; }
@@ -455,4 +506,13 @@ body { grid-template-columns: minmax(0, 1fr); }
   .chip { padding: 5px 12px; }
   .chip.inline { padding: 1px 8px; }
   .desk-bar .btn, .btn.icon { min-height: 36px; min-width: 36px; }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .foot-grip:hover::after { opacity: 1; width: 64px; inset-inline: calc(50% - 32px); }
+  .tab:hover { color: var(--ink); }
+  .qbtn:hover { background: var(--glow); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ring { animation: none !important; }
 }
