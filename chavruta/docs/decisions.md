@@ -687,3 +687,9 @@ to the mishna the gemara is on, brings its text, and recaps the pages since.
   sentence is voiced on its own; an answer that came whole is said sentence
   by sentence too. The conversation scrolls to keep that sentence in view.
 - Esc stops the whole answer, not just the sentence it is on.
+
+**65. Two hands in Steinsaltz.**
+- Bold alone, in one face, did not tell the Talmud from Steinsaltz. Now, as
+  in the printed Koren Steinsaltz: the daf's words in the book face (Frank
+  Ruhl), bold; his own words in a clean modern Hebrew sans (Assistant); his
+  translations of the Aramaic in that sans, smaller and softer.

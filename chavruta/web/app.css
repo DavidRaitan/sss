@@ -535,12 +535,17 @@ button.qitem { cursor: pointer; font: inherit; background: var(--paper); }
 .ex-bar { position: sticky; top: 0; z-index: 2; display: flex; justify-content: center;
   padding: 12px 0 14px; margin-bottom: 4px;
   background: linear-gradient(var(--paper) 70%, color-mix(in srgb, var(--paper) 0%, transparent)); }
-.stz { font-family: var(--square); font-size: 21px; line-height: 1.9; color: var(--ink);
+/* Two hands, so it is clear at a glance which words are the Talmud's: the
+   daf's words in the book face (Frank Ruhl), bold; Steinsaltz's own words in
+   a clean modern Hebrew sans; his translations of the Aramaic in that sans,
+   smaller and softer. (Bold alone, in one face, was not enough.) */
+:root { --sans: "Assistant", "Heebo", -apple-system, "Segoe UI", sans-serif; }
+.stz { font-family: var(--sans); font-size: 19.5px; line-height: 1.95; color: var(--ink);
   text-align: right; font-weight: 400; }
-.stz .d, .stz .w { font-weight: 700; color: var(--ink); }
+.stz .d, .stz .w { font-family: var(--square); font-weight: 700; font-size: 1.1em; color: var(--ink); }
 .stz .ghost { display: none; }
-.stz .tr { font-family: var(--ui); font-size: .8em; color: var(--dim); font-weight: 400; }
-.stz .cite { font-family: var(--ui); font-size: .68em; color: var(--faint); white-space: nowrap; }
+.stz .tr { font-family: var(--sans); font-size: .84em; color: var(--dim); font-weight: 400; }
+.stz .cite { font-family: var(--sans); font-size: .7em; color: var(--faint); white-space: nowrap; }
 .stz-head { font-family: var(--ui); font-size: 11.5px; font-weight: 600; color: var(--mark);
   border: 1px solid color-mix(in srgb, var(--mark) 45%, transparent); border-radius: 5px;
   padding: 1px 7px; vertical-align: .3em; letter-spacing: .02em; }
