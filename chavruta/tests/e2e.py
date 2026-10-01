@@ -162,16 +162,29 @@ def main():
         page.wait_for_selector(".line")
         check("Steinsaltz view: vocalized lines", page.locator(".line").count() == 14 and
               any(0x591 <= ord(c) <= 0x5c7 for c in page.inner_text("#linear")))
-        check("…with Steinsaltz woven in: the daf's words bold, his lighter",
-              page.locator(".line.stz").count() >= 10 and page.locator(".line.stz .ex").count() > 50 and
-              page.evaluate("getComputedStyle(document.querySelector('.line.stz .w')).fontWeight") == "700",
-              "%d woven lines" % page.locator(".line.stz").count())
+        page.evaluate("selectLine(2)")
+        page.wait_for_timeout(400)
+        shown = page.evaluate("[...document.querySelectorAll('#linear .ex')].filter(e => e.getBoundingClientRect().height > 8).length")
+        check("…Steinsaltz's plain Hebrew opens under the line you are on, only", shown == 1, "%d open" % shown)
+        page.click("#linear .ex-bar button:has-text('בכל השורות')")
+        page.wait_for_timeout(400)
+        shown = page.evaluate("[...document.querySelectorAll('#linear .ex')].filter(e => e.getBoundingClientRect().height > 8).length")
+        check("…or under every line, at a tap", shown >= 10, "%d open" % shown)
         check("…and every word of the daf is still there, once",
               page.evaluate(r"""S.pack.segments.every(s => document.querySelectorAll('.line[data-n="' + s.n + '"] .w[data-k]').length ===
                                 s.he.split(/\s+/).filter(t => norm(t)).length)"""))
+        shot("12-steinsaltz-all")
+        page.click("#linear .ex-bar button:has-text('בשורה שלי')")
+        page.evaluate("selectLine(3)")
+        page.wait_for_timeout(450)
         shot("12-steinsaltz")
         page.click("#v-daf")
         page.wait_for_selector(".seg")
+        font = lambda sel: page.evaluate("getComputedStyle(document.querySelector('%s')).fontFamily" % sel)
+        check("the commentaries in plain letters by default", "Rashi" not in font("#col-inner .c"), font("#col-inner .c"))
+        page.evaluate("S.settings.script = 'page'; applyScript()")
+        check("…Rashi script for the page's own, from settings", "Rashi" in font("#col-inner .c"))
+        page.evaluate("S.settings.script = 'plain'; applyScript()")
 
         if args.part in ("all", "voice"):
             # The sitting that taught us what was wrong, replayed.

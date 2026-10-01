@@ -85,7 +85,7 @@ main { overflow: hidden; display: flex; justify-content: center; padding: 14px; 
 .w.head { font-weight: 700; }
 .stops .clause-end::after { content: "·"; color: var(--mark); font-weight: 700; margin-inline: 1px; }
 
-.c { font-family: var(--rashi); font-size: 15.5px; line-height: 1.72; text-align: justify;
+.c { font-family: var(--cfont); font-size: 15.5px; line-height: 1.72; text-align: justify;
   margin-bottom: 7px; padding: 2px 5px; border-radius: 4px; cursor: pointer; }
 .c .dib { font-family: var(--square); font-weight: 700; font-size: 15.5px; }
 .c.on { background: var(--glow); }
@@ -266,7 +266,7 @@ body.resizing, body.resizing * { cursor: col-resize !important; user-select: non
 .src { margin-bottom: 14px; }
 .src .who { font-size: 13px; font-weight: 600; }
 .src .who .dib { font-family: var(--square); color: var(--mark); font-weight: 700; margin-inline-start: 4px; }
-.src .body { font-family: var(--rashi); font-size: 16px; line-height: 1.75; margin-top: 3px;
+.src .body { font-family: var(--pfont); font-size: 16px; line-height: 1.75; margin-top: 3px;
   max-height: 5.3em; overflow: hidden; }
 .src.open .body { max-height: none; }
 .src.flash { animation: flash 1.6s ease-out; }
@@ -370,7 +370,7 @@ main[data-place="below"] .desk-grip::after { inset-block: 3px auto; inset-inline
 .dc-btn { border: 0; background: none; cursor: pointer; color: var(--dim); font-size: 13px; padding: 2px 5px;
   border-radius: 4px; }
 .dc-body { height: 300px; min-height: 90px; overflow-y: auto; resize: vertical; padding: 8px 12px;
-  font-family: var(--rashi); font-size: var(--desk-font); line-height: 1.65; }
+  font-family: var(--pfont); font-size: var(--desk-font); line-height: 1.65; }
 main[data-place="full"] .dc-body { height: 60vh; }
 .dc-entry { padding: 6px 4px 8px; border-bottom: 1px dotted var(--rule); border-radius: 3px; }
 .dc-entry.here { background: color-mix(in srgb, var(--glow) 35%, transparent); }
@@ -525,10 +525,41 @@ button.qitem { cursor: pointer; font: inherit; background: var(--paper); }
 .qitem.held .ic { color: var(--mark); }
 .qitem.later { border-style: dashed; }
 
-/* Steinsaltz woven: the daf's words bold and dark, his explanation lighter,
-   his glosses in brackets lighter still -- one glance tells them apart. */
-.line.stz { font-size: 21px; line-height: 2.05; padding-block: 8px; }
-.line.stz .w { font-weight: 700; color: var(--ink); }
-.line.stz .ex { font-weight: 400; color: var(--dim); }
-.line.stz .gl { font-weight: 400; color: var(--faint); font-size: .9em; }
-.line.stz + .line.stz { border-top: 1px solid color-mix(in srgb, var(--rule) 60%, transparent); }
+/* The Steinsaltz view: read simply. The daf's line is the text; his plain
+   Hebrew opens under the line you are on (or every line, or none). */
+.linear { padding: 0 26px 90px; }
+.linear .line { max-width: 760px; margin: 0 auto 2px; padding: 10px 20px; border-radius: 12px;
+  font-size: 26px; line-height: 1.95; transition: background-color 220ms ease; }
+.linear .line.on { background: color-mix(in srgb, var(--glow) 55%, transparent); box-shadow: none; }
+.ex-bar { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; justify-content: center;
+  gap: 10px; padding: 12px 0 14px; margin-bottom: 6px;
+  background: linear-gradient(var(--paper) 72%, color-mix(in srgb, var(--paper) 0%, transparent)); }
+.ex-name { font-size: 12px; color: var(--faint); letter-spacing: .02em; }
+/* Opens and closes smoothly: its height goes from nothing to its own. */
+.ex { display: grid; grid-template-rows: 0fr; opacity: 0;
+  transition: grid-template-rows 280ms var(--ease), opacity 220ms ease; }
+.ex-clip { overflow: hidden; min-height: 0; }
+.linear[data-explain="line"] .line.on .ex, .linear[data-explain="all"] .ex { grid-template-rows: 1fr; opacity: 1; }
+.linear[data-explain="off"] .ex { display: none; }
+.ex-in { margin: 4px 0 6px; padding-inline-start: 16px; border-inline-start: 2px solid var(--edge);
+  font-family: var(--square); font-size: 18px; line-height: 1.8; color: var(--dim); }
+.ex-in .g { color: var(--ink); }
+.ex-in .gl { color: var(--faint); }
+.linear[data-explain="all"] .line:not(.on) .ex-in { border-color: var(--rule); }
+@media (max-width: 620px) {
+  .linear { padding: 0 10px 80px; }
+  .linear .line { font-size: 22px; padding: 8px 12px; }
+  .ex-in { font-size: 16.5px; }
+}
+@media (prefers-reduced-motion: reduce) { .ex { transition: none; } }
+
+/* The commentaries' letters: plain by default; Rashi script for those on the
+   page, or for every one, from settings. */
+:root { --cfont: var(--square); --pfont: var(--square); }
+body.rashi-page { --cfont: var(--rashi); }
+body.rashi-all { --cfont: var(--rashi); --pfont: var(--rashi); }
+/* A second commentary in the same margin, named on its comments. */
+.c.other { border-inline-start: 2px solid var(--rule); padding-inline-start: 6px; }
+.c .who { font-family: var(--ui); font-size: 10.5px; color: var(--mark); letter-spacing: .02em;
+  display: block; margin-bottom: 1px; }
+.linear .line { scroll-margin-top: 64px; scroll-margin-bottom: 16px; }

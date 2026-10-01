@@ -35,7 +35,7 @@ function el(tag, cls, text) {
 
 const DEFAULTS = { view: "daf", depth: "daf", language: "en", voice: "natural",
   hearing: "api", speak: true, pause: "normal", nudges: true, checks: true, translate: false, stops: false,
-  speakers: false, rate: 1, favor: {}, voices: 3, open: "last", mine: [],
+  speakers: false, rate: 1, favor: {}, voices: 3, open: "last", mine: [], explain: "line", script: "plain",
   sites: ["halachayomit.co.il", "he.wikisource.org", "dafyomi.co.il"], sites_halacha: true };
 const PAUSES = { short: 1000, normal: 1500, long: 2400 };
 function loadSettings() {
@@ -397,13 +397,17 @@ function renderDaf() {
 function fillColumn(col, names) {
   col.replaceChildren();
   const present = names.filter((n) => S.pack.segments.some((s) => (s.commentaries[n] || []).length));
-  col.append(el("div", "colname", present.map(heName).join(" · ") || heName(names[0])));
+  // The column carries its own commentator's name; another work printed in
+  // the same margin (Rabbeinu Chananel beside Tosafot) is named on each of
+  // its comments -- they are two commentaries, not one.
+  col.append(el("div", "colname", heName(present[0] || names[0])));
   let any = false;
   for (const seg of S.pack.segments) {
     for (const name of names) {
       for (const e of seg.commentaries[name] || []) {
         any = true;
         const c = el("div", "c"); c.dataset.n = seg.n; c.dataset.ref = e.ref;
+        if (name !== (present[0] || names[0])) { c.classList.add("other"); c.append(el("span", "who", heName(name))); }
         const body = e.he || "";
         let rest = body;
         if (e.dibur) {
@@ -420,61 +424,85 @@ function fillColumn(col, names) {
   if (!any) col.append(el("div", "empty", "אין כאן"));
 }
 
-// Steinsaltz as he is printed: the words of the daf, bold and pointed, woven
-// into his explanation, which reads lighter -- and his short glosses in
-// brackets lighter still. The daf's own words are the same word-spans as
-// everywhere else, so reading along, quotes and lines still find them.
-// In use the view showed only the pointed text, and Steinsaltz was nowhere.
-function steinsaltz(seg) {
+// The Steinsaltz view is for reading simply. The daf's line is the text --
+// large, pointed, what you read aloud -- and under the line you are on, his
+// explanation in plain Hebrew opens: one calm paragraph, the daf's own words
+// a shade darker, his glosses in brackets a shade lighter. Lines you are not
+// on stay just the daf. (Woven all at once, in three weights, it was too much
+// to look at.) Above: explanation on my line / on every line / off.
+function explanation(seg) {
   const text = (seg.commentaries.Steinsaltz || []).map((e) => e.he).join(" ")
-    .replace(/^\s*[א-ת]{1,2}\s+(?=[א-ת]{3})/, "");              // his paragraph letter
-  const daf = words(seg.he, seg.n, true);
-  const spans = [...daf.childNodes].filter((n) => n.classList && n.classList.contains("w"));
-  if (!text.trim() || !spans.length) return null;
-  const out = document.createDocumentFragment();
+    .replace(/^\s*[א-ת]{1,2}\s+(?=[א-ת]{3})/, "");             // his paragraph letter
+  if (!text.trim()) return null;
+  const daf = seg.he.split(/\s+/).map(norm).filter(Boolean);
   const toks = text.split(/\s+/).filter(Boolean);
+  const box = el("div", "ex-in");
+  box.dir = "rtl";
   let gi = 0, depth = 0;
-  const put = (node) => out.append(node, document.createTextNode(" "));
   toks.forEach((tok, ti) => {
     const k = norm(tok);
-    if (!depth && k && gi < spans.length) {
-      for (let d = 0; d < 3 && gi + d < spans.length; d++) {
-        if (spans[gi + d].dataset.k !== k) continue;
-        // A two-letter word ("את", "עד") counts only when the next one follows too.
+    const opens = (tok.match(/\(/g) || []).length, closes = (tok.match(/\)/g) || []).length;
+    let cls = depth || opens ? "gl" : "";
+    if (!cls && k && gi < daf.length) {
+      for (let d = 0; d < 3 && gi + d < daf.length; d++) {
+        if (daf[gi + d] !== k) continue;
         const next = toks[ti + 1] && norm(toks[ti + 1]);
-        if (k.length <= 2 && spans[gi + d + 1] && next !== spans[gi + d + 1].dataset.k) continue;
-        const j = gi + d;                // a daf word he skipped is kept, in its place
-        while (gi <= j) put(spans[gi++]);
-        return;
+        if (k.length <= 2 && daf[gi + d + 1] && next !== daf[gi + d + 1]) continue;   // "את", "עד": only in step
+        gi += d + 1; cls = "g"; break;
       }
     }
-    const opens = (tok.match(/\(/g) || []).length, closes = (tok.match(/\)/g) || []).length;
-    put(el("span", depth || opens ? "gl" : "ex", tok));
+    box.append(cls ? el("span", cls, tok) : document.createTextNode(tok), document.createTextNode(" "));
     depth = Math.max(0, depth + opens - closes);
   });
-  while (gi < spans.length) put(spans[gi++]);                  // never lose a word of the daf
-  return out;
+  const wrap = el("div", "ex");
+  const inner = el("div", "ex-clip");
+  inner.append(box);
+  wrap.append(inner);
+  return wrap;
 }
 
 function renderLinear() {
   const box = $("linear");
   box.hidden = false; box.replaceChildren();
+  // Explanation: on my line / on every line / off.
+  const bar = el("div", "ex-bar");
+  bar.append(el("span", "ex-name", "ביאור שטיינזלץ"));
+  const seg2 = el("span", "seg2 small");
+  for (const [v, label] of [["line", "בשורה שלי"], ["all", "בכל השורות"], ["off", "כבוי"]]) {
+    const b = el("button", "btn", label);
+    b.setAttribute("aria-pressed", String((S.settings.explain || "line") === v));
+    b.onclick = (e) => { e.stopPropagation(); S.settings.explain = v; saveSettings(); applyToggles();
+      for (const x of seg2.children) x.setAttribute("aria-pressed", String(x === b)); };
+    seg2.append(b);
+  }
+  bar.append(seg2);
+  box.append(bar);
   for (const seg of S.pack.segments) {
     const line = el("div", "line"); line.dataset.n = seg.n;
-    const he = el("div", "he");
-    const woven = steinsaltz(seg);
-    if (woven) { line.classList.add("stz"); he.append(woven); } else he.append(words(seg.he, seg.n, true));
+    const he = el("div", "he"); he.append(words(seg.he, seg.n, true));
+    line.append(he);
+    const ex = explanation(seg);
+    if (ex) line.append(ex);
     const en = el("div", "en");
     for (const s of seg.en || []) en.append(el("span", s.kind === "daf" ? "" : "add", s.text + " "));
-    line.append(he, en);
+    line.append(en);
     line.onclick = () => selectLine(seg.n);
     box.append(line);
   }
+  applyToggles();
+}
+
+// Rashi script, or plain letters: for the commentaries on the page only, for
+// every commentary, or (the default) for none.
+function applyScript() {
+  document.body.classList.toggle("rashi-page", S.settings.script === "page");
+  document.body.classList.toggle("rashi-all", S.settings.script === "all");
 }
 
 function applyToggles() {
   const lin = $("linear"), daf = $("page");
   lin.classList.toggle("showen", S.settings.translate);
+  lin.dataset.explain = S.settings.explain || "line";
   lin.classList.toggle("stops", S.settings.stops);
   daf.classList.toggle("stops", S.settings.stops);
 }
@@ -498,6 +526,9 @@ function selectLine(n, opts) {
 
   const main = S.settings.view === "daf" ? $("col-gemara") : $("linear");
   const node = main.querySelector('[data-n="' + S.line + '"]');
+  if (S.settings.view === "lin" && node && opts.scroll !== "top")
+    // Its explanation opens below it: once it has, keep both in view.
+    setTimeout(() => { if (!visible(node, main)) node.scrollIntoView({ block: "nearest", behavior: "smooth" }); }, 320);
   if (opts.scroll === "top") main.scrollTop = 0;
   else if (node && opts.scroll !== "side" && !visible(node, main))
     node.scrollIntoView({ block: "center", behavior: "smooth" });
@@ -2673,6 +2704,7 @@ function openSettings() {
         for (const x of row.children) x.setAttribute("aria-pressed", String(x === b));
         if (key === "view") render(), selectLine(S.line);
         if (["translate", "stops"].includes(key)) applyToggles();
+        if (key === "script") applyScript();
         if (key === "hearing" && S.listening) { stopListening(); startListening(); }
         if (key === "rate") pace(player);
       };
@@ -2700,6 +2732,8 @@ function openSettings() {
       choice("language", "שפת התשובה", [["en", "English"], ["he", "עברית"], ["auto", "כמוני"]],
         "באנגלית הוא מצטט את הגמרא בעברית, בתוך המשפט — כמו שמדברים בבית המדרש."),
       choice("view", "תצוגת הדף", [["daf", "צורת הדף"], ["lin", "שטיינזלץ, מנוקד"]]),
+      choice("script", "כתב רש״י", [["plain", "בלי — הכול באותיות רגילות"], ["page", "רש״י ותוספות שעל הדף"],
+        ["all", "כל המפרשים"]], "האותיות שבהן נדפסו המפרשים. רגילות קלות יותר לקריאה."),
       choice("translate", "תרגום (בתצוגת שטיינזלץ)", [[false, "בלי"], [true, "עם תרגום"]]),
       choice("stops", "לסמן עצירות", [[false, "לא"], [true, "כן"]], "איפה המשפט נגמר. כבוי כברירת מחדל — זה חלק מהלימוד."),
       choice("pause", "כמה לחכות לפני שאני עונה", [["short", "קצר"], ["normal", "רגיל"], ["long", "ארוך"]],
@@ -2755,6 +2789,7 @@ document.addEventListener("touchend", (e) => {
 /* ------------------------------------------------------------------ start */
 
 (async function start() {
+  applyScript();
   checkHealth();          // not awaited: a slow Sefaria must not hold up a cached page
   await buildPickers();
   setInterval(checkHealth, 60000);

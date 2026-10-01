@@ -620,3 +620,17 @@ to the mishna the gemara is on, brings its text, and recaps the pages since.
   following the mouse after the button was let go when the release landed
   elsewhere. They now let go on release wherever it happens -- and on a
   button that is no longer down, a lost capture, or the window losing focus.
+
+**60. Steinsaltz to read simply; plain letters; two commentaries, two names.**
+- Woven all at once in three weights, Steinsaltz was too much to look at. Now
+  the daf's line is the text -- large, pointed, what you read aloud -- and
+  under the line you are on his plain Hebrew opens (smoothly, and closes as
+  you move on): one calm paragraph, the daf's own words a shade darker, his
+  bracketed glosses a shade lighter. Above: "ביאור שטיינזלץ: בשורה שלי /
+  בכל השורות / כבוי".
+- Commentaries are in plain letters by default -- Rashi script is hard to read
+  for many. Settings → כתב רש״י: none / Rashi and Tosafot on the page / every
+  commentary.
+- The outer column was titled "תוספות · רבינו חננאל", as if one work. The
+  column carries its own name; Rabbeinu Chananel's comments in the same
+  margin are each named and set off.
