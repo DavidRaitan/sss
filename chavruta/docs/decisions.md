@@ -673,3 +673,17 @@ to the mishna the gemara is on, brings its text, and recaps the pages since.
   answer is not kept). An answer it had cut into goes on. Said in a word:
   "OK -- dropped it." The same from a ✕ beside the question in the bar and on
   each question waiting in the queue; struck through in the transcript.
+
+**64. The voice reads the body; the sentence being said is marked.**
+- Sources are for the screen. The voice used to say a book's name wherever
+  its citation was not right after the name ("On 2a, Berakhot 2a, the gemara
+  ...", web page titles). Now every citation is silent, except a short book
+  name the sentence leans on as a word ("we need the text at the Tur") --
+  otherwise the sentence has a hole. Brackets left holding only sources go.
+- Word-by-word marking guessed each word's time from the clip's length; the
+  voice gives no word timings, and it does not read exactly what is shown
+  (sources, long quotes), so the mark landed on the wrong words. Now the
+  sentence being said is marked -- that much is known exactly, since each
+  sentence is voiced on its own; an answer that came whole is said sentence
+  by sentence too. The conversation scrolls to keep that sentence in view.
+- Esc stops the whole answer, not just the sentence it is on.

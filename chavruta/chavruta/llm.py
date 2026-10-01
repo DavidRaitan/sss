@@ -440,19 +440,29 @@ def _names(name):
     return {bare, bare.split()[0]}
 
 
+# A citation the sentence leans on as a word: "the text at [[Tur ...]]".
+AS_A_WORD = re.compile(r"\b(at|in|from|see|of|to|by|per|like|according to|than|with)\s*$", re.I)
+AND = re.compile(r"\band\s*$", re.I)        # "at [[Tur]] and [[Shulchan Arukh]]": only after one said
+
+
 def _cite_aloud(text):
-    """Drop a citation that follows its name; say the book where nothing named it."""
-    out, last = [], 0
+    """Sources are for the screen: the voice reads only the body. The one
+    exception is a citation the sentence uses as a word ("we need the text at
+    [[Tur ...]]"): then the book's short name, or the sentence has a hole."""
+    out, last, said = [], 0, False
     for m in CITE.finditer(text):
-        before = text[max(0, m.start() - 60):m.start()].lower()
+        before = text[max(0, m.start() - 60):m.start()]
         name = said_as(m.group(1).strip())
         out.append(text[last:m.start()])
-        hebrew_name = re.search(r"[א-ת][\"'״׳]?[א-ת]*\s*$", text[max(0, m.start() - 20):m.start()])
-        if not (any(n in before for n in _names(name)) or hebrew_name):
+        named = any(n in before.lower() for n in _names(name))
+        short = len(name.split()) <= 3 and not re.search(r"[:\d]", name)
+        said = bool((AS_A_WORD.search(before) or (said and AND.search(before))) and short and not named)
+        if said:
             out.append(name)
         last = m.end()
     out.append(text[last:])
-    return "".join(out)
+    # Brackets left holding nothing but the sources that were in them.
+    return re.sub(r"\s*\((\s|,|;|\band\b|\bsee\b|\bcf\.?|ראה|עיין|ו)*\)", "", "".join(out))
 
 
 def _table_aloud(rows):

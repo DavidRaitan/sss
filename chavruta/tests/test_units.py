@@ -286,6 +286,16 @@ class Speaking(unittest.TestCase):
         said = speakable("We need the text at [[Tur, Orach Chayim 235]] and [[Shulchan Arukh, Orach Chayim 235:1]].")
         self.assertEqual(said, "We need the text at the Tur and the Shulchan Aruch.")
 
+    def test_sources_are_for_the_screen_only(self):
+        # In use the voice read "On 2a Berakhot 2a the gemara ..." and the titles of web pages.
+        self.assertEqual(speakable("On 2a [[Berakhot 2a]] the gemara asks about the evening Shema."),
+                         "On 2a the gemara asks about the evening Shema.")
+        self.assertEqual(speakable("The outline says three questions [[D.A.F. outline: Berakhot 2]]."),
+                         "The outline says three questions.")
+        self.assertEqual(speakable("Three views ([[Rashi on Berakhot 2a:1:2]], [[Tosafot on Berakhot 2a:1:1]]) "
+                                   "and the Meiri."), "Three views and the Meiri.")
+        self.assertEqual(speakable("Wikisource has it (see [[Wikisource: מהרש\"ל]])."), "Wikisource has it.")
+
     def test_a_table_is_read_row_by_row(self):
         said = speakable("Three opinions.\n| Who | Holds |\n|---|---|\n| ר' אליעזר | «סוף האשמורה» [[Rashi on Berakhot 2a:1:2]] |\n| חכמים | עד חצות |\nSo the Rabbis are in the middle.")
         self.assertNotIn("|", said)

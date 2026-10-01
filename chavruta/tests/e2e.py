@@ -314,8 +314,9 @@ def main():
                   page.evaluate("!S.listening && !!speakingDone && document.querySelector('#mic').classList.contains('muted')"))
             # And the words follow the voice, the conversation scrolling itself.
             page.wait_for_selector("#reply.speaking .sw.in", timeout=5000)
-            page.wait_for_selector("#reply .sw.cur", timeout=5000)
-            check("the words being said are marked as it speaks", True)
+            marked = page.evaluate("[document.querySelectorAll('#reply .sw.in').length, document.querySelectorAll('#reply .sw').length]")
+            check("the sentence being said is marked as it speaks -- that sentence only",
+                  0 < marked[0] < marked[1], str(marked))
             page.wait_for_function("document.querySelector('#talk').scrollTop > 20", timeout=15000)
             check("…and the conversation scrolls to keep up", True)
             page.evaluate("document.documentElement.style.removeProperty('--talk-h')")

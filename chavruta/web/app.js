@@ -715,7 +715,7 @@ function showReply(text, opts) {
   r.classList.toggle("hint", !!opts.hint);
   if (!text) return;
   renderRich(r, text);
-  if (!opts.hint) wordify(r);
+  if (!opts.hint) { wordify(r); followAt = null; }    // new words: mark them afresh
   if (!opts.hint) {
     // Cut off by your own reading, or missed: hear it again.
     const again = ibtn("chip again", "sound", "שוב", "להשמיע שוב");
@@ -727,10 +727,12 @@ function showReply(text, opts) {
 
 /* ------------------------------------------------------- following along */
 
-// While it speaks, the words follow the voice: the sentence being said is in
-// full ink, the rest a shade softer, and a soft mark moves word by word -- and
-// the conversation scrolls itself to keep that word in view (unless you have
-// just scrolled it yourself). In use a long answer ran on below the fold.
+// While it speaks, the sentence being said is in full ink and the rest a
+// shade softer, and the conversation scrolls itself to keep that sentence in
+// view (unless you have just scrolled it yourself). Sentence by sentence,
+// because that is what is known exactly: each sentence is voiced on its own.
+// (Word by word was tried: the voice gives no word timings, the guess
+// drifted, and the mark landed on the wrong words.)
 const WORDY = /[\p{L}\p{N}]/u;
 function wordify(box) {
   const walk = document.createTreeWalker(box, NodeFilter.SHOW_TEXT, {
@@ -748,37 +750,37 @@ function wordify(box) {
 }
 const wordsIn = (text) => (text || "").replace(/\[\[[^\]]+\]\]/g, " ").split(/[\s|«»]+/).filter((w) => WORDY.test(w)).length;
 
+// A whole answer as the sentences it is said in (a table stays whole; a
+// citation stays with the sentence it ends).
+function sentences(text) {
+  const out = [];
+  for (const block of text.split(/\n(?=\|)|(?<=\|)\n/)) {
+    if (block.trim().startsWith("|")) { out.push(block); continue; }
+    for (const s of block.split(/(?<=[.!?…])\s+(?!\[\[)|\n+/)) if (s.trim()) out.push(s.trim());
+  }
+  return out.length ? out : [text];
+}
+
 let followAt = null;
 function follow() {
   const r = $("reply"), now = S.now, t = shownTurn();
   const on = !!(now && t && now.turn === t && now.idx !== undefined && t.parts && t.parts[now.idx] !== undefined);
   r.classList.toggle("speaking", on);
   const ws = r.querySelectorAll(".sw");
-  if (!on) { for (const w of r.querySelectorAll(".sw.in, .sw.cur")) w.classList.remove("in", "cur"); followAt = null; return; }
+  if (!on) { for (const w of r.querySelectorAll(".sw.in")) w.classList.remove("in"); followAt = null; return; }
   const counts = t.parts.map(wordsIn);
   const start = counts.slice(0, now.idx).reduce((a, b) => a + b, 0), n = counts[now.idx] || 0;
-  const cur = now.frac === null ? -1 : start + Math.min(Math.max(n - 1, 0), Math.floor(now.frac * n));
-  const key = start + ":" + cur + ":" + ws.length;
+  const key = start + ":" + n + ":" + ws.length;
   if (key === followAt) return;
   followAt = key;
-  ws.forEach((w, k) => { w.classList.toggle("in", k >= start && k < start + n); w.classList.toggle("cur", k === cur); });
-  const target = ws[cur >= 0 ? cur : start];
-  const talk = $("talk");
-  if (target && Date.now() - (S.userScrolled || 0) > 3500) {
-    const a = target.getBoundingClientRect(), b = talk.getBoundingClientRect();
-    if (a.bottom > b.bottom - 6 || a.top < b.top + 2)
-      talk.scrollBy({ top: a.top - b.top - talk.clientHeight * 0.3, behavior: "smooth" });
+  ws.forEach((w, k) => w.classList.toggle("in", k >= start && k < start + n));
+  const first = ws[start], last = ws[Math.min(ws.length - 1, start + Math.max(n - 1, 0))], talk = $("talk");
+  if (first && Date.now() - (S.userScrolled || 0) > 3500) {
+    const a = first.getBoundingClientRect(), z = last.getBoundingClientRect(), b = talk.getBoundingClientRect();
+    if (a.top < b.top + 2 || z.bottom > b.bottom - 4)
+      talk.scrollBy({ top: a.top - b.top - Math.min(24, talk.clientHeight * 0.15), behavior: "smooth" });
   }
 }
-// Where the voice is in the sentence it is saying.
-setInterval(() => {
-  const now = S.now;
-  if (!now || now.frac === null || !player || !player._syl) return;
-  const d = isFinite(player.duration) && player.duration > 0 ? player.duration
-    : player._syl / ((usualPace() || 3.4) * (player.playbackRate || 1));
-  now.frac = Math.min(0.999, player.currentTime / d);
-  follow();
-}, 120);
 for (const ev of ["wheel", "touchmove"]) $("talk").addEventListener(ev, () => { S.userScrolled = Date.now(); }, { passive: true });
 
 /* ---------------------------------------------------------------- speaking */
@@ -789,6 +791,7 @@ let player = null, speakingDone = null;
 // read row by row, and a citation is dropped where it follows its name.
 function speakable(text) {
   const out = [], lines = text.split("\n");
+  let spokeCite = false;
   for (let i = 0; i < lines.length; i++) {
     if (!lines[i].trim().startsWith("|")) { out.push(lines[i]); continue; }
     const rows = [];
@@ -801,11 +804,17 @@ function speakable(text) {
       .filter(Boolean).join(", ") + ".").join(" "));
   }
   return out.join("\n")
+    // Sources are for the screen; only a short book name the sentence uses as a word is said.
     .replace(/\[\[([^\]]+)\]\]/g, (m, ref, at, all) => {
-      const name = ref.split(/ on |,/)[0].replace(/ \d.*$/, "");
-      return all.slice(Math.max(0, at - 60), at).toLowerCase().includes(name.split(" ")[0].toLowerCase()) ||
-        /[א-ת]["'״׳]?[א-ת]*\s*$/.test(all.slice(Math.max(0, at - 20), at)) ? "" : name;
+      const name = ref.split(/ on |,|:/)[0].replace(/ \d.*$/, "").trim();
+      const before = all.slice(Math.max(0, at - 60), at);
+      const asWord = /\b(at|in|from|see|of|to|by|per|like|according to|than|with)\s*$/i.test(before) ||
+        (spokeCite && /\band\s*$/i.test(before));
+      const named = before.toLowerCase().includes(name.split(" ")[0].toLowerCase());
+      spokeCite = asWord && !named && name.split(" ").length <= 3 && !/\d/.test(name);
+      return spokeCite ? name : "";
     })
+    .replace(/\s*\((\s|,|;|\band\b|\bsee\b|\bcf\.?|ראה|עיין)*\)/gi, "")
     .replace(/«([^»]*)»/g, "$1")
     .replace(/\s+([,.;:?!])/g, "$1").replace(/(\s*…\s*){2,}/g, " … ").replace(/\s{2,}/g, " ").trim();
 }
@@ -1515,11 +1524,11 @@ function discardTurn(t) {
 
 function answered(asked, text, trace) {
   const t = newTurn(asked, "answering");
-  t.text = text; t.complete = true; t.parts = [text]; t.quickly = true;
+  t.text = text; t.complete = true; t.parts = sentences(text); t.quickly = true;
   if (trace && trace.kind === "nudge") t.nudge = true;
   logPush({ me: false, text, trace: Object.assign({ quick: true }, trace), ms_answer: 0 });
   S.lastSaid = text;
-  say(text, t, 0);
+  t.parts.forEach((p, i) => say(p, t, i));
   renderBar();
 }
 
@@ -1880,9 +1889,13 @@ async function respond(batch, g) {
   const t2 = performance.now();
   // Already said sentence by sentence -- except what was held back, or the
   // whole thing if the answer had to be written again.
-  const rest = said_ ? tr.unsaid : lead + answer.text;
-  if (!said_) turn.parts = [answer.text];
-  const spoken = rest ? say(rest, turn, said_ ? undefined : 0) : Promise.resolve();
+  let spoken;
+  if (said_) spoken = tr.unsaid ? say(tr.unsaid, turn) : Promise.resolve();
+  else {
+    // Said sentence by sentence, so the one being said can be shown.
+    turn.parts = sentences(answer.text);
+    spoken = Promise.all(turn.parts.map((p, i) => say((i ? "" : lead) + p, turn, i)));
+  }
   spoken.then(() => {
     entry.ms_spoken = Math.round(performance.now() - t2);
     if (g !== S.gen || !into || !into.held) return;
@@ -1923,7 +1936,7 @@ async function pump() {
     if (ears) ears.guard = true;
     // The next sentence's voice is made while this one plays.
     if (naturalVoice() && speechQ[0] && S.settings.speak) prepare(speechQ[0]);
-    S.now = { item, turn: item.turn, idx: item.idx, frac: naturalVoice() ? 0 : null };
+    S.now = { item, turn: item.turn, idx: item.idx };
     follow();
     await speak(item.text, item);
     S.now = null;
@@ -2942,7 +2955,7 @@ $("v-lin").onclick = () => { S.settings.view = "lin"; saveSettings(); if (S.pack
 document.addEventListener("keydown", (e) => {
   const tag = (document.activeElement || {}).tagName;
   if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA") return;
-  if (e.key === "Escape") return speakingDone ? stopSpeaking() : closePanel();
+  if (e.key === "Escape") return speakingDone ? skipCurrent() : closePanel();   // the whole answer, not one sentence
   if (e.key === " ") { e.preventDefault(); return speakingDone ? pauseSpeaking() : $("mic").click(); }
   else if (e.key === "ArrowLeft") flip(1);             // right to left: left is forward
   else if (e.key === "ArrowRight") flip(-1);
