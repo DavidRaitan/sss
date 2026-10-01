@@ -187,7 +187,8 @@ ANY_SITE = re.compile(r"\b(search|check|look) (it )?(up )?(online|the web|the in
 DAF_SITE = "dafyomi.co.il"
 DAF_KNOWN = {"Berakhot": ("berachos", "br"), "Taanit": ("taanis", "tn"), "Sotah": ("sotah", "so"),
              "Yevamot": ("yevamos", "ye"), "Kiddushin": ("kidushin", "kd"), "Bava Metzia": ("bmetzia", "bm"),
-             "Zevachim": ("zevachim", "zv"), "Menachot": ("menachos", "mn")}
+             "Zevachim": ("zevachim", "zv"), "Menachot": ("menachos", "mn"),
+             "Rosh Hashanah": ("rhashanah", "rh")}
 DAF_URL = re.compile(r"dafyomi\.co\.il/([a-z_]+)/points/([a-z]+)-ps-\d+\.htm", re.I)
 
 
