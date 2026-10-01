@@ -266,8 +266,9 @@ def main():
                 open(os.path.join(args.shots, "session.md"), "w").write(report)
             recorded = os.listdir(os.environ["CHAVRUTA_SESSIONS"])
             check("each turn is recorded on disk", bool(recorded), str(recorded))
-            page.click("#mic")
+            page.click("#mic", delay=900)              # held down: everything stops
             page.wait_for_function("!saying && !speakingDone", timeout=15000)
+            check("a long press on the mic stops everything", page.evaluate("!S.listening && !speechQ.length"))
             # Citations sit in the sentence and open what they cite.
             page.evaluate("showReply(S.log.find((t) => /can't be right/.test(t.text)).text)")
             check("a citation sits inside the sentence", page.locator("#reply .chip.inline").count() >= 1)
@@ -298,6 +299,28 @@ def main():
             page.keyboard.press("Escape")
             page.wait_for_selector("#hold", state="hidden", timeout=5000)
             check("Esc stops it", True)
+
+            # A tap on the mic is the mic: closed while it speaks, and it goes on speaking.
+            long_text = ("Rabban Gamliel holds the whole night is bedtime, and the Sages set midnight as a fence "
+                         "so that a person does not come to miss it altogether. ") * 6
+            page.evaluate("document.documentElement.style.setProperty('--talk-h', '70px')")   # a small area
+            page.evaluate("answered('tell me more', %s)" % json.dumps(long_text))
+            page.wait_for_function("!!(saying && speakingDone)", timeout=10000)
+            # (An open mic without the test's looping recording, which would talk over it.)
+            page.evaluate("S.listening = true; syncMic()")
+            page.click("#mic")
+            page.wait_for_timeout(300)
+            check("a tap on the mic while it speaks only closes the mic",
+                  page.evaluate("!S.listening && !!speakingDone && document.querySelector('#mic').classList.contains('muted')"))
+            # And the words follow the voice, the conversation scrolling itself.
+            page.wait_for_selector("#reply.speaking .sw.in", timeout=5000)
+            page.wait_for_selector("#reply .sw.cur", timeout=5000)
+            check("the words being said are marked as it speaks", True)
+            page.wait_for_function("document.querySelector('#talk').scrollTop > 20", timeout=15000)
+            check("…and the conversation scrolls to keep up", True)
+            page.evaluate("document.documentElement.style.removeProperty('--talk-h')")
+            page.keyboard.press("Escape")
+            page.wait_for_selector("#hold", state="hidden", timeout=5000)
 
             # Mic on/off/on quickly: never stuck, never two microphones.
             for _ in range(3):

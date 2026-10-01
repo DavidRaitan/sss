@@ -35,7 +35,7 @@ function el(tag, cls, text) {
 
 const DEFAULTS = { view: "daf", depth: "daf", language: "en", voice: "natural",
   hearing: "api", speak: true, pause: "normal", nudges: true, checks: true, translate: false, stops: false,
-  speakers: false, rate: 1, favor: {}, voices: 3, open: "last", mine: [], explain: "line", script: "plain",
+  speakers: false, rate: 1, favor: {}, voices: 3, open: "last", mine: [], explain: "line", script: "plain", voice_name: "cedar",
   sites: ["halachayomit.co.il", "he.wikisource.org", "dafyomi.co.il"], sites_halacha: true };
 const PAUSES = { short: 1000, normal: 1500, long: 2400 };
 function loadSettings() {
@@ -689,6 +689,7 @@ function showReply(text, opts) {
   r.classList.toggle("hint", !!opts.hint);
   if (!text) return;
   renderRich(r, text);
+  if (!opts.hint) wordify(r);
   if (!opts.hint) {
     // Cut off by your own reading, or missed: hear it again.
     const again = ibtn("chip again", "sound", "שוב", "להשמיע שוב");
@@ -697,6 +698,62 @@ function showReply(text, opts) {
   }
   if (opts.grounded === false) chips.append(el("span", "chip warn", "לא נמצא מקור — אל תסמוך על זה"));
 }
+
+/* ------------------------------------------------------- following along */
+
+// While it speaks, the words follow the voice: the sentence being said is in
+// full ink, the rest a shade softer, and a soft mark moves word by word -- and
+// the conversation scrolls itself to keep that word in view (unless you have
+// just scrolled it yourself). In use a long answer ran on below the fold.
+const WORDY = /[\p{L}\p{N}]/u;
+function wordify(box) {
+  const walk = document.createTreeWalker(box, NodeFilter.SHOW_TEXT, {
+    acceptNode: (n) => (n.parentElement.closest("button") ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT) });
+  const nodes = [];
+  while (walk.nextNode()) nodes.push(walk.currentNode);
+  for (const node of nodes) {
+    const frag = document.createDocumentFragment();
+    for (const tok of node.textContent.split(/(\s+)/)) {
+      if (!tok) continue;
+      if (WORDY.test(tok)) frag.append(el("span", "sw", tok)); else frag.append(document.createTextNode(tok));
+    }
+    node.replaceWith(frag);
+  }
+}
+const wordsIn = (text) => (text || "").replace(/\[\[[^\]]+\]\]/g, " ").split(/[\s|«»]+/).filter((w) => WORDY.test(w)).length;
+
+let followAt = null;
+function follow() {
+  const r = $("reply"), now = S.now, t = shownTurn();
+  const on = !!(now && t && now.turn === t && now.idx !== undefined && t.parts && t.parts[now.idx] !== undefined);
+  r.classList.toggle("speaking", on);
+  const ws = r.querySelectorAll(".sw");
+  if (!on) { for (const w of r.querySelectorAll(".sw.in, .sw.cur")) w.classList.remove("in", "cur"); followAt = null; return; }
+  const counts = t.parts.map(wordsIn);
+  const start = counts.slice(0, now.idx).reduce((a, b) => a + b, 0), n = counts[now.idx] || 0;
+  const cur = now.frac === null ? -1 : start + Math.min(Math.max(n - 1, 0), Math.floor(now.frac * n));
+  const key = start + ":" + cur + ":" + ws.length;
+  if (key === followAt) return;
+  followAt = key;
+  ws.forEach((w, k) => { w.classList.toggle("in", k >= start && k < start + n); w.classList.toggle("cur", k === cur); });
+  const target = ws[cur >= 0 ? cur : start];
+  const talk = $("talk");
+  if (target && Date.now() - (S.userScrolled || 0) > 3500) {
+    const a = target.getBoundingClientRect(), b = talk.getBoundingClientRect();
+    if (a.bottom > b.bottom - 6 || a.top < b.top + 2)
+      talk.scrollBy({ top: a.top - b.top - talk.clientHeight * 0.3, behavior: "smooth" });
+  }
+}
+// Where the voice is in the sentence it is saying.
+setInterval(() => {
+  const now = S.now;
+  if (!now || now.frac === null || !player || !player._syl) return;
+  const d = isFinite(player.duration) && player.duration > 0 ? player.duration
+    : player._syl / ((usualPace() || 3.4) * (player.playbackRate || 1));
+  now.frac = Math.min(0.999, player.currentTime / d);
+  follow();
+}, 120);
+for (const ev of ["wheel", "touchmove"]) $("talk").addEventListener(ev, () => { S.userScrolled = Date.now(); }, { passive: true });
 
 /* ---------------------------------------------------------------- speaking */
 
@@ -808,7 +865,8 @@ function prepare(item) {
   if (item.ready) return item.ready;
   item.ready = (async () => {
     const r = await fetch("/api/voice", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: item.text, ref: S.pack && S.pack.ref, whole: !!(item.turn && item.turn.whole) }) });
+      body: JSON.stringify({ text: item.text, ref: S.pack && S.pack.ref, whole: !!(item.turn && item.turn.whole),
+        voice_name: S.settings.voice_name }) });
     if (!r.ok) throw new Error("voice_" + r.status);
     const { id } = await r.json();
     const audio = new Audio("/api/voice/" + id);
@@ -1076,11 +1134,31 @@ async function startListening() {
     }
     ears = next;
     S.listening = true;
-    setMode("listening", "מקשיב… קרא מהדף, או תגיד מה אתה חושב שכתוב.");
+    syncMic();
+    // Opened while it talks: it listens, and goes on talking.
+    if (speakingDone) $("state").textContent = "מקשיב · אפשר לדבר מעליי";
+    else setMode("listening", "מקשיב… קרא מהדף, או תגיד מה אתה חושב שכתוב.");
   } finally { S.starting = false; }
 }
 
-// Mic off is a clean stop: nothing half-heard, nothing waiting, nothing talking.
+// The mic closed, and only the mic: the answer being said goes on.
+function muteMic() {
+  S.listening = false;
+  if (ears) ears.stop();
+  ears = null;
+  syncMic();
+  if (speakingDone) $("state").textContent = "המיקרופון סגור · ממשיך לדבר";
+  else setMode("idle", "המיקרופון סגור — לחיצה פותחת.");
+}
+function syncMic() {
+  const m = $("mic");
+  m.classList.toggle("muted", !S.listening);
+  m.setAttribute("aria-pressed", String(!!S.listening));
+  const use = m.querySelector("use");
+  if (use) use.setAttribute("href", S.listening ? "#i-mic" : "#i-mic-off");
+}
+
+// A long press: a clean stop -- nothing half-heard, nothing waiting, nothing talking.
 function stopListening() {
   S.gen++;
   S.listening = false;
@@ -1096,11 +1174,13 @@ function stopListening() {
   renderBar();
   hearChain = Promise.resolve();
   showMine("");
+  syncMic();
   setMode("idle", "המיקרופון כבוי. לחץ כדי להמשיך.");
 }
 
 function micDenied() {
   S.listening = false;
+  syncMic();
   setMode("idle", "צריך אישור למיקרופון — לחץ על סמל המנעול בשורת הכתובת ואפשר מיקרופון.", true);
 }
 
@@ -1379,11 +1459,11 @@ function goOnFrom(t) { if (t && t.held) resumeTurn(t, true); }
 
 function answered(asked, text, trace) {
   const t = newTurn(asked, "answering");
-  t.text = text; t.complete = true;
+  t.text = text; t.complete = true; t.parts = [text];
   if (trace && trace.kind === "nudge") t.nudge = true;
   logPush({ me: false, text, trace: Object.assign({ quick: true }, trace), ms_answer: 0 });
   S.lastSaid = text;
-  say(text, t);
+  say(text, t, 0);
   renderBar();
 }
 
@@ -1403,6 +1483,7 @@ function renderBar() {
     else if (t.interim) showReply(t.interim, { hint: true });
     else if (open(t)) showReply(S.settings.language === "he" ? "חושב…" : "Thinking…", { hint: true });
   }
+  follow();
   const waiting = S.turns.filter((x) => open(x) && x !== t && !x.held);
   const held = S.turns.filter((x) => open(x) && x !== t && x.held);
   const q = $("queue");
@@ -1660,7 +1741,8 @@ async function respond(batch, g) {
           first = first || performance.now();
           turn.text += (turn.text ? (msg.text.startsWith("|") ? "\n" : " ") : "") + msg.text;
           if (turn.status !== "skipped") turn.status = "answering";
-          say(lead + msg.text, turn);
+          (turn.parts = turn.parts || []).push(msg.text);
+          say(lead + msg.text, turn, turn.parts.length - 1);
           markDesk(msg.text);
           lead = "";
         }
@@ -1730,7 +1812,8 @@ async function respond(batch, g) {
   // Already said sentence by sentence -- except what was held back, or the
   // whole thing if the answer had to be written again.
   const rest = said_ ? tr.unsaid : lead + answer.text;
-  const spoken = rest ? say(rest, turn) : Promise.resolve();
+  if (!said_) turn.parts = [answer.text];
+  const spoken = rest ? say(rest, turn, said_ ? undefined : 0) : Promise.resolve();
   spoken.then(() => {
     entry.ms_spoken = Math.round(performance.now() - t2);
     if (g !== S.gen || !into || !into.held) return;
@@ -1745,9 +1828,9 @@ async function respond(batch, g) {
 // Queue something to be said. It waits for the learner to finish their
 // sentence (never talks into the middle of it), then speaks; talking over it
 // stops it, ⏸ pauses it, ⏭ skips the rest of the answer, and 🔊 says it again.
-function say(text, turn) {
+function say(text, turn, idx) {
   if (!text || (turn && turn.status === "skipped")) return Promise.resolve();
-  const item = { text, turn, g: S.gen };
+  const item = { text, turn, g: S.gen, idx };
   item.done = new Promise((r) => { item.resolve = r; });
   if (turn && turn.held) { turn.parked.push(item); return item.done; }   // written while it waits
   speechQ.push(item);
@@ -1771,7 +1854,11 @@ async function pump() {
     if (ears) ears.guard = true;
     // The next sentence's voice is made while this one plays.
     if (naturalVoice() && speechQ[0] && S.settings.speak) prepare(speechQ[0]);
+    S.now = { item, turn: item.turn, idx: item.idx, frac: naturalVoice() ? 0 : null };
+    follow();
     await speak(item.text, item);
+    S.now = null;
+    follow();
     if (ears) ears.guard = false;
   }
   saying = null;
@@ -1791,7 +1878,20 @@ async function pump() {
   pump();
 }
 
-$("mic").onclick = () => (S.listening ? stopListening() : startListening());
+// The mic button is the mic, as in any voice assistant: a tap closes it or
+// opens it, and nothing else -- what is being said goes on (⏸, Esc, or just
+// talking over it stop that). Held down, it stops everything. In use a tap
+// meant to mute, so as to talk to someone in the room, cut the answer off.
+let micHeld = null, micLong = false;
+$("mic").addEventListener("pointerdown", () => {
+  micLong = false;
+  micHeld = setTimeout(() => { micLong = true; stopListening(); if (navigator.vibrate) navigator.vibrate(12); }, 650);
+});
+for (const ev of ["pointerup", "pointerleave", "pointercancel"]) $("mic").addEventListener(ev, () => clearTimeout(micHeld));
+$("mic").onclick = () => {
+  if (micLong) { micLong = false; return; }
+  if (S.listening) muteMic(); else startListening();
+};
 $("hold").onclick = pauseSpeaking;
 
 /* ------------------------------------------------------------- panels */
@@ -2475,6 +2575,8 @@ function openLog() {
 
 function renderTurns() {
   const box = $("turns"); if (!box) return;
+  const p = $("panel"), atEnd = p.scrollHeight - p.scrollTop - p.clientHeight < 160;
+  requestAnimationFrame(() => { if (atEnd) p.scrollTo({ top: p.scrollHeight, behavior: "smooth" }); });
   box.replaceChildren();
   if (!S.log.length) box.append(el("div", "sub", "עוד לא דיברתם."));
   for (const t of S.log) {
@@ -2705,8 +2807,9 @@ function openSettings() {
         if (key === "view") render(), selectLine(S.line);
         if (["translate", "stops"].includes(key)) applyToggles();
         if (key === "script") applyScript();
-        if (key === "hearing" && S.listening) { stopListening(); startListening(); }
+        if (key === "hearing" && S.listening) { muteMic(); startListening(); }
         if (key === "rate") pace(player);
+        if (key === "voice_name") { stopSpeaking(); say(S.settings.language === "he" ? "שלום, בוא נלמד יחד." : "Hello — let's learn together."); }
       };
       row.append(b);
     }
@@ -2745,6 +2848,11 @@ function openSettings() {
       choice("rate", "מהירות הדיבור", [[0.85, "לאט"], [1, "רגיל"], [1.15, "קצת מהר"], [1.3, "מהר"], [1.5, "מהר מאוד"]],
         "אפשר גם להגיד לו: ״תדבר יותר מהר״ / ״a bit slower״."),
       choice("voice", "קול", [["natural", "טבעי (OpenAI) — תמיד אותו קול"], ["browser", "הדפדפן (חינם, רובוטי)"]]),
+      choice("voice_name", "איזה קול", [["cedar", "Cedar · גבר, חם"], ["marin", "Marin · אישה, חמה"],
+        ["ash", "Ash · גבר, צלול"], ["ballad", "Ballad · גבר, רך"], ["verse", "Verse · גבר, חי"],
+        ["onyx", "Onyx · גבר, עמוק"], ["sage", "Sage · אישה, רגועה"], ["coral", "Coral · אישה, ערה"],
+        ["shimmer", "Shimmer · אישה, בהירה"]],
+        "Cedar ו-Marin הם החדשים והטבעיים ביותר. לחיצה משמיעה דוגמה."),
       choice("speakers", "שמע", [[false, "אוזניות"], [true, "רמקול"]],
         "ברמקול, בזמן שאני מדבר אני לא מקשיב (אחרת אני שומע את עצמי). לעצור: כפתור העצירה או רווח."),
       choice("hearing", "זיהוי דיבור", [["api", "מדויק, עברית ואנגלית יחד"], ["browser", "הדפדפן (חינם, שפה אחת)"]]),
@@ -2790,6 +2898,7 @@ document.addEventListener("touchend", (e) => {
 
 (async function start() {
   applyScript();
+  syncMic();
   checkHealth();          // not awaited: a slow Sefaria must not hold up a cached page
   await buildPickers();
   setInterval(checkHealth, 60000);

@@ -19,6 +19,7 @@
 <!-- One set of line icons, drawn like the type around them. -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11.5" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3"/></symbol>
+  <symbol id="i-mic-off" viewBox="0 0 24 24"><path d="M15 9.5V6a3 3 0 0 0-5.6-1.5M9 9v2.5a3 3 0 0 0 4.6 2.5M5.5 11.5a6.5 6.5 0 0 0 10.4 5.2M18.4 13.2a6.5 6.5 0 0 0 .1-1.7M12 18v3M4 4l16 16"/></symbol>
   <symbol id="i-pause" viewBox="0 0 24 24"><path d="M9 6v12M15 6v12"/></symbol>
   <symbol id="i-play" viewBox="0 0 24 24"><path d="M8.5 6.2v11.6L18 12z"/></symbol>
   <symbol id="i-skip" viewBox="0 0 24 24"><path d="M6.5 6.5v11L14.5 12zM17.5 6.5v11"/></symbol>
@@ -104,7 +105,7 @@
     <div class="micwrap">
       <span class="level" id="level"></span>
       <span class="ring" aria-hidden="true"></span>
-      <button id="mic" data-state="idle" title="מיקרופון: לפתוח / לסגור (רווח)" aria-label="מיקרופון"><svg class="ic"><use href="#i-mic"/></svg></button>
+      <button id="mic" data-state="idle" title="מיקרופון: לחיצה פותחת וסוגרת · לחיצה ארוכה עוצרת הכול" aria-label="מיקרופון" aria-pressed="false"><svg class="ic"><use href="#i-mic"/></svg></button>
       <button id="hold" class="hold" hidden title="לעצור (רווח)" aria-label="לעצור את הדיבור"><svg class="ic"><use href="#i-pause"/></svg></button>
     </div>
     <div class="talkcol">

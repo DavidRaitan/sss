@@ -634,3 +634,18 @@ to the mishna the gemara is on, brings its text, and recaps the pages since.
 - The outer column was titled "תוספות · רבינו חננאל", as if one work. The
   column carries its own name; Rabbeinu Chananel's comments in the same
   margin are each named and set off.
+
+**61. The mic is the mic; the words follow the voice; a choice of voice.**
+- A tap on the mic closes it or opens it, and nothing else -- as in any voice
+  assistant. What is being said goes on (to stop it: ⏸, Esc, or just talk
+  over it). Held down, the mic stops everything. Closed, it is drawn crossed
+  out. In use a tap meant to mute (to talk to someone in the room) cut the
+  answer off and dropped everything waiting.
+- While it speaks, the sentence being said is in full ink, the rest softer,
+  and a soft mark moves word by word with the voice (timed from the audio,
+  or from the usual pace while it streams); the conversation area scrolls
+  itself to keep that word in view, unless you have just scrolled it. The
+  transcript stays at its end while you are at its end.
+- Settings → איזה קול: the OpenAI voices (Cedar, the default, and Marin are
+  the newest and most natural; also Ash, Ballad, Verse, Onyx, Sage, Coral,
+  Shimmer). A tap plays a sample. The kept audio is keyed by voice.

@@ -51,6 +51,12 @@ SPOKEN = []   # the words of what it said last, to know its own voice when it he
 ECHO = 0.6    # this much of what was "heard" being its own last words means it heard itself
 
 
+# The OpenAI voices the speech model offers; marin and cedar are the newest
+# and most natural. Chosen in settings, sent with each sentence.
+VOICE_NAMES = ("cedar", "marin", "ash", "ballad", "coral", "echo", "fable", "nova", "onyx", "sage",
+               "shimmer", "verse", "alloy")
+
+
 def voice_key(llm, text):
     """Kept audio is keyed by everything that shapes the voice, so a change of
     voice or direction never mixes old clips with new ones."""
@@ -785,12 +791,15 @@ class Handler(BaseHTTPRequestHandler):
         return text
 
     def prepare_voice(self):
-        text = self.spoken_text(self.body_json())
+        body = self.body_json()
+        text = self.spoken_text(body)
         if not text.strip(" …"):
             return self.fail(400, "nothing_to_say")
         llm = LLM()
+        if body.get("voice_name") in VOICE_NAMES:
+            llm.voice = body["voice_name"]
         key = voice_key(llm, text)
-        VOICES[key] = text
+        VOICES[key] = (text, llm.voice)
         while len(VOICES) > 64:            # kept for a retry, but not forever
             VOICES.pop(next(iter(VOICES)))
         # What it says, so that hearing it back through the speakers is
@@ -806,10 +815,12 @@ class Handler(BaseHTTPRequestHandler):
         if os.path.exists(path):
             with open(path, "rb") as handle:
                 return self.send_bytes(handle.read(), "audio/mpeg")
-        text = VOICES.get(key)
-        if not text:
+        if key not in VOICES:
             return self.fail(404, "no_such_voice")
-        stream = LLM().speak_stream(text)
+        text, name = VOICES[key]
+        llm = LLM()
+        llm.voice = name
+        stream = llm.speak_stream(text)
         try:
             first = next(stream)
         except StopIteration:

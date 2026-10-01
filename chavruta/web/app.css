@@ -563,3 +563,15 @@ body.rashi-all { --cfont: var(--rashi); --pfont: var(--rashi); }
 .c .who { font-family: var(--ui); font-size: 10.5px; color: var(--mark); letter-spacing: .02em;
   display: block; margin-bottom: 1px; }
 .linear .line { scroll-margin-top: 64px; scroll-margin-bottom: 16px; }
+
+/* Following the voice: the sentence being said in full ink, the rest softer,
+   and a soft mark on the word -- it moves with the voice. */
+#reply.speaking .sw { color: var(--dim); transition: color 180ms ease, background-color 120ms ease; }
+#reply.speaking .sw.in { color: var(--ink); }
+#reply.speaking .sw.cur { background: color-mix(in srgb, var(--quote) 70%, transparent); border-radius: 3px;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--quote) 70%, transparent); }
+.talk { scroll-behavior: smooth; }
+/* The mic closed: drawn crossed out, quieter -- whatever it is doing goes on. */
+#mic.muted { color: var(--faint); border-style: dashed; }
+#mic.muted[data-state="speaking"], #mic.muted[data-state="paused"] { color: var(--dim); }
+@media (prefers-reduced-motion: reduce) { #reply.speaking .sw { transition: none; } .talk { scroll-behavior: auto; } }
