@@ -16,7 +16,7 @@ or because the learner has asked to learn deeper.
 import re
 
 from . import commentators as who
-from . import library, web
+from . import library, review, web
 
 # Beyond the question kinds: the small exchanges of sitting together, which
 # want a few words back and not a lecture.
@@ -491,17 +491,23 @@ def plan(pack, n, route):
     if kind == "people":
         return people_plan(pack, route)
     if kind in ("review", "recall"):
-        jobs = [(("recap", ref), "Recap") for ref in route.get("pages") or []] + \
+        # "The last nine pages": the D.A.F. outline of every daf in the stretch
+        # (one quick page each, side by side), and a recap made from the text
+        # only for the last amud or two -- the one they want in detail. In use
+        # twelve recaps, each building its page first, ran past the deadline
+        # and the answer came back with almost nothing.
+        pages = route.get("pages") or []
+        outlines = web.DAF_SITE in (route.get("sites") or [])
+        dafim = []
+        for ref in pages:
+            m = re.match(r"^(.+) (\d+)[ab]$", ref)
+            if m and (m.group(1), int(m.group(2))) not in dafim:
+                dafim.append((m.group(1), int(m.group(2))))
+        recaps = [ref for ref in pages if review.has_recap(ref)] + pages[-(2 if outlines else 6):]
+        jobs = [(("recap", ref), "Recap") for ref in dict.fromkeys(r for r in pages if r in recaps)] + \
             [(("text", ref), "Parallels") for ref in route.get("parallels") or []]
-        # The D.A.F. outline of those dafim, when that site is trusted: a second,
-        # fuller summary, and one written for pages learned before this app.
-        if web.DAF_SITE in (route.get("sites") or []):
-            dafim = []
-            for ref in route.get("pages") or []:
-                m = re.match(r"^(.+) (\d+)[ab]$", ref)
-                if m and (m.group(1), int(m.group(2))) not in dafim:
-                    dafim.append((m.group(1), int(m.group(2))))
-            jobs += [(("outline", m, d), "D.A.F. outline") for m, d in dafim[-3:]]
+        if outlines:
+            jobs += [(("outline", m, d), "D.A.F. outline") for m, d in dafim[-10:]]
         return jobs
     if kind in QUIET or kind == "check_reading":
         return []
@@ -692,7 +698,7 @@ def people_plan(pack, route):
 
 
 CLOCK = re.compile(r"\b(what time|clock|o'?clock|numbers?|real[- ]world time|tonight|today|p\.?m\.?|a\.?m\.?|"
-                   r"summer|winter|latest|last time|sunset|sundown|sunrise|dawn|nightfall|dark|stars come out|"
+                   r"summer|winter|latest|last time (to|for|you can|one can|we can|i can)|sunset|sundown|sunrise|dawn|nightfall|dark|stars come out|"
                    r"how long (till|until|to|before))\b|מה השעה|באיזו שעה|עד איזו שעה|הלילה|היום|קיץ|חורף|"
                    r"שקיעה|השקיעה|זריחה|הזריחה|צאת הכוכבים|עלות השחר|מתי מחשיך|כמה זמן עד", re.I)
 SEASONS = re.compile(r"\b(summer|winter|seasons?)\b|קיץ|חורף", re.I)

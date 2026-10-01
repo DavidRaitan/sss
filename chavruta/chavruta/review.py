@@ -21,7 +21,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SESSIONS_DIR = os.environ.get("CHAVRUTA_SESSIONS") or os.path.join(ROOT, "sessions")
 PACKS = os.environ.get("CHAVRUTA_PACKS") or os.path.join(ROOT, "packs")
 LOAD = None          # set by the server: ref -> Pack (built from Sefaria if need be)
-MOST = 12            # amudim in one review: six dapim
+MOST = 20            # amudim in one review: ten dapim
 _LOCK = threading.Lock()
 
 
@@ -103,20 +103,36 @@ def _path(ref):
     return os.path.join(PACKS, "_recap", ref.lower().replace(" ", "_") + ".json")
 
 
+def has_recap(ref):
+    return os.path.exists(_path(ref))
+
+
+def _body(ref):
+    """The amud's words for its recap: from its page if built, else the text
+    alone -- one quick call, not the whole page with every commentary."""
+    pack = ON_DISK(ref) if ON_DISK else None
+    if pack:
+        return "\n".join(" ".join(s["text"] for s in seg.get("en", []) if s.get("text")) or seg["he"]
+                         for seg in pack.segments)
+    data = sefaria.get("v3/texts/%s" % ref, soft=True, version="source")
+    for version in (data or {}).get("versions", []):
+        he = sefaria.plain(version.get("text"))
+        if he:
+            return he
+    if LOAD is None:
+        return ""
+    return "\n".join(seg["he"] for seg in LOAD(ref).segments)
+
+
 def recap(ref):
     """A short recap of one amud, as a citable entry under the amud's own ref."""
     path = _path(ref)
     if os.path.exists(path):
         with open(path, encoding="utf-8") as handle:
             return json.load(handle)
-    if LOAD is None:
+    if LOAD is None and ON_DISK is None:
         return None
-    pack = LOAD(ref)
-    lines = []
-    for seg in pack.segments:
-        english = " ".join(s["text"] for s in seg.get("en", []) if s.get("text"))
-        lines.append(english or seg["he"])
-    body = "\n".join(lines)[:9000]
+    body = _body(ref)[:9000]
     if not body.strip():
         return None
     from .llm import LLM

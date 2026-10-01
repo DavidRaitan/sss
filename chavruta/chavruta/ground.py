@@ -65,6 +65,10 @@ def _pattern(english, hebrew):
 
 
 PATTERNS = {name: _pattern(en, he) for name, (en, he, _) in NAMES.items()}
+# Names that only look like a commentator's: in use "Rosh Hashanah 9a" was
+# taken for the Rosh, and a right answer about the page was sent back.
+NOT_NAMES = re.compile(r"\bRosh[ -](Ha-?)?Shanah\b|\bRosh[ -]Chodesh\b|\bRosh[ -]Hodesh\b|"
+                       r"ראש[ -]ה?שנה|ראש[ -]חודש", re.I)
 
 
 def _loose(english, hebrew, extra=()):
@@ -133,7 +137,7 @@ def check(text, known_refs, texts=None):
     """`texts` maps refs to their text, for names reported through a source."""
     cited = [c.strip() for c in CITE.findall(text)]
     unknown = {c for c in cited if c not in known_refs}
-    bare = CITE.sub(" ", text)
+    bare = NOT_NAMES.sub(" ", CITE.sub(" ", text))
     uncited = set()
     paragraphs = [p for p in re.split(r"\n+", text) if p.strip()] or [text]
     for name, pattern in PATTERNS.items():

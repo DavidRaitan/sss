@@ -90,10 +90,13 @@ from the page which one is meant (whom he argues with, which layer of the text
 he is in), say so, and use his record only.
 
 Coming back to it. When they ask what they learned -- the last pages, last
-time, the mishna so far -- the turn brings a short recap of each amud they
-mean, made from its text. Tell it as the story of the sugya in order, the
-question and where it landed, citing each amud ("on 5a [[Berakhot 5a]] the
-gemara asks ..."), briefly, and offer to go back into one.
+time, the mishna so far -- the turn brings the D.A.F. outline of each daf in
+the stretch and a recap of the last amud or two, made from the text. Tell it
+as the story of the sugya in order -- a line or two a daf, the question and
+where it landed, citing each ("on 5a [[Berakhot 5a]] the gemara asks ...") --
+then the last amud more fully, since that is where they pick up. Pages before
+the app count: never tell them a page is "not in our record"; if one could
+not be opened just now, say only that, and go on.
 
 Did we learn this? When they ask whether they learned something, or where
 they saw it, the turn says what they learned by day, the lines holding the
@@ -463,7 +466,7 @@ def fetching_line(labels, lang):
                 else "One second, let me open that up.")
     if lang == "he":
         return "רגע, אני פותח את %s — שנייה." % _join(names, lang)
-    return "Good question — let me pull up %s. One second." % _join(names, lang)
+    return "Let me pull up %s — one second." % _join(names, lang)
 
 
 class Partner:
@@ -547,7 +550,7 @@ class Partner:
         # "Did we learn this yesterday? I think I saw it somewhere" -- the pages
         # they learned, the lines holding the words, and where the page itself
         # points (Mesoret HaShas), nearest first.
-        local = []
+        local, review_size = [], None
         if kind in ("review", "recall"):
             import datetime
             learned = review.sittings()
@@ -566,6 +569,11 @@ class Partner:
                         if mishna["amud"] in pages and self.pack.ref in pages:
                             since = pages[pages.index(mishna["amud"]):pages.index(self.pack.ref)]
                             route["pages"] = since[-review.MOST:]
+                if len(route["pages"]) > 4:
+                    first, last = route["pages"][0], route["pages"][-1]
+                    note += " [the pages they mean: %s to %s, learned with you or not]" % (first, last)
+                    review_size = ("a line or two for each daf, in order, then the last amud more fully -- "
+                                   "up to about 250 words")
             else:
                 route["pages"] = [r for s in learned for r in s["refs"]][:8]
                 hits = review.find_words(review.terms(said), self.pack.ref, learned)
@@ -655,6 +663,7 @@ class Partner:
         texts = dict(self.texts, **{e["ref"]: e.get("he") or "" for _, e in chosen + fetched + carried})
         if cut and cut.get("kind") in CUT_SIZE:
             size_now = CUT_SIZE[cut["kind"]]
+        size_now = size_now or review_size
         size = size_now or ("whatever that earlier question needs, up to about 100 words" if pending
                             else SIZE.get(kind, SIZE["other"]))
         note += " [%s Depth: %s. Length: %s.]" % (LANGUAGE[self.language], retrieve.DEPTHS[self.depth], size)

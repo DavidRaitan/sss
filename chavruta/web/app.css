@@ -524,3 +524,11 @@ button.qitem { cursor: pointer; font: inherit; background: var(--paper); }
 .qitem.held { border-color: var(--edge); }
 .qitem.held .ic { color: var(--mark); }
 .qitem.later { border-style: dashed; }
+
+/* Steinsaltz woven: the daf's words bold and dark, his explanation lighter,
+   his glosses in brackets lighter still -- one glance tells them apart. */
+.line.stz { font-size: 21px; line-height: 2.05; padding-block: 8px; }
+.line.stz .w { font-weight: 700; color: var(--ink); }
+.line.stz .ex { font-weight: 400; color: var(--dim); }
+.line.stz .gl { font-weight: 400; color: var(--faint); font-size: .9em; }
+.line.stz + .line.stz { border-top: 1px solid color-mix(in srgb, var(--rule) 60%, transparent); }

@@ -591,3 +591,32 @@ to the mishna the gemara is on, brings its text, and recaps the pages since.
   mic check over it: that sentence again, and on. Reading on over it: it waits.
 - The plain cases ("no, I mean", "later") are decided by pattern, not the
   model; the export records each cut-in's verdict.
+
+**59. From the first session on Rosh Hashanah 9a, and the Steinsaltz view.**
+- "Rosh Hashanah 9a" was taken for the Rosh: a right answer about the page
+  was sent back for "naming the Rosh without a citation" and shipped marked
+  unsourced. The gate now skips Rosh Hashanah / Rosh Chodesh / ראש השנה /
+  ראש חודש.
+- "The last time I studied this" fetched tonight's zmanim ("last time" was a
+  clock word, for "the last time to say Shema"). Now only "last time to /
+  for ..." is.
+- "Good question --" was said before fetching even when nothing was asked.
+  Now: "Let me pull up the pages -- one second."
+- "A refresher of the last nine pages" asked for twelve recaps, each first
+  building its whole page with every commentary, six at a time: most ran past
+  the 14-second deadline and the answer said the pages were "not in our
+  learned record". Now: the D.A.F. outline of every daf in the stretch (up to
+  ten, side by side, one light page each), and a recap made from the text
+  alone for the last amud or two -- the one they pick up from. Pages learned
+  before the app count; a page that could not be opened is said to be so.
+- "I'm still waiting" while it gathers gets "Still on it" at once, and the
+  work goes on (it had been taken as a new question).
+- The Steinsaltz view showed only the pointed text; Steinsaltz himself was
+  nowhere. Now it is woven as he is printed: the daf's words bold and dark,
+  his explanation lighter, his bracketed glosses lighter still -- the daf's
+  words are the same word-spans as everywhere, so reading along still works,
+  and none is ever dropped.
+- The edges you drag (the panel, the desk, the conversation area) kept
+  following the mouse after the button was let go when the release landed
+  elsewhere. They now let go on release wherever it happens -- and on a
+  button that is no longer down, a lost capture, or the window losing focus.

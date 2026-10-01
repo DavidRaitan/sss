@@ -833,7 +833,7 @@ class Review(unittest.TestCase):
                          ["Berakhot 4b", "Berakhot 5a", "Berakhot 5b"])
         self.assertEqual(pages("Berakhot 30a", "תזכיר לי את שלושת הדפים האחרונים", [], "2026-09-28")[0],
                          "Berakhot 27a")
-        self.assertEqual(len(pages("Berakhot 40a", "the last twenty pages", [], "2026-09-28")), 12)   # capped
+        self.assertEqual(len(pages("Berakhot 40a", "the last twenty pages", [], "2026-09-28")), 20)   # ten dapim
 
     def test_last_time_comes_from_the_sittings(self):
         self.write("2026-09-27", [{"kind": "heard", "ref": "Berakhot 4b"}, {"kind": "answer", "ref": "Berakhot 5a"},
@@ -1061,6 +1061,38 @@ class TrustedSites(unittest.TestCase):
         self.assertTrue(verdict.ok, text)
         self.assertIn("Halacha Yomit", text)
         self.assertIn("Halacha Yomit: זמן קריאת שמע של ערבית", trace["fetched"])
+
+
+class FirstRealSession(unittest.TestCase):
+    """From the first session on Rosh Hashanah 9a."""
+
+    def test_rosh_hashanah_is_not_the_rosh(self):
+        known = {"Rosh Hashanah 9a:1"}
+        self.assertTrue(ground.check("I see it -- Rosh Hashanah 9a, right at the start of this unit.", known).ok)
+        self.assertTrue(ground.check("אנחנו בראש השנה ט ע״א.", known).ok)
+        self.assertTrue(ground.check("Rosh Chodesh is not counted.", known).ok)
+        self.assertFalse(ground.check("The Rosh says it is the synagogue Shema.", known).ok)
+
+    def test_the_last_time_i_studied_is_not_a_clock_question(self):
+        self.assertFalse(retrieve.CLOCK.search("the last time I studied Rosh Hashanah was long ago"))
+        self.assertTrue(retrieve.CLOCK.search("what's the last time to say shema tonight?"))
+
+    def test_nine_pages_back_is_outlines_and_the_last_amud_in_full(self):
+        pages = retrieve.review.which_pages("Rosh Hashanah 9a", "a refresher of the last nine pages", [], "2026-10-01")
+        self.assertEqual((pages[0], pages[-1]), ("Rosh Hashanah 2a", "Rosh Hashanah 8b"))
+        jobs = [job for job, _ in retrieve.plan(Pack(PACK), 1, {"kind": "review", "pages": pages,
+                                                               "sites": ["dafyomi.co.il"]})]
+        recaps = [j[1] for j in jobs if j[0] == "recap"]
+        outlines = [j[2] for j in jobs if j[0] == "outline"]
+        self.assertEqual(outlines, list(range(2, 9)))                  # every daf, quickly
+        self.assertEqual(recaps[-2:], ["Rosh Hashanah 8a", "Rosh Hashanah 8b"])
+        self.assertLessEqual(len(recaps), 2 + sum(retrieve.review.has_recap(p) for p in pages))
+        # Without the outline site, recaps carry it: the last six amudim.
+        jobs = [job for job, _ in retrieve.plan(Pack(PACK), 1, {"kind": "review", "pages": pages, "sites": []})]
+        self.assertEqual(len([j for j in jobs if j[0] == "recap"]), 6)
+
+    def test_no_good_question_for_a_statement(self):
+        self.assertNotIn("Good question", partner.fetching_line(["Recap"], "en"))
 
 
 class CuttingIn(unittest.TestCase):

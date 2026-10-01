@@ -420,12 +420,50 @@ function fillColumn(col, names) {
   if (!any) col.append(el("div", "empty", "אין כאן"));
 }
 
+// Steinsaltz as he is printed: the words of the daf, bold and pointed, woven
+// into his explanation, which reads lighter -- and his short glosses in
+// brackets lighter still. The daf's own words are the same word-spans as
+// everywhere else, so reading along, quotes and lines still find them.
+// In use the view showed only the pointed text, and Steinsaltz was nowhere.
+function steinsaltz(seg) {
+  const text = (seg.commentaries.Steinsaltz || []).map((e) => e.he).join(" ")
+    .replace(/^\s*[א-ת]{1,2}\s+(?=[א-ת]{3})/, "");              // his paragraph letter
+  const daf = words(seg.he, seg.n, true);
+  const spans = [...daf.childNodes].filter((n) => n.classList && n.classList.contains("w"));
+  if (!text.trim() || !spans.length) return null;
+  const out = document.createDocumentFragment();
+  const toks = text.split(/\s+/).filter(Boolean);
+  let gi = 0, depth = 0;
+  const put = (node) => out.append(node, document.createTextNode(" "));
+  toks.forEach((tok, ti) => {
+    const k = norm(tok);
+    if (!depth && k && gi < spans.length) {
+      for (let d = 0; d < 3 && gi + d < spans.length; d++) {
+        if (spans[gi + d].dataset.k !== k) continue;
+        // A two-letter word ("את", "עד") counts only when the next one follows too.
+        const next = toks[ti + 1] && norm(toks[ti + 1]);
+        if (k.length <= 2 && spans[gi + d + 1] && next !== spans[gi + d + 1].dataset.k) continue;
+        const j = gi + d;                // a daf word he skipped is kept, in its place
+        while (gi <= j) put(spans[gi++]);
+        return;
+      }
+    }
+    const opens = (tok.match(/\(/g) || []).length, closes = (tok.match(/\)/g) || []).length;
+    put(el("span", depth || opens ? "gl" : "ex", tok));
+    depth = Math.max(0, depth + opens - closes);
+  });
+  while (gi < spans.length) put(spans[gi++]);                  // never lose a word of the daf
+  return out;
+}
+
 function renderLinear() {
   const box = $("linear");
   box.hidden = false; box.replaceChildren();
   for (const seg of S.pack.segments) {
     const line = el("div", "line"); line.dataset.n = seg.n;
-    const he = el("div", "he"); he.append(words(seg.he, seg.n, true));
+    const he = el("div", "he");
+    const woven = steinsaltz(seg);
+    if (woven) { line.classList.add("stz"); he.append(woven); } else he.append(words(seg.he, seg.n, true));
     const en = el("div", "en");
     for (const s of seg.en || []) en.append(el("span", s.kind === "daf" ? "" : "add", s.text + " "));
     line.append(he, en);
@@ -1153,6 +1191,14 @@ async function hearOne(u, g, t0) {
     const t = (offered && offered.held) ? offered : S.turns.filter((x) => x.held && open(x)).pop();
     if (t) { resumeTurn(t, true); return; }
   }
+  // "I'm still waiting" while it gathers: a word back at once, and it keeps
+  // working. In use it was taken as a new question and the work was lost.
+  const busy = S.turns.find((t) => open(t) && !t.text && ["thinking", "answering"].includes(t.status));
+  if (heard.mode === "talking" && busy && STILL.test(heard.said)) {
+    const he = S.settings.language === "he" || (S.settings.language === "auto" && /[א-ת]/.test(heard.said));
+    answered(heard.said, he ? "עוד רגע — אני עדיין אוסף את זה." : "Still on it — almost there.", { kind: "still working" });
+    return;
+  }
   if (S.pendingSettings && heard.mode === "talking") {
     // The answer to "turn my voice off?"
     const changes = S.pendingSettings; S.pendingSettings = null;
@@ -1227,6 +1273,7 @@ async function hearOne(u, g, t0) {
 //   later  -- "let's come back to that": kept in the queue, and on it goes.
 // In use a clarifying question waited behind the whole of a long answer.
 const RESUME = /\b(go back|where were we|back to (it|that|what you were saying)|(continue|finish) (what you were saying|your answer|that)|as you were saying)\b|תמשיך (במה|את מה|מאיפה) ש|תחזור ל(מה ש|זה)|איפה היינו|נחזור למה ש|תסיים את מה ש/i;
+const STILL = /^\W*((i'?m |i am )?still waiting|(hello|hey)\W*$|are you (still )?(there|with me)|what'?s taking (so long|you)|is it (coming|working)|anything yet|any news|נו|אני (עדיין )?מחכה|עדיין מחכה|אתה (עדיין )?(שם|איתי)|הלו|מה קורה עם זה)\b/i;
 const YES = /^\W*(yes|yeah|yep|sure|ok(ay)?|please|go ahead|go on|continue|כן|בטח|יאללה|סבבה|תמשיך|קדימה)\b/i;
 S.later = [];
 
@@ -1720,6 +1767,41 @@ $("hold").onclick = pauseSpeaking;
 
 // Panels sit beside the page, not over it: the gemara stays in view while
 // you read Rashi, ask, or look at the transcript.
+// Dragging an edge: it follows the pointer only while the button is down, and
+// lets go the moment it is released -- wherever that happens. In use the
+// panel's edge kept following the mouse after the button was let go, because
+// the release landed somewhere the edge never heard it.
+function onDrag(grip, cls, move, end) {
+  grip.addEventListener("pointerdown", (e) => {
+    if (e.button > 0) return;
+    e.preventDefault();
+    try { grip.setPointerCapture(e.pointerId); } catch (x) {}
+    document.body.classList.add(cls);
+    let done = false;
+    const mv = (ev) => {
+      if (ev.pointerId !== e.pointerId) return;
+      if (ev.pointerType === "mouse" && ev.buttons === 0) return up();    // let go where we did not hear it
+      move(ev);
+    };
+    const up = () => {
+      if (done) return;
+      done = true;
+      window.removeEventListener("pointermove", mv);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+      window.removeEventListener("blur", up);
+      grip.removeEventListener("lostpointercapture", up);
+      document.body.classList.remove(cls);
+      if (end) end();
+    };
+    window.addEventListener("pointermove", mv);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+    window.addEventListener("blur", up);
+    grip.addEventListener("lostpointercapture", up);
+  });
+}
+
 function openPanel(build, kind) {
   const panel = $("panel"); panel.replaceChildren();
   build(panel);
@@ -1747,21 +1829,10 @@ function syncTabs() {
   const apply = (px) => root.setProperty("--talk-h", Math.round(Math.min(Math.max(px, 70), innerHeight * 0.7)) + "px");
   const saved = +(recall("talk") || 0);
   if (saved) apply(saved);
-  grip.addEventListener("pointerdown", (e) => {
-    e.preventDefault();
-    grip.setPointerCapture(e.pointerId);
-    document.body.classList.add("resizing-v");
-    const talk = $("talk"), startY = e.clientY, startH = talk.getBoundingClientRect().height;
-    const move = (ev) => apply(startH + (startY - ev.clientY));
-    const up = () => {
-      grip.removeEventListener("pointermove", move);
-      document.body.classList.remove("resizing-v");
-      remember("talk", parseInt(getComputedStyle(document.documentElement).getPropertyValue("--talk-h"), 10) || "");
-    };
-    grip.addEventListener("pointermove", move);
-    grip.addEventListener("pointerup", up, { once: true });
-    grip.addEventListener("pointercancel", up, { once: true });
-  });
+  let startY = 0, startH = 0;
+  grip.addEventListener("pointerdown", (e) => { startY = e.clientY; startH = $("talk").getBoundingClientRect().height; });
+  onDrag(grip, "resizing-v", (ev) => apply(startH + (startY - ev.clientY)), () =>
+    remember("talk", parseInt(getComputedStyle(document.documentElement).getPropertyValue("--talk-h"), 10) || ""));
   grip.addEventListener("dblclick", () => { root.removeProperty("--talk-h"); remember("talk", ""); });
 })();
 // ✕ sits outside the scrolling panel, so it is always in reach.
@@ -1778,26 +1849,12 @@ $("close-panel").onclick = closePanel;
   };
   const saved = +(recall(narrow() ? "sheet" : "side") || 0);
   if (saved) apply(saved);
-  const grip = $("grip");
-  grip.addEventListener("pointerdown", (e) => {
-    e.preventDefault();
-    grip.setPointerCapture(e.pointerId);
-    document.body.classList.add("resizing");
+  onDrag($("grip"), "resizing", (ev) => {
     const rtl = getComputedStyle(document.body).direction === "rtl";
-    const move = (ev) => {
-      const px = narrow() ? innerHeight - ev.clientY : rtl ? innerWidth - ev.clientX : ev.clientX;
-      apply(px);
-    };
-    const up = () => {
-      grip.removeEventListener("pointermove", move);
-      document.body.classList.remove("resizing");
-      const v = getComputedStyle(document.documentElement).getPropertyValue(narrow() ? "--sheet" : "--side");
-      remember(narrow() ? "sheet" : "side", parseInt(v, 10) || "");
-    };
-    // On the window, not the grip: moving the card in the page drops the grip's capture.
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", up);
-    window.addEventListener("pointercancel", up);
+    apply(narrow() ? innerHeight - ev.clientY : rtl ? innerWidth - ev.clientX : ev.clientX);
+  }, () => {
+    const v = getComputedStyle(document.documentElement).getPropertyValue(narrow() ? "--sheet" : "--side");
+    remember(narrow() ? "sheet" : "side", parseInt(v, 10) || "");
   });
 })();
 
@@ -2340,27 +2397,16 @@ $("desk-bigger").onclick = () => { DESK.size = Math.min(26, DESK.size + 1); desk
 
 // The edge toward the page: drag it for more or less desk. Not remembered.
 (function sizeDesk() {
-  const grip = $("desk-grip");
-  grip.addEventListener("pointerdown", (e) => {
-    e.preventDefault();
-    grip.setPointerCapture(e.pointerId);
-    document.body.classList.add("resizing");
-    const move = (ev) => {
-      const d = $("desk").getBoundingClientRect(), p = document.querySelector(".sheet").getBoundingClientRect();
-      const main = document.querySelector("main");
-      if (getComputedStyle(main).flexDirection.startsWith("column")) {
-        const px = p.top < d.top ? d.bottom - ev.clientY : ev.clientY - d.top;
-        main.style.setProperty("--desk-h", Math.round(Math.min(Math.max(px, 140), innerHeight * 0.85)) + "px");
-      } else {
-        const px = p.left > d.left ? ev.clientX - d.left : d.right - ev.clientX;
-        main.style.setProperty("--desk-w", Math.round(Math.min(Math.max(px, 240), innerWidth * 0.8)) + "px");
-      }
-    };
-    const up = () => { grip.removeEventListener("pointermove", move); document.body.classList.remove("resizing"); };
-    // On the window, not the grip: moving the card in the page drops the grip's capture.
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", up);
-    window.addEventListener("pointercancel", up);
+  onDrag($("desk-grip"), "resizing", (ev) => {
+    const d = $("desk").getBoundingClientRect(), p = document.querySelector(".sheet").getBoundingClientRect();
+    const main = document.querySelector("main");
+    if (getComputedStyle(main).flexDirection.startsWith("column")) {
+      const px = p.top < d.top ? d.bottom - ev.clientY : ev.clientY - d.top;
+      main.style.setProperty("--desk-h", Math.round(Math.min(Math.max(px, 140), innerHeight * 0.85)) + "px");
+    } else {
+      const px = p.left > d.left ? ev.clientX - d.left : d.right - ev.clientX;
+      main.style.setProperty("--desk-w", Math.round(Math.min(Math.max(px, 240), innerWidth * 0.8)) + "px");
+    }
   });
 })();
 

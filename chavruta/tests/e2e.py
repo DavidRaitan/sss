@@ -162,6 +162,14 @@ def main():
         page.wait_for_selector(".line")
         check("Steinsaltz view: vocalized lines", page.locator(".line").count() == 14 and
               any(0x591 <= ord(c) <= 0x5c7 for c in page.inner_text("#linear")))
+        check("…with Steinsaltz woven in: the daf's words bold, his lighter",
+              page.locator(".line.stz").count() >= 10 and page.locator(".line.stz .ex").count() > 50 and
+              page.evaluate("getComputedStyle(document.querySelector('.line.stz .w')).fontWeight") == "700",
+              "%d woven lines" % page.locator(".line.stz").count())
+        check("…and every word of the daf is still there, once",
+              page.evaluate(r"""S.pack.segments.every(s => document.querySelectorAll('.line[data-n="' + s.n + '"] .w[data-k]').length ===
+                                s.he.split(/\s+/).filter(t => norm(t)).length)"""))
+        shot("12-steinsaltz")
         page.click("#v-daf")
         page.wait_for_selector(".seg")
 
@@ -449,6 +457,22 @@ def main():
             check("…and goes back when asked", True)
             page.evaluate("skipCurrent()")
             page.evaluate("S.later.length = 0; renderBar()")
+            page.wait_for_function("!saying && !speechQ.length", timeout=30000)
+            # "I'm still waiting" while it gathers: a word back at once, and the work goes on.
+            latency(2.5)
+            page.fill("#panel input", "why does the mishna mention the priests at all?")
+            page.press("#panel input", "Enter")
+            page.wait_for_function("S.turns.some(t => /mention the priests/.test(t.asked) && t.status === 'thinking')",
+                                   timeout=10000)
+            page.fill("#panel input", "I'm still waiting")
+            page.press("#panel input", "Enter")
+            page.wait_for_function("S.log.some(t => !t.me && /Still on it/.test(t.text))", timeout=10000)
+            check("'still waiting' gets a word back at once", True)
+            page.wait_for_function("(() => { const t = S.turns.filter(t => /mention the priests/.test(t.asked)).pop();"
+                                   " return t && t.text && t.status !== 'skipped'; })()", timeout=20000)
+            check("…and the answer it was working on still comes", True)
+            latency(0)
+            page.wait_for_function("!saying && !speechQ.length", timeout=30000)
             box = page.evaluate("(() => { const g = document.querySelector('#col-gemara').getBoundingClientRect();"
                                 " const p = document.querySelector('#panel').getBoundingClientRect();"
                                 " return [g.left, g.right, p.left, p.right]; })()")
@@ -468,6 +492,9 @@ def main():
             page.mouse.up()
             after = page.evaluate("document.querySelector('#over').getBoundingClientRect().width")
             check("dragging the edge resizes the panel", after > before + 100, "%d -> %d" % (before, after))
+            page.mouse.move(g["x"] - 350, g["y"] + g["height"] / 2, steps=4)
+            check("…and once let go, it stays where it was left",
+                  abs(page.evaluate("document.querySelector('#over').getBoundingClientRect().width") - after) < 2)
             page.click("#close-panel")
             check("✕ closes it", page.locator("#over.open").count() == 0)
 
