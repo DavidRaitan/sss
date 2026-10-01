@@ -525,33 +525,31 @@ button.qitem { cursor: pointer; font: inherit; background: var(--paper); }
 .qitem.held .ic { color: var(--mark); }
 .qitem.later { border-style: dashed; }
 
-/* The Steinsaltz view: read simply. The daf's line is the text; his plain
-   Hebrew opens under the line you are on (or every line, or none). */
+/* The Steinsaltz view, as Sefaria sets him: a paragraph a line, the daf's
+   words bold, his words plain in the same ink, his translations of the
+   Aramaic smaller and in another face (no brackets), references in small print. */
 .linear { padding: 0 26px 90px; }
-.linear .line { max-width: 760px; margin: 0 auto 2px; padding: 10px 20px; border-radius: 12px;
+.linear .line { max-width: 740px; margin: 0 auto 4px; padding: 12px 22px; border-radius: 12px;
   font-size: 26px; line-height: 1.95; transition: background-color 220ms ease; }
-.linear .line.on { background: color-mix(in srgb, var(--glow) 55%, transparent); box-shadow: none; }
-.ex-bar { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; justify-content: center;
-  gap: 10px; padding: 12px 0 14px; margin-bottom: 6px;
-  background: linear-gradient(var(--paper) 72%, color-mix(in srgb, var(--paper) 0%, transparent)); }
-.ex-name { font-size: 12px; color: var(--faint); letter-spacing: .02em; }
-/* Opens and closes smoothly: its height goes from nothing to its own. */
-.ex { display: grid; grid-template-rows: 0fr; opacity: 0;
-  transition: grid-template-rows 280ms var(--ease), opacity 220ms ease; }
-.ex-clip { overflow: hidden; min-height: 0; }
-.linear[data-explain="line"] .line.on .ex, .linear[data-explain="all"] .ex { grid-template-rows: 1fr; opacity: 1; }
-.linear[data-explain="off"] .ex { display: none; }
-.ex-in { margin: 4px 0 6px; padding-inline-start: 16px; border-inline-start: 2px solid var(--edge);
-  font-family: var(--square); font-size: 18px; line-height: 1.8; color: var(--dim); }
-.ex-in .g { color: var(--ink); }
-.ex-in .gl { color: var(--faint); }
-.linear[data-explain="all"] .line:not(.on) .ex-in { border-color: var(--rule); }
+.linear .line.on { background: color-mix(in srgb, var(--glow) 50%, transparent); box-shadow: none; }
+.ex-bar { position: sticky; top: 0; z-index: 2; display: flex; justify-content: center;
+  padding: 12px 0 14px; margin-bottom: 4px;
+  background: linear-gradient(var(--paper) 70%, color-mix(in srgb, var(--paper) 0%, transparent)); }
+.stz { font-family: var(--square); font-size: 21px; line-height: 1.9; color: var(--ink);
+  text-align: right; font-weight: 400; }
+.stz .d, .stz .w { font-weight: 700; color: var(--ink); }
+.stz .ghost { display: none; }
+.stz .tr { font-family: var(--ui); font-size: .8em; color: var(--dim); font-weight: 400; }
+.stz .cite { font-family: var(--ui); font-size: .68em; color: var(--faint); white-space: nowrap; }
+.stz-head { font-family: var(--ui); font-size: 11.5px; font-weight: 600; color: var(--mark);
+  border: 1px solid color-mix(in srgb, var(--mark) 45%, transparent); border-radius: 5px;
+  padding: 1px 7px; vertical-align: .3em; letter-spacing: .02em; }
+.linear .line.stzline + .line.stzline { margin-top: 2px; }
 @media (max-width: 620px) {
-  .linear { padding: 0 10px 80px; }
-  .linear .line { font-size: 22px; padding: 8px 12px; }
-  .ex-in { font-size: 16.5px; }
+  .linear { padding: 0 8px 80px; }
+  .linear .line { padding: 10px 12px; font-size: 22px; }
+  .stz { font-size: 18.5px; line-height: 1.85; }
 }
-@media (prefers-reduced-motion: reduce) { .ex { transition: none; } }
 
 /* The commentaries' letters: plain by default; Rashi script for those on the
    page, or for every one, from settings. */

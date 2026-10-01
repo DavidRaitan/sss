@@ -61,7 +61,7 @@ _SEEN = {}
 # Bumped whenever the pack's shape or meaning changes. Older packs on disk are
 # rebuilt: version 1 packs had every commentary detached from its line;
 # version 5 names who speaks in each move of an argument.
-PACK_VERSION = 5
+PACK_VERSION = 6      # 6: Steinsaltz keeps which words are the daf's (bold on Sefaria)
 
 
 class SefariaError(RuntimeError):
@@ -120,6 +120,31 @@ def split_gloss(html):
         if text:
             spans.append({"kind": "text" if index % 2 == 0 else "daf", "text": text})
     return spans
+
+
+STZ_TAG = re.compile(r"(</?(?:b|strong|small|big)\b[^>]*>)", re.I)
+
+
+def steinsaltz_parts(html):
+    """Steinsaltz as Sefaria marks him: the daf's own words (bold), his
+    translations of the Aramaic (small, in brackets), section heads (big,
+    "ב גמרא"), and his own words. Spaces kept, so the parts join back up."""
+    parts, state = [], {"b": False, "small": False, "big": False}
+    for chunk in STZ_TAG.split(html or ""):
+        m = re.match(r"<(/?)(b|strong|small|big)\b", chunk, re.I)
+        if m:
+            tag = {"strong": "b"}.get(m.group(2).lower(), m.group(2).lower())
+            state[tag] = not m.group(1)
+            continue
+        text = re.sub(r"\s+", " ", TAG.sub("", chunk))
+        if not text:
+            continue
+        kind = "head" if state["big"] else "tr" if state["small"] else "daf" if state["b"] else "text"
+        if parts and parts[-1]["kind"] == kind:
+            parts[-1]["text"] += text
+        else:
+            parts.append({"kind": kind, "text": text})
+    return parts
 
 
 def split_clauses(vocalized):
@@ -239,6 +264,10 @@ def build(ref):
                 "en": plain(english_text) if isinstance(english_text, str) else None,
                 "structure": sugya.structure(link.get("ref"), body),
             }
+            if name == "Steinsaltz":
+                # Sefaria sets the daf's own words in bold: kept, so the
+                # Steinsaltz view shows them as he is printed, not by guess.
+                entry["parts"] = steinsaltz_parts(link.get("he") if isinstance(link.get("he"), str) else "")
             if len(lines) > 1:
                 entry["span"] = [lines[0], lines[-1]]
             first["commentaries"].setdefault(name, []).append(entry)

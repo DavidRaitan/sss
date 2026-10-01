@@ -649,3 +649,17 @@ to the mishna the gemara is on, brings its text, and recaps the pages since.
 - Settings → איזה קול: the OpenAI voices (Cedar, the default, and Marin are
   the newest and most natural; also Ash, Ballad, Verse, Onyx, Sage, Coral,
   Shimmer). A tap plays a sample. The kept audio is keyed by voice.
+
+**62. Steinsaltz as Sefaria sets him; two voices.**
+- Learners know Steinsaltz from Sefaria: a paragraph a line, the daf's words
+  bold, his words plain in the same ink. Sefaria marks the daf's words in
+  bold, his Aramaic translations in small type inside [brackets], and the
+  section heads ("ב גמרא") in big type; the page build now keeps that
+  (pack version 6 -- older pages rebuild themselves once) instead of
+  stripping it and guessing. Shown: the daf's words bold; his translations
+  without the brackets, smaller and in the interface face, a quiet gloss;
+  verse references, (דברים ו, ז), in small faint print; משנה / גמרא as a
+  small tag. The daf's bold words are the page's word-spans, so reading along
+  and quotes still find them; a daf word he splits or skips stays, unseen.
+  Above: שטיינזלץ / גמרא מנוקדת.
+- Voices: Cedar (default) and Verse -- the two the learner liked.

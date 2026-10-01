@@ -35,7 +35,7 @@ function el(tag, cls, text) {
 
 const DEFAULTS = { view: "daf", depth: "daf", language: "en", voice: "natural",
   hearing: "api", speak: true, pause: "normal", nudges: true, checks: true, translate: false, stops: false,
-  speakers: false, rate: 1, favor: {}, voices: 3, open: "last", mine: [], explain: "line", script: "plain", voice_name: "cedar",
+  speakers: false, rate: 1, favor: {}, voices: 3, open: "last", mine: [], explain: "stz", script: "plain", voice_name: "cedar",
   sites: ["halachayomit.co.il", "he.wikisource.org", "dafyomi.co.il"], sites_halacha: true };
 const PAUSES = { short: 1000, normal: 1500, long: 2400 };
 function loadSettings() {
@@ -44,6 +44,7 @@ function loadSettings() {
   catch (e) { s = Object.assign({}, DEFAULTS); }
   // Sites added to the defaults after a list was saved join it once.
   if (!s.sites_seen) { s.sites = [...new Set([...s.sites, ...DEFAULTS.sites])]; s.sites_seen = 1; }
+  if (!["cedar", "verse"].includes(s.voice_name)) s.voice_name = "cedar";   // the voices on offer
   return s;
 }
 function saveSettings() {
@@ -424,65 +425,90 @@ function fillColumn(col, names) {
   if (!any) col.append(el("div", "empty", "אין כאן"));
 }
 
-// The Steinsaltz view is for reading simply. The daf's line is the text --
-// large, pointed, what you read aloud -- and under the line you are on, his
-// explanation in plain Hebrew opens: one calm paragraph, the daf's own words
-// a shade darker, his glosses in brackets a shade lighter. Lines you are not
-// on stay just the daf. (Woven all at once, in three weights, it was too much
-// to look at.) Above: explanation on my line / on every line / off.
-function explanation(seg) {
-  const text = (seg.commentaries.Steinsaltz || []).map((e) => e.he).join(" ")
-    .replace(/^\s*[א-ת]{1,2}\s+(?=[א-ת]{3})/, "");             // his paragraph letter
-  if (!text.trim()) return null;
-  const daf = seg.he.split(/\s+/).map(norm).filter(Boolean);
-  const toks = text.split(/\s+/).filter(Boolean);
-  const box = el("div", "ex-in");
+// The Steinsaltz view, as Sefaria shows him (and as learners know him): one
+// paragraph a line, the daf's own words bold, his words plain in the same
+// ink. His translations of the Aramaic (Sefaria's [brackets]) are set without
+// the brackets, smaller and in another face -- a quiet gloss under the voice
+// of the text; a verse reference is small print. Which words are the daf's
+// comes from Sefaria's own bold, kept when the page is built. Those words are
+// the same word-spans as everywhere, so reading along and quotes still find
+// them. Above: Steinsaltz / the pointed daf alone.
+const CITE_LIKE = /^[^()]{0,24}[א-ת]{1,3}["׳״']?[א-ת]?\s*,\s*[א-ת]{1,3}["׳״']?[א-ת]?$|^[א-ת]{1,4}["״][א-ת]{1,2}$/;
+function stzText(box, text) {
+  for (const piece of text.split(/(\([^)]*\))/)) {
+    if (!piece) continue;
+    const m = piece.match(/^\((.*)\)$/);
+    if (!m) { box.append(document.createTextNode(piece)); continue; }
+    box.append(el("span", CITE_LIKE.test(m[1].trim()) ? "cite" : "tr", m[1].trim()));
+  }
+}
+function steinsaltz(seg) {
+  const parts = (seg.commentaries.Steinsaltz || []).flatMap((e) => e.parts || []);
+  if (!parts.length) return null;
+  const gem = [...words(seg.he, seg.n, false).childNodes].filter((x) => x.classList && x.classList.contains("w"));
+  const box = el("div", "stz");
   box.dir = "rtl";
-  let gi = 0, depth = 0;
-  toks.forEach((tok, ti) => {
-    const k = norm(tok);
-    const opens = (tok.match(/\(/g) || []).length, closes = (tok.match(/\)/g) || []).length;
-    let cls = depth || opens ? "gl" : "";
-    if (!cls && k && gi < daf.length) {
-      for (let d = 0; d < 3 && gi + d < daf.length; d++) {
-        if (daf[gi + d] !== k) continue;
-        const next = toks[ti + 1] && norm(toks[ti + 1]);
-        if (k.length <= 2 && daf[gi + d + 1] && next !== daf[gi + d + 1]) continue;   // "את", "עד": only in step
-        gi += d + 1; cls = "g"; break;
+  const daf = [];
+  for (const p of parts) {
+    if (p.kind === "head") {
+      const label = p.text.replace(/^\s*[א-ת]{1,2}(?=\s|$)/, "").trim();      // his paragraph letter
+      if (label) box.append(el("span", "stz-head", label), document.createTextNode(" "));
+    } else if (p.kind === "tr") {
+      const t = p.text.replace(/[\[\]]/g, "");
+      if (t.trim()) box.append(el("span", "tr", t));
+    } else if (p.kind === "text") {
+      stzText(box, p.text);
+    } else {
+      for (const tok of p.text.split(/(\s+)/)) {
+        if (!tok) continue;
+        if (/^\s+$/.test(tok)) { box.append(document.createTextNode(tok)); continue; }
+        const d = el("b", "d", tok);
+        box.append(d); daf.push(d);
       }
     }
-    box.append(cls ? el("span", cls, tok) : document.createTextNode(tok), document.createTextNode(" "));
-    depth = Math.max(0, depth + opens - closes);
-  });
-  const wrap = el("div", "ex");
-  const inner = el("div", "ex-clip");
-  inner.append(box);
-  wrap.append(inner);
-  return wrap;
+  }
+  // Each bold word takes the place of its word on the daf (so reading along
+  // finds it); a daf word he split ("ו" + "לא") or skipped stays, unseen.
+  let gi = 0;
+  for (let i = 0; i < daf.length; i++) {
+    const k = norm(daf[i].textContent);
+    if (!k) continue;
+    let hit = -1, joined = false;
+    for (let d = 0; d < 4 && gi + d < gem.length && hit < 0; d++) {
+      if (gem[gi + d].dataset.k === k) hit = gi + d;
+      else if (k.length <= 2 && daf[i + 1] && gem[gi + d].dataset.k === k + norm(daf[i + 1].textContent)) { hit = gi + d; joined = true; }
+    }
+    if (hit < 0) continue;
+    const at = joined ? daf[++i] : daf[i];
+    for (; gi < hit; gi++) { gem[gi].classList.add("ghost"); at.before(gem[gi]); }
+    const w = gem[gi++];
+    w.textContent = at.textContent; w.classList.add("d");
+    at.replaceWith(w);
+  }
+  for (; gi < gem.length; gi++) { gem[gi].classList.add("ghost"); box.append(gem[gi]); }
+  return box;
 }
 
 function renderLinear() {
   const box = $("linear");
   box.hidden = false; box.replaceChildren();
-  // Explanation: on my line / on every line / off.
+  // Steinsaltz, or the pointed daf alone.
   const bar = el("div", "ex-bar");
-  bar.append(el("span", "ex-name", "ביאור שטיינזלץ"));
   const seg2 = el("span", "seg2 small");
-  for (const [v, label] of [["line", "בשורה שלי"], ["all", "בכל השורות"], ["off", "כבוי"]]) {
+  for (const [v, label] of [["stz", "שטיינזלץ"], ["off", "גמרא מנוקדת"]]) {
     const b = el("button", "btn", label);
-    b.setAttribute("aria-pressed", String((S.settings.explain || "line") === v));
-    b.onclick = (e) => { e.stopPropagation(); S.settings.explain = v; saveSettings(); applyToggles();
-      for (const x of seg2.children) x.setAttribute("aria-pressed", String(x === b)); };
+    b.setAttribute("aria-pressed", String((S.settings.explain === "off" ? "off" : "stz") === v));
+    b.onclick = (e) => { e.stopPropagation(); S.settings.explain = v; saveSettings(); render(); selectLine(S.line); };
     seg2.append(b);
   }
   bar.append(seg2);
   box.append(bar);
+  const woven = S.settings.explain !== "off";
   for (const seg of S.pack.segments) {
     const line = el("div", "line"); line.dataset.n = seg.n;
-    const he = el("div", "he"); he.append(words(seg.he, seg.n, true));
-    line.append(he);
-    const ex = explanation(seg);
-    if (ex) line.append(ex);
+    const stz = woven ? steinsaltz(seg) : null;
+    if (stz) { line.classList.add("stzline"); line.append(stz); }
+    else { const he = el("div", "he"); he.append(words(seg.he, seg.n, true)); line.append(he); }
     const en = el("div", "en");
     for (const s of seg.en || []) en.append(el("span", s.kind === "daf" ? "" : "add", s.text + " "));
     line.append(en);
@@ -502,7 +528,7 @@ function applyScript() {
 function applyToggles() {
   const lin = $("linear"), daf = $("page");
   lin.classList.toggle("showen", S.settings.translate);
-  lin.dataset.explain = S.settings.explain || "line";
+  lin.dataset.explain = S.settings.explain || "stz";
   lin.classList.toggle("stops", S.settings.stops);
   daf.classList.toggle("stops", S.settings.stops);
 }
@@ -2848,11 +2874,8 @@ function openSettings() {
       choice("rate", "מהירות הדיבור", [[0.85, "לאט"], [1, "רגיל"], [1.15, "קצת מהר"], [1.3, "מהר"], [1.5, "מהר מאוד"]],
         "אפשר גם להגיד לו: ״תדבר יותר מהר״ / ״a bit slower״."),
       choice("voice", "קול", [["natural", "טבעי (OpenAI) — תמיד אותו קול"], ["browser", "הדפדפן (חינם, רובוטי)"]]),
-      choice("voice_name", "איזה קול", [["cedar", "Cedar · גבר, חם"], ["marin", "Marin · אישה, חמה"],
-        ["ash", "Ash · גבר, צלול"], ["ballad", "Ballad · גבר, רך"], ["verse", "Verse · גבר, חי"],
-        ["onyx", "Onyx · גבר, עמוק"], ["sage", "Sage · אישה, רגועה"], ["coral", "Coral · אישה, ערה"],
-        ["shimmer", "Shimmer · אישה, בהירה"]],
-        "Cedar ו-Marin הם החדשים והטבעיים ביותר. לחיצה משמיעה דוגמה."),
+      choice("voice_name", "איזה קול", [["cedar", "Cedar · חם, רגוע"], ["verse", "Verse · חי, ער"]],
+        "לחיצה משמיעה דוגמה."),
       choice("speakers", "שמע", [[false, "אוזניות"], [true, "רמקול"]],
         "ברמקול, בזמן שאני מדבר אני לא מקשיב (אחרת אני שומע את עצמי). לעצור: כפתור העצירה או רווח."),
       choice("hearing", "זיהוי דיבור", [["api", "מדויק, עברית ואנגלית יחד"], ["browser", "הדפדפן (חינם, שפה אחת)"]]),

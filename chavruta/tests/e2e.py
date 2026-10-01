@@ -160,24 +160,24 @@ def main():
 
         page.click("#v-lin")
         page.wait_for_selector(".line")
-        check("Steinsaltz view: vocalized lines", page.locator(".line").count() == 14 and
-              any(0x591 <= ord(c) <= 0x5c7 for c in page.inner_text("#linear")))
-        page.evaluate("selectLine(2)")
-        page.wait_for_timeout(400)
-        shown = page.evaluate("[...document.querySelectorAll('#linear .ex')].filter(e => e.getBoundingClientRect().height > 8).length")
-        check("…Steinsaltz's plain Hebrew opens under the line you are on, only", shown == 1, "%d open" % shown)
-        page.click("#linear .ex-bar button:has-text('בכל השורות')")
-        page.wait_for_timeout(400)
-        shown = page.evaluate("[...document.querySelectorAll('#linear .ex')].filter(e => e.getBoundingClientRect().height > 8).length")
-        check("…or under every line, at a tap", shown >= 10, "%d open" % shown)
+        check("Steinsaltz view: a line for each line of the daf", page.locator("#linear .line").count() == 14)
+        check("Steinsaltz as Sefaria sets him: a paragraph a line, the daf's words bold",
+              page.locator("#linear .line.stzline").count() == 14 and
+              page.evaluate("getComputedStyle(document.querySelector('.stz .w.d')).fontWeight") == "700")
+        check("…his translations without brackets, quieter",
+              page.locator(".stz .tr").count() > 5 and "[" not in page.inner_text("#linear"),
+              page.inner_text("#linear")[:80])
+        check("…verse references in small print", page.locator(".stz .cite").count() >= 2)
         check("…and every word of the daf is still there, once",
               page.evaluate(r"""S.pack.segments.every(s => document.querySelectorAll('.line[data-n="' + s.n + '"] .w[data-k]').length ===
                                 s.he.split(/\s+/).filter(t => norm(t)).length)"""))
-        shot("12-steinsaltz-all")
-        page.click("#linear .ex-bar button:has-text('בשורה שלי')")
-        page.evaluate("selectLine(3)")
+        page.evaluate("selectLine(6)")
         page.wait_for_timeout(450)
         shot("12-steinsaltz")
+        page.click("#linear .ex-bar button:has-text('גמרא מנוקדת')")
+        check("…or the pointed daf alone, at a tap", page.locator("#linear .line.stzline").count() == 0 and
+              any(0x591 <= ord(c) <= 0x5c7 for c in page.inner_text("#linear")))
+        page.click("#linear .ex-bar button:has-text('שטיינזלץ')")
         page.click("#v-daf")
         page.wait_for_selector(".seg")
         font = lambda sel: page.evaluate("getComputedStyle(document.querySelector('%s')).fontFamily" % sel)

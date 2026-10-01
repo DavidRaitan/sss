@@ -51,10 +51,9 @@ SPOKEN = []   # the words of what it said last, to know its own voice when it he
 ECHO = 0.6    # this much of what was "heard" being its own last words means it heard itself
 
 
-# The OpenAI voices the speech model offers; marin and cedar are the newest
-# and most natural. Chosen in settings, sent with each sentence.
-VOICE_NAMES = ("cedar", "marin", "ash", "ballad", "coral", "echo", "fable", "nova", "onyx", "sage",
-               "shimmer", "verse", "alloy")
+# The voices offered in settings (chosen by the learner from OpenAI's set):
+# Cedar, the default, and Verse. Anything else falls back to the default.
+VOICE_NAMES = ("cedar", "verse")
 
 
 def voice_key(llm, text):
