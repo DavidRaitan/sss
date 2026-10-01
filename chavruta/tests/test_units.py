@@ -1141,6 +1141,33 @@ class CuttingIn(unittest.TestCase):
         self.assertIn("did not hear: «and the Beit Yosef»", seen[-1])
 
 
+class TakingItBack(unittest.TestCase):
+    def test_forgotten_by_the_partner(self):
+        import json as _json
+        import threading
+        import urllib.request
+        from http.server import ThreadingHTTPServer
+        from chavruta import server
+        state = server.session("forget-test")
+        state["history"] = [{"role": "user", "content": "[note]\nwhat does chatzot mean?"},
+                            {"role": "assistant", "content": "Midnight."},
+                            {"role": "user", "content": "[note]\nwho is talking to you?"},
+                            {"role": "assistant", "content": "You are."}]
+        httpd = ThreadingHTTPServer(("127.0.0.1", 0), server.Handler)
+        threading.Thread(target=httpd.serve_forever, daemon=True).start()
+        try:
+            req = urllib.request.Request("http://127.0.0.1:%d/api/forget" % httpd.server_address[1],
+                                         data=_json.dumps({"session": "forget-test",
+                                                           "said": "who is talking to you?"}).encode(),
+                                         headers={"Content-Type": "application/json"})
+            out = _json.loads(urllib.request.urlopen(req).read())
+        finally:
+            httpd.shutdown()
+        self.assertTrue(out["removed"])
+        self.assertEqual([m["content"] for m in state["history"]], ["[note]\nwhat does chatzot mean?", "Midnight."])
+        self.assertIn("who is talking to you?", state["discarded"])
+
+
 class Server(unittest.TestCase):
     def test_all_of_shas_and_nothing_else(self):
         from chavruta import server

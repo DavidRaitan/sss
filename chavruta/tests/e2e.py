@@ -494,6 +494,26 @@ def main():
             page.evaluate("skipCurrent()")
             page.evaluate("S.later.length = 0; renderBar()")
             page.wait_for_function("!saying && !speechQ.length", timeout=30000)
+            # Taken back: "never mind" drops what was just asked; so does the ✕ beside it.
+            latency(2.0)
+            page.fill("#panel input", "what about the Rambam on this?")
+            page.press("#panel input", "Enter")
+            page.wait_for_function("S.turns.some(t => /Rambam on this/.test(t.asked) && t.status === 'thinking')", timeout=10000)
+            page.fill("#panel input", "never mind")
+            page.press("#panel input", "Enter")
+            page.wait_for_function("S.turns.some(t => /Rambam on this/.test(t.asked) && t.discarded)", timeout=10000)
+            page.wait_for_timeout(2500)
+            check("'never mind' takes back what was just asked, unanswered",
+                  page.evaluate("(() => { const t = S.turns.find(t => /Rambam on this/.test(t.asked));"
+                                " return t.status === 'skipped' && !t.text; })()"))
+            page.fill("#panel input", "and the Rif on this?")
+            page.press("#panel input", "Enter")
+            page.wait_for_selector("#asked .asked-x", timeout=10000)
+            page.click("#asked .asked-x")
+            check("…and so does the ✕ beside it",
+                  page.evaluate("S.turns.some(t => /Rif on this/.test(t.asked) && t.discarded && t.status === 'skipped')"))
+            latency(0)
+            page.wait_for_function("!saying && !speechQ.length", timeout=30000)
             # "I'm still waiting" while it gathers: a word back at once, and the work goes on.
             latency(2.5)
             page.fill("#panel input", "why does the mishna mention the priests at all?")

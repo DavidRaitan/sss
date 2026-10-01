@@ -461,6 +461,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.say()
             if route == "/api/speak":
                 return self.speak()
+            if route == "/api/forget":
+                return self.forget()
             if route == "/api/voice":
                 return self.prepare_voice()
             if route == "/api/prepare":
@@ -641,6 +643,7 @@ class Handler(BaseHTTPRequestHandler):
         if not allowed(ref) or not said:
             return self.fail(400, "need_ref_and_words")
         state = session(body.get("session"))
+        state.setdefault("discarded", set()).discard(said)      # asked again: it counts again
         fresh_page(state, ref)
         line = int(body.get("line") or state.get("line") or 1)
         state["line"] = line
@@ -742,13 +745,17 @@ class Handler(BaseHTTPRequestHandler):
             emit({"mode": "cut_in", "kind": route["cut_in"]})
         started = time.time()
         try:
-            text, verdict, state["history"], trace = partner.ask(
+            text, verdict, history, trace = partner.ask(
                 line, state["history"], said, heard=heard, route=route,
                 recent=recent, spoke=state.get("spoke"), announce=announce,
                 # Each sentence as it is written, to be spoken while the rest is.
                 on_part=(lambda text: emit({"mode": "part", "text": text})) if stream else None,
                 memory=state.setdefault("memory", {}),
                 cut=dict(body["cut_in"], kind=route["cut_in"]) if route.get("cut_in") else None)
+            # Taken back while it was being answered: the conversation goes on
+            # as if it had not been said.
+            if said not in state.setdefault("discarded", set()):
+                state["history"] = history
         except (BrokenPipeError, ConnectionResetError):
             # The page asked again, together with what was said next.
             log.info("say: the page stopped waiting for this answer")
@@ -779,6 +786,26 @@ class Handler(BaseHTTPRequestHandler):
                 pass
             return
         return self.send_json(payload)
+
+    def forget(self):
+        """ "Never mind" / ✕: what they said is taken back -- out of the
+        conversation the partner remembers, as if it had not been said."""
+        body = self.body_json()
+        said = (body.get("said") or "").strip()
+        if not said:
+            return self.fail(400, "nothing_to_forget")
+        state = session(body.get("session"))
+        state.setdefault("discarded", set()).add(said)
+        history, removed = state["history"], False
+        for i in range(len(history) - 1, -1, -1):
+            m = history[i]
+            if m["role"] == "user" and m["content"].rsplit("\n", 1)[-1].strip() == said:
+                end = i + 2 if i + 1 < len(history) and history[i + 1]["role"] == "assistant" else i + 1
+                state["history"] = history[:i] + history[end:]
+                removed = True
+                break
+        record("discarded", session=body.get("session"), said=said)
+        return self.send_json({"ok": True, "removed": removed})
 
     def spoken_text(self, body):
         text = speakable((body.get("text") or "").strip())

@@ -573,3 +573,13 @@ body.rashi-all { --cfont: var(--rashi); --pfont: var(--rashi); }
 #mic.muted { color: var(--faint); border-style: dashed; }
 #mic.muted[data-state="speaking"], #mic.muted[data-state="paused"] { color: var(--dim); }
 @media (prefers-reduced-motion: reduce) { #reply.speaking .sw { transition: none; } .talk { scroll-behavior: auto; } }
+
+/* Taking back what was said: a quiet ✕ beside the question, and on each one waiting. */
+.asked { display: flex; align-items: baseline; gap: 6px; }
+.asked-text { min-width: 0; }
+.asked-x, .qx { border: 0; background: none; color: var(--faint); cursor: pointer; padding: 0 3px;
+  border-radius: 4px; flex: none; }
+.asked-x .ic, .qx .ic { width: 13px; height: 13px; stroke-width: 2; vertical-align: -2px; }
+.turn.discarded { text-decoration: line-through; opacity: .55; }
+@media (hover: hover) and (pointer: fine) { .asked-x:hover, .qx:hover { color: var(--bad); background: var(--glow); } }
+@media (pointer: coarse) { .asked-x, .qx { padding: 4px 8px; } }

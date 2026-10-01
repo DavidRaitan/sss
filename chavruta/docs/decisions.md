@@ -663,3 +663,13 @@ to the mishna the gemara is on, brings its text, and recaps the pages since.
   and quotes still find them; a daf word he splits or skips stays, unseen.
   Above: שטיינזלץ / גמרא מנוקדת.
 - Voices: Cedar (default) and Verse -- the two the learner liked.
+
+**63. Taking back what was said.**
+- "Never mind", "ignore that", "scratch that", "I wasn't talking to you",
+  "עזוב", "לא משנה", "תתעלם", "לא דיברתי אליך": the last thing asked is
+  taken back -- not answered (or no longer: it stops), out of the queue, and
+  forgotten by the partner, as if it had not been said (the server drops it
+  from the conversation it keeps; if its answer was still being written, that
+  answer is not kept). An answer it had cut into goes on. Said in a word:
+  "OK -- dropped it." The same from a ✕ beside the question in the bar and on
+  each question waiting in the queue; struck through in the transcript.
