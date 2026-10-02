@@ -760,3 +760,13 @@ to the mishna the gemara is on, brings its text, and recaps the pages since.
 - Not carried over: the phone link with its own certificate (the Worker's
   address replaces it) and pre-making the small-talk voices (the edge keeps them
   after their first use).
+
+**69. No passcode; a new mark.**
+- The passcode screen stood between the learner and the page, so it went. The
+  link is enough. What stays is a check that costs nothing: the Worker answers
+  only its own page (the browser's Sec-Fetch-Site / Origin), so no other
+  website can use it as a door to the OpenAI key. Someone with the link can
+  still use the app; an OpenAI spending limit is the ceiling.
+- The icon: ח in a speech bubble, cream on the page's terracotta -- learning
+  by talking it through. Drawn as shapes (no font), so it is the same
+  everywhere; a maskable copy for Android keeps clear of its circle.

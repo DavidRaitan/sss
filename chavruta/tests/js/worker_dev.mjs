@@ -12,12 +12,11 @@ const freePort = () => new Promise((ok) => {
 });
 
 /** Start the Worker; resolves to {url, stop()} once it answers. vars: extra --var values. */
-export async function startWorker({ sefaria, openaiRoot, passcode = "", vars = {}, persist = null } = {}) {
+export async function startWorker({ sefaria, openaiRoot, open = true, vars = {}, persist = null } = {}) {
   const port = await freePort();
   const args = ["wrangler", "dev", "--port", String(port), "--ip", "127.0.0.1", "--log-level", "warn",
     "--var", "SEFARIA_BASE:" + sefaria, "--var", "OPENAI_BASE:" + openaiRoot, "--var", "OPENAI_API_KEY:sk-test"];
-  if (passcode) args.push("--var", "PASSCODE:" + passcode);
-  else args.push("--var", "OPEN:1");
+  if (open) args.push("--var", "OPEN:1");      // tests that are not about who may ask
   for (const [k, v] of Object.entries(vars)) args.push("--var", k + ":" + v);
   if (persist) args.push("--persist-to", persist);
   // Its own process group, so stopping it stops workerd too, not only npx.

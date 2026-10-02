@@ -6,23 +6,20 @@
 //   /x/sefaria/...     Sefaria's API, kept at the edge for a day
 //   /x/fetch?url=      any other page the partner reads (Wikisource, Hebcal, the study sites)
 //   /x/events          the record of every sitting and the learner's notes (D1)
-//   /x/login, /x/who   the passcode, once per device
+//   /x/who             whether the key is set
 //
 // Everything that thinks runs in the page. The Worker only passes things
 // through, so each request costs it almost no CPU -- which is what keeps it
 // on the free plan.
 
 const OPENAI_PATHS = /^(chat\/completions|responses|audio\/transcriptions|audio\/speech|models)$/;
-const COOKIE = "chavruta";
-const YEAR = 60 * 60 * 24 * 365;
 
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     if (!url.pathname.startsWith("/x/")) return env.ASSETS.fetch(request);
     try {
-      if (url.pathname === "/x/login") return login(request, env);
-      if (!(await allowed(request, env))) return json({ error: "need_passcode" }, 401);
+      if (!fromThePage(request, env, url)) return json({ error: "not_from_the_app" }, 403);
       if (url.pathname === "/x/who") return json({ ok: true, key: !!env.OPENAI_API_KEY });
       if (url.pathname.startsWith("/x/openai/v1/")) return openai(request, env, url);
       if (url.pathname === "/x/voice") return voice(request, env, ctx, url);
@@ -41,36 +38,20 @@ function json(body, status = 200, headers = {}) {
     status, headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", ...headers } });
 }
 
-// -- the passcode -----------------------------------------------------------------
-// Typed once on each device; what stays is a signed cookie, not the passcode.
-// With no PASSCODE set the door is shut -- unless OPEN=1, which only a test
-// run or `./run.sh worker` on the Mac sets.
+// -- only the app's own page ----------------------------------------------------------
+// No passcode: the link is enough. But the Worker answers only the page it
+// serves -- not another website, and not a request that says it comes from
+// nowhere -- so it is not a free door to the OpenAI key for the whole web.
+// (A determined person with the link can still use the app itself; an
+// OpenAI spending limit is the real ceiling.) OPEN=1 (tests, ./run.sh on the
+// Mac) skips the check.
 
-async function sign(env) {
-  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(env.PASSCODE),
-    { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-  const mac = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode("chavruta:v1"));
-  return [...new Uint8Array(mac)].map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-async function allowed(request, env) {
-  if (!env.PASSCODE) return env.OPEN === "1";
-  const cookie = request.headers.get("Cookie") || "";
-  const m = cookie.match(new RegExp("(?:^|;\\s*)" + COOKIE + "=([0-9a-f]{64})"));
-  return !!m && m[1] === (await sign(env));
-}
-
-async function login(request, env) {
-  if (request.method !== "POST") return json({ error: "post" }, 405);
-  if (!env.PASSCODE) return json(env.OPEN === "1" ? { ok: true } : { error: "no_passcode_set" }, env.OPEN === "1" ? 200 : 401);
-  const body = await request.json().catch(() => ({}));
-  // A wrong guess waits a moment, so guessing is slow.
-  if (String(body.passcode || "").trim() !== env.PASSCODE) {
-    await new Promise((ok) => setTimeout(ok, 800));
-    return json({ error: "wrong_passcode" }, 401);
-  }
-  return json({ ok: true }, 200, {
-    "Set-Cookie": `${COOKIE}=${await sign(env)}; Path=/; Max-Age=${YEAR}; HttpOnly; Secure; SameSite=Strict` });
+function fromThePage(request, env, url) {
+  if (env.OPEN === "1") return true;
+  const site = request.headers.get("Sec-Fetch-Site");
+  if (site) return site === "same-origin";
+  const from = request.headers.get("Origin") || request.headers.get("Referer");
+  try { return !!from && new URL(from).host === url.host; } catch (e) { return false; }
 }
 
 // -- the model ------------------------------------------------------------------------

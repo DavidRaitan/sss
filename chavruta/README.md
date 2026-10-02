@@ -21,10 +21,10 @@ One address for the phone and the Mac, on Cloudflare's free plan:
     cd ~/sss && git pull && cd chavruta
     ./run.sh deploy
 
-The first time it opens a browser to log in to Cloudflare, asks you to choose a
-**passcode** (typed once on each device — without it nobody can use your OpenAI
-key), takes your OpenAI key from `.env`, and prints the address
-(`https://chavruta.<you>.workers.dev`). On the phone: open it in Safari, then
+The first time it opens a browser to log in to Cloudflare, takes your OpenAI key
+from `.env`, and prints the address (`https://chavruta.<you>.workers.dev`). There
+is no passcode: the link is enough. Anyone you give the link to uses your OpenAI
+key, so set a monthly limit at platform.openai.com → Settings → Limits. On the phone: open it in Safari, then
 Share → **Add to Home Screen** — it opens full screen, like an app. Run
 `./run.sh deploy` again after each `git pull` to publish the new version.
 

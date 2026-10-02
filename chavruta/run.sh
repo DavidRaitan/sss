@@ -23,15 +23,10 @@ case "${1:-}" in
     npm install --silent
     npx wrangler whoami >/dev/null 2>&1 || npx wrangler login
     npx wrangler d1 execute chavruta --remote --file schema.sql >/dev/null
-    # The Worker must exist before it can hold secrets: deployed first, then the passcode, then the key
-    # (each takes effect at once; with no passcode set it lets nobody in).
+    # The Worker must exist before it can hold its key: deployed first, then the key (it takes effect at once).
+    # The key from this folder's .env, or the original folder's (a second copy of the repo has none of its own).
+    [ -f ../.env ] || { [ -f "$HOME/sss/chavruta/.env" ] && cp "$HOME/sss/chavruta/.env" ../.env; } || true
     npx wrangler deploy
-    if ! npx wrangler secret list 2>/dev/null | grep -q PASSCODE; then
-      echo
-      echo "Choose a passcode. You type it once on each device (phone, Mac); without it nobody can use your key."
-      read -r -s -p "Passcode: " CODE; echo
-      printf %s "$CODE" | npx wrangler secret put PASSCODE
-    fi
     if ! npx wrangler secret list 2>/dev/null | grep -q OPENAI_API_KEY; then
       KEY="$(cd .. && key_from_env)"
       if [ -z "$KEY" ]; then read -r -s -p "Your OpenAI API key: " KEY; echo; fi

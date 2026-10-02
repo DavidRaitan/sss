@@ -7,14 +7,14 @@ import { fake, control } from "./harness.mjs";
 import { startWorker } from "./worker_dev.mjs";
 
 const persist = fs.mkdtempSync(path.join(os.tmpdir(), "chav-"));
-const w = await startWorker({ sefaria: fake.sefaria, openaiRoot: fake.control, passcode: "shalom", persist });
+const w = await startWorker({ sefaria: fake.sefaria, openaiRoot: fake.control, open: false, persist });
 const { execSync } = await import("node:child_process");
 execSync("npx wrangler d1 execute chavruta --local --persist-to " + persist + " --file schema.sql",
   { cwd: path.resolve(path.dirname(new URL(import.meta.url).pathname), "../../worker"), stdio: "ignore" });
 test.after(() => w.stop());
 
-let cookie = "";
-const go = (p, init = {}) => fetch(w.url + p, { ...init, headers: { ...(init.headers || {}), Cookie: cookie } });
+// As the app's own page asks: the browser says the request is from the same site.
+const go = (p, init = {}) => fetch(w.url + p, { ...init, headers: { ...(init.headers || {}), "Sec-Fetch-Site": "same-origin" } });
 
 test("the page itself is served to anyone", async () => {
   const r = await fetch(w.url + "/");
@@ -22,21 +22,18 @@ test("the page itself is served to anyone", async () => {
   assert.match(await r.text(), /חברותא/);
 });
 
-test("without the passcode, nothing behind it", async () => {
-  assert.equal((await fetch(w.url + "/x/who")).status, 401);
-  assert.equal((await fetch(w.url + "/x/openai/v1/models")).status, 401);
-  const wrong = await fetch(w.url + "/x/login", { method: "POST", body: JSON.stringify({ passcode: "nope" }) });
-  assert.equal(wrong.status, 401);
+test("no passcode: the app's own page is answered at once", async () => {
+  const r = await go("/x/who");
+  assert.equal(r.status, 200);
+  assert.equal((await r.json()).key, true);
+  const viaOrigin = await fetch(w.url + "/x/who", { headers: { Origin: w.url } });
+  assert.equal(viaOrigin.status, 200);
 });
 
-test("the passcode once, then a cookie", async () => {
-  const r = await fetch(w.url + "/x/login", { method: "POST", body: JSON.stringify({ passcode: "shalom" }) });
-  assert.equal(r.status, 200);
-  const set = r.headers.get("set-cookie");
-  assert.match(set, /HttpOnly/);
-  assert.doesNotMatch(set, /shalom/);
-  cookie = set.split(";")[0];
-  assert.equal((await go("/x/who")).status, 200);
+test("but not another website, nor a request from nowhere", async () => {
+  assert.equal((await fetch(w.url + "/x/openai/v1/models")).status, 403);
+  assert.equal((await fetch(w.url + "/x/openai/v1/models", { headers: { "Sec-Fetch-Site": "cross-site" } })).status, 403);
+  assert.equal((await fetch(w.url + "/x/who", { headers: { Origin: "https://elsewhere.example" } })).status, 403);
 });
 
 test("the model, with the key added by the Worker", async () => {
