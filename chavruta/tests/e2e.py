@@ -48,30 +48,61 @@ def speechlike(path, pattern=((0.6, 0), (1.8, 1), (2.6, 0), (1.8, 1), (4.0, 0)),
                 b"data" + struct.pack("<I", len(data)) + data)
 
 
+WORKER = os.path.join(os.path.dirname(HERE), "worker")
+
+
+def start_worker(sef, oai_root, persist):
+    """The real Worker, run by wrangler (workerd) on this machine, pointed at the stand-ins."""
+    import socket
+    import subprocess
+    subprocess.run(["npx", "wrangler", "d1", "execute", "chavruta", "--local", "--persist-to", persist,
+                    "--file", "schema.sql"], cwd=WORKER, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    with socket.socket() as sock:
+        sock.bind(("127.0.0.1", 0))
+        port = sock.getsockname()[1]
+    proc = subprocess.Popen(["npx", "wrangler", "dev", "--port", str(port), "--ip", "127.0.0.1", "--log-level", "warn",
+                             "--persist-to", persist, "--var", "SEFARIA_BASE:" + sef, "--var", "OPENAI_BASE:" + oai_root,
+                             "--var", "OPENAI_API_KEY:sk-test", "--var", "OPEN:1"], cwd=WORKER, stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL, start_new_session=True,
+                            env=dict(os.environ, WRANGLER_SEND_METRICS="false", CI="1"))
+    import atexit
+    import signal
+    atexit.register(lambda: os.killpg(proc.pid, signal.SIGTERM))
+    url = "http://127.0.0.1:%d/" % port
+    for _ in range(120):
+        try:
+            urllib.request.urlopen(url + "x/who", timeout=2)
+            break
+        except Exception:
+            time.sleep(0.5)
+    return url
+
+
+def records(app, kinds=None):
+    """The sitting's record, as the Worker keeps it in D1."""
+    q = "?kinds=" + ",".join(kinds) if kinds else ""
+    return json.loads(urllib.request.urlopen(app + "x/events" + q).read())["rows"]
+
+
+def page_config(sef):
+    """What the page would have read from the environment on the Python server."""
+    site = sef[:-4]
+    return "window.CHAVRUTA_CONFIG = %s;" % json.dumps({
+        "zmanim": site + "/zmanim", "wikisource": site + "/w/api.php",
+        "web_rewrite": {"https://halachayomit.co.il": site + "/hy", "https://www.dafyomi.co.il": site + "/daf"}})
+
+
 def start_stack():
     s1, sef = fake_sefaria.start()
     s2, oai = fake_openai.start()
-    packs = tempfile.mkdtemp()
+    app = start_worker(sef, oai.replace("/v1", ""), tempfile.mkdtemp())
     # Yesterday's sitting, so coming back has something to review.
-    sessions = tempfile.mkdtemp()
     import datetime
     yesterday = (datetime.date.today() - datetime.timedelta(days=1)).isoformat()
-    with open(os.path.join(sessions, yesterday + ".jsonl"), "w") as f:
-        for ref in ("Berakhot 2a", "Berakhot 2b"):
-            f.write(json.dumps({"kind": "heard", "ref": ref, "at": yesterday + " 21:00:00"}) + "\n")
-    os.environ.update(CHAVRUTA_SEFARIA_API=sef, OPENAI_BASE_URL=oai, OPENAI_API_KEY="sk-test",
-                      CHAVRUTA_PACKS=packs, CHAVRUTA_SESSIONS=sessions,
-                      CHAVRUTA_NOTES=os.path.join(sessions, "notes.jsonl"), CHAVRUTA_WIKISOURCE_API=sef[:-4] + "/w/api.php",
-                      CHAVRUTA_WEB_REWRITE='{"https://halachayomit.co.il": "%s/hy", "https://www.dafyomi.co.il": "%s/daf"}' % (sef[:-4], sef[:-4]))
-    import importlib
-    import chavruta.sefaria as sf
-    importlib.reload(sf)
-    import chavruta.server as srv
-    importlib.reload(srv)
-    from http.server import ThreadingHTTPServer
-    httpd = ThreadingHTTPServer(("127.0.0.1", 0), srv.Handler)
-    threading.Thread(target=httpd.serve_forever, daemon=True).start()
-    return "http://127.0.0.1:%d/" % httpd.server_address[1], oai.replace("/v1", "")
+    for ref in ("Berakhot 2a", "Berakhot 2b"):
+        urllib.request.urlopen(urllib.request.Request(app + "x/events", data=json.dumps(
+            {"kind": "heard", "ref": ref, "at": yesterday + " 21:00:00"}).encode(), headers={"Content-Type": "application/json"}))
+    return app, oai.replace("/v1", ""), sef
 
 
 def queue_transcript(control, text):
@@ -80,16 +111,18 @@ def queue_transcript(control, text):
                            headers={"Content-Type": "application/json"}))
 
 
-def phone(browser, app, check, shots):
+def phone(browser, app, check, shots, sef):
     """The same app held in one hand: an iPhone-sized screen, touch only."""
     ctx = browser.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=2, is_mobile=True,
                               has_touch=True, permissions=["microphone"])
+    ctx.add_init_script(page_config(sef))
     page = ctx.new_page()
     errors = []
     page.on("pageerror", lambda e: errors.append(str(e)))
     box = lambda sel: page.locator(sel).bounding_box()
     shot = lambda name: shots and page.screenshot(path=os.path.join(shots, name + ".png"))
     page.goto(app, wait_until="domcontentloaded")
+    page.wait_for_function("typeof S !== 'undefined'", timeout=20000)   # the app starts once boot.js has loaded it
     page.wait_for_function("S.pack && document.querySelectorAll('.seg').length", timeout=20000)
     page.evaluate("S.settings.view = 'daf'; render()")
     check("phone: nothing wider than the screen", page.evaluate("document.documentElement.scrollWidth") <= 390)
@@ -184,7 +217,7 @@ def main():
     args = ap.parse_args()
     from playwright.sync_api import sync_playwright
 
-    app, control = start_stack()
+    app, control, sef = start_stack()
     mic = os.path.join(tempfile.mkdtemp(), "mic.wav")
     speechlike(mic)
     problems = []
@@ -193,9 +226,11 @@ def main():
             "--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream",
             "--use-file-for-fake-audio-capture=%s" % mic, "--autoplay-policy=no-user-gesture-required"])
         ctx = browser.new_context(viewport={"width": 1400, "height": 900}, permissions=["microphone"])
+        ctx.add_init_script(page_config(sef))
         page = ctx.new_page()
         errors = []
         page.on("pageerror", lambda e: errors.append(str(e)))
+        page.on("response", lambda r: errors.append("http %d %s" % (r.status, r.url[:160])) if r.status >= 400 else None)
         # A web font refused by this sandbox's network proxy is not the page's error.
         page.on("console", lambda m: errors.append("console: " + m.text)
                 if m.type == "error" and "ERR_CERT_AUTHORITY_INVALID" not in m.text else None)
@@ -210,6 +245,7 @@ def main():
                 page.screenshot(path=os.path.join(args.shots, name + ".png"))
 
         page.goto(app, wait_until="domcontentloaded")
+        page.wait_for_function("typeof S !== 'undefined'", timeout=20000)   # the app starts once boot.js has loaded it
         page.wait_for_selector(".seg", timeout=20000)
         check("opens Berakhot 2a", page.locator(".seg").count() == 14, "(%d lines)" % page.locator(".seg").count())
         check("Rashi column filled", page.locator("#col-inner .c").count() >= 10,
@@ -363,8 +399,8 @@ def main():
                   "(%d chars)" % len(report))
             if args.shots:
                 open(os.path.join(args.shots, "session.md"), "w").write(report)
-            recorded = os.listdir(os.environ["CHAVRUTA_SESSIONS"])
-            check("each turn is recorded on disk", bool(recorded), str(recorded))
+            recorded = records(app, ["answer"])
+            check("each turn is recorded", bool(recorded), str(len(recorded)))
             page.click("#mic", delay=900)              # held down: everything stops
             page.wait_for_function("!saying && !speakingDone", timeout=15000)
             check("a long press on the mic stops everything", page.evaluate("!S.listening && !speechQ.length"),
@@ -449,9 +485,7 @@ def main():
             page.press("#panel input", "Enter")
             page.wait_for_function("/why the priests are named/.test(document.querySelector('#turns').textContent)",
                                    timeout=15000)
-            chose = [json.loads(l) for f in os.listdir(os.environ["CHAVRUTA_SESSIONS"]) if f.endswith(".jsonl")
-                     for l in open(os.path.join(os.environ["CHAVRUTA_SESSIONS"], f))
-                     if '"chose"' in l]
+            chose = [r for r in records(app, ["answer"]) if "chose" in (r.get("trace") or {})]
             check("…and reads it with them, in full", chose and chose[-1]["trace"]["chose"] == "read")
             # The desk: what is read opens beside the page, the words lit as they are read.
             page.wait_for_selector("#desk:not([hidden]) .dc", timeout=5000)
@@ -616,8 +650,7 @@ def main():
             latency(0)
             page.wait_for_function("!saying && !speechQ.length", timeout=30000)
             # The fast path: a plain question started before the router answered, and the export says where time went.
-            heads = [json.loads(l) for f in os.listdir(os.environ["CHAVRUTA_SESSIONS"]) if f.endswith(".jsonl")
-                     for l in open(os.path.join(os.environ["CHAVRUTA_SESSIONS"], f)) if '"head_start": true' in l]
+            heads = [r for r in records(app, ["answer"]) if (r.get("trace") or {}).get("head_start") is True]
             check("a plain question begins before the router has answered", bool(heads),
                   heads[0]["said"] if heads else "")
             check("the export shows where the time went", "[timing:" in page.evaluate("sessionReport()"))
@@ -690,6 +723,15 @@ def main():
 
         errors = [e for e in errors if "favicon" not in e and "fonts.g" not in e and "ERR_TUNNEL" not in e
                   and "ERR_CERT" not in e]  # this sandbox's proxy blocks Google Fonts
+        # The stand-in refuses reasoning_effort "none" for the cheap model on purpose, to prove the app
+        # steps down and asks again; in the browser each refusal is a 400 the console reports. Those, and
+        # only those, are expected.
+        refused = [e for e in errors if e.startswith("http 400 ") and e.endswith("/x/openai/v1/chat/completions")]
+        errors = [e for e in errors if e not in refused]
+        for _ in refused:
+            noise = next((e for e in errors if "status of 400" in e), None)
+            if noise:
+                errors.remove(noise)
         # One pace for every sentence: measured as they are said, in both languages alike.
         check("each sentence's pace is measured", page.evaluate("PACES.length") >= 2, str(page.evaluate("PACES.length")))
         check("syllables counted alike in Hebrew and English",
@@ -723,6 +765,7 @@ def main():
         # Back at the same line after closing and opening.
         page.evaluate("selectLine(7)")
         page.reload(wait_until="domcontentloaded")
+        page.wait_for_function("typeof S !== 'undefined'", timeout=20000)   # the app starts once boot.js has loaded it
         page.wait_for_function("S.pack && S.pack.ref === 'Berakhot 2b' && S.line === 7", timeout=20000)
         check("opens again at the line you were on", True)
         check("the desk was for that sitting only", page.evaluate("DESK.cards.length === 0 && !DESK.open"))
@@ -731,12 +774,13 @@ def main():
         check("…but a saved layout opens in one tap", page.locator("#desk .dc").count() == 3)
         page.click(".lay.on .lay-x[title='לפתוח מעצמו עם כל דף']")
         page.reload(wait_until="domcontentloaded")
+        page.wait_for_function("typeof S !== 'undefined'", timeout=20000)   # the app starts once boot.js has loaded it
         page.wait_for_function("S.pack && DESK.open && document.querySelectorAll('#desk .dc').length === 3",
                                timeout=20000)
         check("the ★ layout opens by itself", page.evaluate("DESK.place") == "side")
         check("no JavaScript errors", not errors, "; ".join(errors[:3]))
         if args.part in ("all", "phone"):
-            phone(browser, app, check, args.shots)
+            phone(browser, app, check, args.shots, sef)
         browser.close()
     print("\n%s" % ("ALL PASSED" if not problems else "FAILED: " + ", ".join(problems)))
     return 1 if problems else 0

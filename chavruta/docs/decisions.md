@@ -737,3 +737,26 @@ to the mishna the gemara is on, brings its text, and recaps the pages since.
 - No keyboard hints where there is no keyboard; the transcript does not open
   the keyboard by itself; it can be added to the home screen and opens
   full-screen with its own icon.
+
+**68. On Cloudflare, free, with the Mac off.**
+- Free and always reachable ruled out a container ($5/month) and a tunnel to the
+  Mac (only while it is on). What is left is a Worker on the free plan -- and the
+  free plan gives a Worker about 10 ms of CPU per request. So the Worker only
+  passes things through: the OpenAI key (never in the page), Sefaria and other
+  sites (kept at the edge), each sentence's voice (kept at the edge: "Go ahead."
+  is paid for once), the record of sittings and notes (D1), and a passcode once
+  per device, signed into a cookie. With no passcode set it lets nobody in.
+- Everything that thinks moved into the page: the Python modules were ported to
+  JavaScript (`web/lib/`) function by function, names and prompts unchanged
+  (docs/porting.md). Python's regexes know Hebrew word boundaries and
+  JavaScript's do not, so every pattern goes through `re()`, which translates.
+  Each module was checked against the Python on the same inputs -- packs built,
+  prompts sent, answers, routes, plans -- not only by its ported tests.
+- `api.js` answers the page's /api requests as server.py did, with the same
+  shapes and the same streaming, so app.js barely changed.
+- Tests: 192 JavaScript tests (the Python unit tests ported, parity with the
+  Python, and the Worker under wrangler), and the end-to-end test now runs
+  against the real Worker on workerd.
+- Not carried over: the phone link with its own certificate (the Worker's
+  address replaces it) and pre-making the small-talk voices (the edge keeps them
+  after their first use).

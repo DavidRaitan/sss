@@ -151,6 +151,18 @@
   <div class="panel" id="panel" role="complementary"></div>
 </aside>
 
-<script src="app.js"></script>
+<!-- The passcode, typed once on each device. -->
+<div class="door" id="door" hidden>
+  <form class="door-card">
+    <div class="door-mark"><svg class="ic"><use href="#i-book"/></svg></div>
+    <h1>חברותא</h1>
+    <label for="door-code">קוד כניסה</label>
+    <input id="door-code" type="password" autocomplete="current-password" enterkeyhint="go" required>
+    <button class="btn" type="submit">כניסה</button>
+    <div class="door-note" aria-live="polite"></div>
+  </form>
+</div>
+
+<script type="module" src="boot.js"></script>
 </body>
 </html>

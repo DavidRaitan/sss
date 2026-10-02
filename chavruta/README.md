@@ -14,6 +14,28 @@ shows you why from the page.
 The first run sets itself up and creates `.env`. Put your OpenAI key in it
 (`open -e .env`), then run again.
 
+## On Cloudflare (free) — the phone, anywhere, Mac off
+
+One address for the phone and the Mac, on Cloudflare's free plan:
+
+    cd ~/sss && git pull && cd chavruta
+    ./run.sh deploy
+
+The first time it opens a browser to log in to Cloudflare, asks you to choose a
+**passcode** (typed once on each device — without it nobody can use your OpenAI
+key), takes your OpenAI key from `.env`, and prints the address
+(`https://chavruta.<you>.workers.dev`). On the phone: open it in Safari, then
+Share → **Add to Home Screen** — it opens full screen, like an app. Run
+`./run.sh deploy` again after each `git pull` to publish the new version.
+
+How it is built: the page is static; everything that thinks (the partner, the
+router, following your reading) runs in the browser (`web/lib/`). A small Worker
+(`worker/`) does only what the page cannot: holds the OpenAI key, reaches Sefaria
+and the study sites, makes each sentence's voice (and keeps it, so the same words
+are never paid for twice), and keeps the record of every sitting and your notes in
+a D1 database (so phone and Mac share your history). `./run.sh` runs the same thing
+on the Mac; `./run.sh python` runs the original Python server.
+
 ## Using it
 
 **Turn to a page** with the three menus at the top — מסכת, דף, עמוד — or the ‹ ›

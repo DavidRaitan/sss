@@ -1,0 +1,20 @@
+{
+  // חברותא: the page (../web) and the Worker that holds the key and the record.
+  "name": "chavruta",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-01",
+  "assets": {
+    "directory": "../web",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/x/*"]
+  },
+  "d1_databases": [
+    { "binding": "DB", "database_name": "chavruta", "database_id": "1cf82c3d-ae01-4d6e-8591-380a9d894122" }
+  ],
+  "vars": {
+    "OPENAI_BASE": "https://api.openai.com",
+    "SEFARIA_BASE": "https://www.sefaria.org/api"
+  }
+  // Secrets (set once with `npx wrangler secret put NAME`): OPENAI_API_KEY, PASSCODE
+}

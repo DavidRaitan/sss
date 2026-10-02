@@ -6,6 +6,9 @@
    is pointing at, the sources it cites. */
 
 const $ = (id) => document.getElementById(id);
+// The server's work is done in this page (lib/api.js, loaded by boot.js); it
+// is asked as the server was, and answers with a Response.
+const api = (path, init) => window.API.handle(path, init);
 // A phone: narrow, or a touch screen on its side. A keyboard: a fine pointer that hovers.
 const PHONE = window.matchMedia("(max-width: 760px), (max-height: 500px) and (pointer: coarse)");
 const KEYS = window.matchMedia("(hover: hover) and (pointer: fine)");
@@ -121,7 +124,7 @@ function setStatus(kind, text, title) {
 
 async function checkHealth() {
   try {
-    const r = await fetch("/api/health");
+    const r = await api("/api/health");
     S.health = await r.json();
   } catch (e) {
     S.health = null;
@@ -138,7 +141,7 @@ async function checkHealth() {
 
 async function buildPickers() {
   try {
-    const r = await fetch("/api/masechtot");
+    const r = await api("/api/masechtot");
     S.masechtot = (await r.json()).masechtot || [];
   } catch (e) { S.masechtot = []; }
   fillMasechtot();
@@ -187,7 +190,7 @@ function fillMasechtot() {
 // Coming back after a day or more: say where you were, and offer a review.
 async function lastTime() {
   try {
-    const { sittings } = await (await fetch("/api/history")).json();
+    const { sittings } = await (await api("/api/history")).json();
     const todayIso = new Date().toLocaleDateString("sv");   // YYYY-MM-DD, local
     const last = (sittings || []).find((s) => s.date < todayIso);
     if (!last || (sittings[0] && sittings[0].date === todayIso)) return;
@@ -206,11 +209,11 @@ async function lastTime() {
 async function today() {
   if (S.today && S.today.date === new Date().toLocaleDateString("sv")) return S.today;
   try {
-    const r = await fetch("/api/today");
+    const r = await api("/api/today");
     if (r.ok) S.today = await r.json();
   } catch (e) {}
   if (S.today) { $("today-label").textContent = S.today.he; $("today-label").dataset.day = "1"; }
-  fetch("/api/progress").then((r) => r.json()).then((p) => {
+  api("/api/progress").then((r) => r.json()).then((p) => {
     if (p.daf_yomi && p.daf_yomi.done) $("today-label").textContent = (S.today ? S.today.he : "") + " ✓";
     if (p.streak > 1) $("today").title = "הדף היומי · " + p.streak + " ימים ברצף";
   }).catch(() => {});
@@ -281,7 +284,7 @@ async function turnTo(ref, line) {
   $("page").hidden = true; $("linear").hidden = true;
   $("runner").textContent = runnerText(ref);
   try {
-    const r = await fetch("/api/daf?ref=" + encodeURIComponent(ref));
+    const r = await api("/api/daf?ref=" + encodeURIComponent(ref));
     const data = await r.json();
     if (token !== opening) return;               // the reader already turned again
     if (!r.ok) return pageError(ref, data.error);
@@ -344,7 +347,7 @@ async function drawNotes(fresh) {
   if (!S.pack) return;
   const ref = S.pack.ref;
   if (!fresh) {
-    try { S.notes = (await (await fetch("/api/notes?ref=" + encodeURIComponent(ref))).json()).notes || []; }
+    try { S.notes = (await (await api("/api/notes?ref=" + encodeURIComponent(ref))).json()).notes || []; }
     catch (e) { S.notes = []; }
     if (!S.pack || S.pack.ref !== ref) return;
   }
@@ -923,12 +926,12 @@ function showHold() {
 function prepare(item) {
   if (item.ready) return item.ready;
   item.ready = (async () => {
-    const r = await fetch("/api/voice", { method: "POST", headers: { "Content-Type": "application/json" },
+    const r = await api("/api/voice", { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text: item.text, ref: S.pack && S.pack.ref, whole: !!(item.turn && item.turn.whole),
         voice_name: S.settings.voice_name }) });
     if (!r.ok) throw new Error("voice_" + r.status);
-    const { id } = await r.json();
-    const audio = new Audio("/api/voice/" + id);
+    const { id, url } = await r.json();
+    const audio = new Audio(url || "/api/voice/" + id);     // the Worker's address, or the Python server's
     audio.preload = "auto";
     return audio;
   })();
@@ -1020,7 +1023,7 @@ function browserSpeak(text) {
 // One piece of a sentence to words, sent as soon as the speaker pauses.
 function transcribePiece(blob) {
   const q = "ref=" + encodeURIComponent(S.pack ? S.pack.ref : "") + "&line=" + S.line;
-  return fetch("/api/transcribe?" + q, { method: "POST", headers: { "Content-Type": blob.type || "audio/webm" }, body: blob })
+  return api("/api/transcribe?" + q, { method: "POST", headers: { "Content-Type": blob.type || "audio/webm" }, body: blob })
     .then((r) => (r.ok ? r.json() : { said: "" })).catch(() => ({ said: "" }));
 }
 
@@ -1297,7 +1300,7 @@ function logPush(entry) {
 }
 
 async function post(path, body, raw, signal) {
-  const r = await fetch(path, raw ? { method: "POST", headers: { "Content-Type": raw }, body, signal }
+  const r = await api(path, raw ? { method: "POST", headers: { "Content-Type": raw }, body, signal }
     : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal });
   let data = {};
   try { data = await r.json(); } catch (e) {}
@@ -1308,7 +1311,7 @@ async function post(path, body, raw, signal) {
 // /api/say answers in lines of JSON: sometimes a "let me pull up the Tur" line
 // while Sefaria is asked, then the answer. onLine sees each one as it lands.
 async function postStream(path, body, onLine, signal) {
-  const r = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" },
+  const r = await api(path, { method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify(Object.assign({ stream: true }, body)), signal });
   if (!r.ok) {
     let data = {};
@@ -1582,7 +1585,7 @@ function discardTurn(t) {
   dropTurn(t);
   for (const e of S.log) if (e.me && e.text === t.asked) e.discarded = true;
   logPush({ me: false, text: "(" + t.asked.slice(0, 60) + " — בוטל)", trace: { kind: "discarded", quick: true } });
-  fetch("/api/forget", { method: "POST", headers: { "Content-Type": "application/json" },
+  api("/api/forget", { method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ session: S.session, said: t.asked }) }).catch(() => {});
   if (t.cutInto && t.cutInto.held) resumeTurn(t.cutInto, true);
   renderBar();
@@ -2337,7 +2340,7 @@ function textLink(ref) {
     if (body.dataset.done) return;
     body.textContent = "פותח…";
     try {
-      const r = await fetch("/api/text?ref=" + encodeURIComponent(ref));
+      const r = await api("/api/text?ref=" + encodeURIComponent(ref));
       const data = await r.json();
       if (!r.ok) throw new Error(data.error);
       body.textContent = data.he;
@@ -2554,7 +2557,7 @@ function deskCard(c, i) {
     if (c.text) body.append(deskWords(c.text));
     else {
       body.append(el("div", "dc-none", "פותח…"));
-      fetch("/api/text?ref=" + encodeURIComponent(c.ref)).then((r) => r.json()).then((d) => {
+      api("/api/text?ref=" + encodeURIComponent(c.ref)).then((r) => r.json()).then((d) => {
         c.text = d.he || "לא הצלחתי להביא את זה מהספרייה.";
         body.replaceChildren(deskWords(c.text));
       }).catch(() => { body.replaceChildren(el("div", "dc-none", "לא הצלחתי להביא את זה מהספרייה.")); });
@@ -2883,7 +2886,7 @@ function progressBox() {
   box.append(el("div", "lbl", "ההתקדמות שלי"));
   const body = el("div", "prog"); body.textContent = "…";
   box.append(body);
-  fetch("/api/progress?mine=" + encodeURIComponent(S.settings.mine.join(","))).then((r) => r.json()).then((p) => {
+  api("/api/progress?mine=" + encodeURIComponent(S.settings.mine.join(","))).then((r) => r.json()).then((p) => {
     body.replaceChildren();
     const top = [];
     if (p.streak) top.push(p.streak + " ימים ברצף");
@@ -2920,13 +2923,13 @@ function learningBox() {
       line.append(label);
       prep.append(line);
       try {
-        const s = await (await fetch("/api/prepare?masechta=" + encodeURIComponent(name))).json();
+        const s = await (await api("/api/prepare?masechta=" + encodeURIComponent(name))).json();
         const ready = s.done >= s.total;
         label.textContent = m.he + ": " + (ready ? "מוכנה ✓" : s.done + " / " + s.total + " דפים" + (s.running ? " — מכין…" : ""));
         if (!ready && !s.running) {
           const go = el("button", "btn", "להכין מראש");
           go.onclick = async () => {
-            await fetch("/api/prepare", { method: "POST", headers: { "Content-Type": "application/json" },
+            await api("/api/prepare", { method: "POST", headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ masechta: name }) });
             drawPrep();
           };
@@ -3004,7 +3007,7 @@ function seatsBox() {
     b.dataset.v = v;
     b.setAttribute("aria-pressed", String(v === 1));
   };
-  fetch("/api/table").then((r) => r.json()).then(({ table }) => {
+  api("/api/table").then((r) => r.json()).then(({ table }) => {
     for (const { group, names } of table) {
       box.append(el("div", "sub", group));
       const row = el("div", "opts");

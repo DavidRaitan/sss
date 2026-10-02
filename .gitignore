@@ -19,3 +19,7 @@ chavruta/sessions/
 # Personal, and secret: your notes, and the phone link's key and certificate.
 chavruta/notes.jsonl
 chavruta/.phone/
+# The Worker: its tools, local state and local secrets.
+node_modules/
+chavruta/worker/.wrangler/
+chavruta/worker/.dev.vars
