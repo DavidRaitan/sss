@@ -1,0 +1,746 @@
+# -*- coding: utf-8 -*-
+"""End to end: a browser, a microphone, the app, and stand-ins for Sefaria and OpenAI.
+
+The microphone is Chromium's fake capture device playing a file of speech-like
+bursts, so the whole voice loop runs for real -- detecting speech, recording,
+posting, following the reading, answering aloud -- with only the two remote
+services swapped out. Run:
+
+    python3 tests/e2e.py [--shots DIR]
+"""
+
+import argparse
+import json
+import math
+import os
+import random
+import struct
+import sys
+import tempfile
+import threading
+import time
+import urllib.request
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.dirname(HERE))
+
+from tests import fake_openai, fake_sefaria  # noqa: E402
+
+
+def speechlike(path, pattern=((0.6, 0), (1.8, 1), (2.6, 0), (1.8, 1), (4.0, 0)), rate=16000):
+    """Bursts of voiced noise and silence -- enough for any VAD to find turns."""
+    rnd = random.Random(7)
+    frames = []
+    t = 0
+    for seconds, on in pattern:
+        for i in range(int(seconds * rate)):
+            s = 0.0
+            if on:
+                env = 0.55 + 0.45 * math.sin(2 * math.pi * 4 * t / rate)
+                s = env * (0.28 * math.sin(2 * math.pi * 170 * t / rate) +
+                           0.12 * math.sin(2 * math.pi * 340 * t / rate) + 0.06 * (rnd.random() - 0.5))
+            frames.append(struct.pack("<h", int(max(-1, min(1, s)) * 32000)))
+            t += 1
+    data = b"".join(frames)
+    with open(path, "wb") as f:
+        f.write(b"RIFF" + struct.pack("<I", 36 + len(data)) + b"WAVEfmt " +
+                struct.pack("<IHHIIHH", 16, 1, 1, rate, rate * 2, 2, 16) +
+                b"data" + struct.pack("<I", len(data)) + data)
+
+
+def start_stack():
+    s1, sef = fake_sefaria.start()
+    s2, oai = fake_openai.start()
+    packs = tempfile.mkdtemp()
+    # Yesterday's sitting, so coming back has something to review.
+    sessions = tempfile.mkdtemp()
+    import datetime
+    yesterday = (datetime.date.today() - datetime.timedelta(days=1)).isoformat()
+    with open(os.path.join(sessions, yesterday + ".jsonl"), "w") as f:
+        for ref in ("Berakhot 2a", "Berakhot 2b"):
+            f.write(json.dumps({"kind": "heard", "ref": ref, "at": yesterday + " 21:00:00"}) + "\n")
+    os.environ.update(CHAVRUTA_SEFARIA_API=sef, OPENAI_BASE_URL=oai, OPENAI_API_KEY="sk-test",
+                      CHAVRUTA_PACKS=packs, CHAVRUTA_SESSIONS=sessions,
+                      CHAVRUTA_NOTES=os.path.join(sessions, "notes.jsonl"), CHAVRUTA_WIKISOURCE_API=sef[:-4] + "/w/api.php",
+                      CHAVRUTA_WEB_REWRITE='{"https://halachayomit.co.il": "%s/hy", "https://www.dafyomi.co.il": "%s/daf"}' % (sef[:-4], sef[:-4]))
+    import importlib
+    import chavruta.sefaria as sf
+    importlib.reload(sf)
+    import chavruta.server as srv
+    importlib.reload(srv)
+    from http.server import ThreadingHTTPServer
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), srv.Handler)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    return "http://127.0.0.1:%d/" % httpd.server_address[1], oai.replace("/v1", "")
+
+
+def queue_transcript(control, text):
+    urllib.request.urlopen(urllib.request.Request(control + "/control/transcript",
+                           data=json.dumps({"text": text}).encode(),
+                           headers={"Content-Type": "application/json"}))
+
+
+def phone(browser, app, check, shots):
+    """The same app held in one hand: an iPhone-sized screen, touch only."""
+    ctx = browser.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=2, is_mobile=True,
+                              has_touch=True, permissions=["microphone"])
+    page = ctx.new_page()
+    errors = []
+    page.on("pageerror", lambda e: errors.append(str(e)))
+    box = lambda sel: page.locator(sel).bounding_box()
+    shot = lambda name: shots and page.screenshot(path=os.path.join(shots, name + ".png"))
+    page.goto(app, wait_until="domcontentloaded")
+    page.wait_for_function("S.pack && document.querySelectorAll('.seg').length", timeout=20000)
+    page.evaluate("S.settings.view = 'daf'; render()")
+    check("phone: nothing wider than the screen", page.evaluate("document.documentElement.scrollWidth") <= 390)
+    head = box("header")
+    check("phone: the bar is one line", head["height"] < 64, str(head))
+    check("phone: it names the page", "ברכות" in page.inner_text("#m-title"), page.inner_text("#m-title"))
+    mic, tabs = box("#mic"), [box(t) for t in ("#open-sources", "#open-desk", "#open-log", "#open-view")]
+    row = lambda b: b["y"] + b["height"] / 2
+    check("phone: the mic in a toolbar at the bottom, between the tabs",
+          all(abs(row(t) - row(mic)) < 8 for t in tabs) and mic["y"] + mic["height"] > 844 - 90
+          and tabs[1]["x"] > mic["x"] > tabs[2]["x"], str([mic] + tabs))
+    check("phone: every control a fingertip wide", all(t["height"] >= 44 for t in tabs + [box("#m-title"), box("#open-settings")]))
+    # Turning to a page: the title opens a sheet; the last choice closes it.
+    page.tap("#m-title")
+    page.wait_for_timeout(350)
+    check("phone: the title opens the page picker", page.evaluate("document.body.classList.contains('picking')")
+          and box("#picker")["y"] > 300)
+    shot("p1-picker")
+    page.select_option("#daf", "3")
+    page.wait_for_function("S.pack && S.pack.ref === 'Berakhot 3a'", timeout=20000)
+    check("phone: choosing the daf turns to it and closes the picker",
+          not page.evaluate("document.body.classList.contains('picking')") and "ג׳" in page.inner_text("#m-title"))
+    page.tap("#m-am-b")
+    page.wait_for_function("S.pack && S.pack.ref === 'Berakhot 3b'", timeout=20000)
+    check("phone: the other side is one tap in the bar", page.get_attribute("#m-am-b", "aria-pressed") == "true")
+    # The view: Steinsaltz, and bigger letters.
+    page.tap("#open-view")
+    page.wait_for_selector("#over.open .view-set")
+    page.tap("#panel .view-set .btn:has-text('שטיינזלץ')")
+    page.wait_for_selector("#linear .line")
+    check("phone: Steinsaltz from the view sheet", page.evaluate("S.settings.view") == "lin")
+    size = page.evaluate("parseFloat(getComputedStyle(document.querySelector('#linear .line')).fontSize)")
+    page.tap("#panel .sizer .btn >> nth=1")
+    check("phone: bigger letters at a tap",
+          page.evaluate("parseFloat(getComputedStyle(document.querySelector('#linear .line')).fontSize)") > size)
+    check("phone: the view sheet as tall as what it holds", box("#over")["height"] < 520, str(box("#over")))
+    page.tap("#panel .sizer .btn >> nth=0")
+    page.tap("#panel .view-set .btn:has-text('צורת הדף')")
+    # The commentaries: a sheet that rises from the toolbar, the page still above it.
+    page.tap("#open-sources")
+    page.wait_for_selector("#over.open .src")
+    page.wait_for_timeout(400)
+    over, foot, main = box("#over"), box("footer"), box("main")
+    check("phone: the commentaries rise from the toolbar", abs(over["y"] + over["height"] - foot["y"]) < 2
+          and page.locator("#mic").is_visible(), str([over, foot]))
+    check("phone: …and the page stays in view above them", main["height"] > 200 and main["y"] + main["height"] <= over["y"] + 2,
+          str([main, over]))
+    shot("p2-sources")
+    g = box("#grip")
+    x, y = g["x"] + g["width"] / 2, g["y"] + 12
+    page.mouse.move(x, y); page.mouse.down()
+    for k in range(1, 9):
+        page.mouse.move(x, y - 30 * k)
+        page.wait_for_timeout(16)
+    page.mouse.up()
+    page.wait_for_timeout(500)
+    check("phone: drawn up, it settles tall", box("#over")["height"] > over["height"] + 150, str(box("#over")))
+    g = box("#grip")
+    page.mouse.move(x, g["y"] + 12); page.mouse.down()
+    page.mouse.move(x, g["y"] + 60); page.mouse.move(x, g["y"] + 260)
+    page.mouse.up()
+    page.wait_for_timeout(500)
+    check("phone: flicked down, it goes away", page.locator("#over.open").count() == 0)
+    # One thing at a time: the desk and a sheet do not stack.
+    page.tap("#open-sources"); page.wait_for_selector("#over.open")
+    page.tap("#open-desk")
+    check("phone: opening the desk lowers the sheet", page.locator("#over.open").count() == 0 and
+          page.locator("#desk:not([hidden])").count() == 1)
+    page.tap("#open-sources"); page.wait_for_selector("#over.open")
+    check("phone: …and a sheet puts the desk away", page.evaluate("!DESK.open"))
+    page.tap("#close-panel")
+    # The transcript: no keyboard jumping up unasked.
+    page.tap("#open-log"); page.wait_for_selector("#over.open #turns")
+    page.wait_for_timeout(100)
+    check("phone: the transcript does not open the keyboard", page.evaluate("document.activeElement.tagName") != "INPUT")
+    page.tap("#close-panel")
+    # On its side: the panel goes beside the page.
+    page.set_viewport_size({"width": 844, "height": 390})
+    page.wait_for_timeout(200)
+    page.tap("#open-sources"); page.wait_for_selector("#over.open"); page.wait_for_timeout(400)
+    check("phone on its side: the commentaries beside the page", box("#over")["width"] < 844 * 0.6 and
+          box("main")["width"] > 400, str([box("#over"), box("main")]))
+    shot("p3-landscape")
+    check("phone: no JavaScript errors", not errors, "; ".join(errors[:3]))
+    ctx.close()
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--shots", default=None)
+    ap.add_argument("--part", default="all")
+    args = ap.parse_args()
+    from playwright.sync_api import sync_playwright
+
+    app, control = start_stack()
+    mic = os.path.join(tempfile.mkdtemp(), "mic.wav")
+    speechlike(mic)
+    problems = []
+    with sync_playwright() as p:
+        browser = p.chromium.launch(executable_path="/opt/pw-browsers/chromium", args=[
+            "--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream",
+            "--use-file-for-fake-audio-capture=%s" % mic, "--autoplay-policy=no-user-gesture-required"])
+        ctx = browser.new_context(viewport={"width": 1400, "height": 900}, permissions=["microphone"])
+        page = ctx.new_page()
+        errors = []
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        # A web font refused by this sandbox's network proxy is not the page's error.
+        page.on("console", lambda m: errors.append("console: " + m.text)
+                if m.type == "error" and "ERR_CERT_AUTHORITY_INVALID" not in m.text else None)
+
+        def check(label, ok, detail=""):
+            print("%s %s %s" % ("✓" if ok else "✗", label, detail))
+            if not ok:
+                problems.append(label)
+
+        def shot(name):
+            if args.shots:
+                page.screenshot(path=os.path.join(args.shots, name + ".png"))
+
+        page.goto(app, wait_until="domcontentloaded")
+        page.wait_for_selector(".seg", timeout=20000)
+        check("opens Berakhot 2a", page.locator(".seg").count() == 14, "(%d lines)" % page.locator(".seg").count())
+        check("Rashi column filled", page.locator("#col-inner .c").count() >= 10,
+              "(%d)" % page.locator("#col-inner .c").count())
+        check("Tosafot column filled", page.locator("#col-outer .c").count() >= 4,
+              "(%d)" % page.locator("#col-outer .c").count())
+        check("runner in Hebrew", "ברכות" in page.inner_text("#runner"), page.inner_text("#runner"))
+        check("the units of the page are marked", page.locator(".unit").all_inner_texts() == ["משנה", "גמרא", "אמר מר"],
+              str(page.locator(".unit").all_inner_texts()))
+        check("status ready", page.inner_text("#statustext") in ("מוכן", "ספריא לא זמינה"), page.inner_text("#statustext"))
+        check("printed text has no nikud", not any(0x591 <= ord(c) <= 0x5c7 for c in page.inner_text("#gtext")))
+        check("the phone's own controls stay on the phone",
+              not any(page.is_visible(x) for x in ("#m-title", ".m-amud", "#open-view", "#skipnow", ".pick-head")))
+        shot("01-daf")
+
+        # Coming back after a day: where you were, and a review on one tap.
+        page.wait_for_selector("#chips .chip:has-text('חזרה על מה שלמדנו')", timeout=10000)
+        check("coming back, it says where you stopped", "בפעם הקודמת" in page.inner_text("#reply"),
+              page.inner_text("#reply")[:60])
+        page.click("#chips .chip:has-text('חזרה על מה שלמדנו')")
+        page.wait_for_function("S.turns.some(t => /\\[\\[Berakhot 2b\\]\\]/.test(t.text || ''))", timeout=20000)
+        check("↺ reviews last time's pages, each cited",
+              page.evaluate("S.turns.some(t => /Berakhot 2a/.test(t.text) && /Berakhot 2b/.test(t.text))"))
+        page.wait_for_function("!saying && !speechQ.length", timeout=20000)
+
+        # The picker: daf ג, amud ב.
+        page.select_option("#daf", "3")
+        page.click("#am-b")
+        page.wait_for_function("document.querySelector('#runner').textContent.includes('דף ג׳ · עמוד ב׳')")
+        page.wait_for_selector(".seg", timeout=20000)
+        page.wait_for_function("document.querySelectorAll('.seg').length === 32", timeout=20000)
+        check("picker opens ג ע״ב with its 32 lines", page.locator(".seg").count() == 32)
+        check("amud bet puts Rashi on the left",
+              "bet" in page.get_attribute("#page", "class"))
+        page.keyboard.press("ArrowLeft")
+        page.wait_for_function("document.querySelector('#runner').textContent.includes('ד׳')", timeout=20000)
+        check("← key flips on to ד ע״א", "ד׳" in page.inner_text("#runner"), page.inner_text("#runner"))
+        page.wait_for_function("S.pack && S.pack.ref === 'Berakhot 4a'", timeout=20000)
+        page.keyboard.press("ArrowRight")
+        page.wait_for_function("document.querySelector('#runner').textContent.includes('דף ג׳ · עמוד ב׳')", timeout=20000)
+        check("→ key flips back to ג ע״ב", "עמוד ב׳" in page.inner_text("#runner"), page.inner_text("#runner"))
+        shot("02-bet")
+
+        # Back to 2a for the conversation.
+        page.select_option("#daf", "2"); page.click("#am-a")
+        page.wait_for_function("document.querySelectorAll('.seg').length === 14", timeout=20000)
+
+        page.click("#v-lin")
+        page.wait_for_selector(".line")
+        check("Steinsaltz view: a line for each line of the daf", page.locator("#linear .line").count() == 14)
+        check("Steinsaltz as Sefaria sets him: a paragraph a line, the daf's words bold",
+              page.locator("#linear .line.stzline").count() == 14 and
+              page.evaluate("getComputedStyle(document.querySelector('.stz .w.d')).fontWeight") == "700")
+        check("…his translations without brackets, quieter",
+              page.locator(".stz .tr").count() > 5 and "[" not in page.inner_text("#linear"),
+              page.inner_text("#linear")[:80])
+        check("…verse references in small print", page.locator(".stz .cite").count() >= 2)
+        check("…and every word of the daf is still there, once",
+              page.evaluate(r"""S.pack.segments.every(s => document.querySelectorAll('.line[data-n="' + s.n + '"] .w[data-k]').length ===
+                                s.he.split(/\s+/).filter(t => norm(t)).length)"""))
+        page.evaluate("selectLine(6)")
+        page.wait_for_timeout(450)
+        shot("12-steinsaltz")
+        page.click("#linear .ex-bar button:has-text('גמרא מנוקדת')")
+        check("…or the pointed daf alone, at a tap", page.locator("#linear .line.stzline").count() == 0 and
+              any(0x591 <= ord(c) <= 0x5c7 for c in page.inner_text("#linear")))
+        page.click("#linear .ex-bar button:has-text('שטיינזלץ')")
+        page.click("#v-daf")
+        page.wait_for_selector(".seg")
+        font = lambda sel: page.evaluate("getComputedStyle(document.querySelector('%s')).fontFamily" % sel)
+        check("the commentaries in plain letters by default", "Rashi" not in font("#col-inner .c"), font("#col-inner .c"))
+        page.evaluate("S.settings.script = 'page'; applyScript()")
+        check("…Rashi script for the page's own, from settings", "Rashi" in font("#col-inner .c"))
+        page.evaluate("S.settings.script = 'plain'; applyScript()")
+
+        if args.part in ("all", "voice"):
+            # The sitting that taught us what was wrong, replayed.
+            line1 = ("מאימתי קורין את שמע בערבין משעה שהכהנים נכנסים לאכול בתרומתן "
+                     "עד סוף האשמורה הראשונה דברי רבי אליעזר")
+            queue_transcript(control, line1)                                  # 1. read right: silence
+            queue_transcript(control, line1.replace("בתרומתן", "מעשר"))      # 2. a different word: asked
+            queue_transcript(control, "וחכמים אומרים עד חצות רבן גמליאל אומר עד שיעלה עמוד השחר "
+                                      "מעשה ובאו בניו מבית המשתה אמרו לו לא קרינו את שמע אמר להם "
+                                      "אם לא עלה עמוד השחר חייבין אתם לקרות ולא זו בלבד אמרו אלא כל מה "
+                                      "שאמרו חכמים עד חצות מצותן עד שיעלה עמוד השחר הקטר חלבים ואברים "
+                                      "מצותן עד שיעלה עמוד השחר וכל הנאכלים ליום אחד מצותן עד שיעלה "
+                                      "עמוד השחר אם כן למה אמרו חכמים עד חצות כדי להרחיק אדם מן העבירה")  # 3. to the end of the mishna
+            queue_transcript(control, "so he's saying you read shema whenever you happen to go to sleep")
+            queue_transcript(control, "and was this codified in the Tur or Shulchan Aruch or the Rama?")
+            queue_transcript(control, "can you hear me?")
+            page.click("#mic")
+            page.wait_for_function("['listening','capturing'].includes(document.querySelector('#mic').dataset.state)",
+                                   timeout=8000)
+            check("mic opens and listens", True, page.inner_text("#state"))
+            page.wait_for_function("document.querySelectorAll('.w.read').length > 5", timeout=25000)
+            check("follows the reading on the page", page.locator(".w.read").count() >= 10,
+                  "(%d words marked)" % page.locator(".w.read").count())
+            def said(pattern, t=60000):
+                try:
+                    page.wait_for_function("S.log.some((t) => !t.me && %s.test(t.text))" % pattern, timeout=t)
+                except Exception:
+                    print("waited for %s; the log was:" % pattern,
+                          page.evaluate("JSON.stringify(S.log.map((t) => [t.me, t.mode, (t.text || '').slice(0, 60)]))"))
+                    raise
+            said("/מעשר\\?/")
+            log = page.evaluate("S.log.map((t) => [t.me ? 'me' : 'it', t.mode || '', t.text])")
+            log = log[next(i for i, t in enumerate(log) if t[1] == "reading"):]   # after the review at the start
+            check("a clean reading gets no reply", log[0][:2] == ["me", "reading"] and log[1][0] == "me",
+                  str(log[:2])[:160])
+            check("a different word is asked about, once", sum("מעשר?" in t[2] for t in log) == 1,
+                  next((t[2] for t in log if "מעשר?" in t[2]), "")[:90])
+            said("/takes on Rashi/")
+            check("speaks up at the end of the mishna, not the first line", True)
+            shot("03-reading")
+            said("/can't be right/")
+            check("answers the explanation", True)
+            said("/pull up/")
+            said("/rules like Rabban Gamliel/")
+            log = page.evaluate("S.log.map((t) => [t.me ? 'me' : 'it', t.interim ? 'interim' : '', t.text])")
+            fetching = next(t[2] for t in log if t[1] == "interim" and "the Tur" in t[2]) \
+                if any("the Tur" in t[2] for t in log if t[1] == "interim") else ""
+            check("says it is fetching, then answers from the Tur", "the Tur" in fetching, fetching)
+            said("/hear you/")
+            check("a mic check gets a few words", True)
+            shot("04-answer")
+            # Replies wait for a pause in the learner's speech, and the fake
+            # microphone talks a lot: give them time to be said.
+            for _ in range(40):
+                spoken = [e for e in json.loads(urllib.request.urlopen(control + "/control/log").read())
+                          if e["path"] == "speech"]
+                if len(spoken) >= 4:
+                    break
+                time.sleep(0.5)
+            check("replies are spoken", len(spoken) >= 4, "(%d)" % len(spoken))
+            check("the fetching line is spoken before the answer",
+                  any("pull up" in e["input"] for e in spoken))
+            check("short quotes are spoken, the gemara is not read back",
+                  any("בתרומתן" in e["input"] for e in spoken) and
+                  not any("נכנסים לאכול בתרומתן עד סוף האשמורה הראשונה" in e["input"] for e in spoken),
+                  " | ".join(e["input"][:40] for e in spoken[:4]))
+            check("no citation markers reach the voice", not any("[[" in e["input"] for e in spoken))
+            heard = [e for e in json.loads(urllib.request.urlopen(control + "/control/log").read())
+                     if e["path"] == "transcribe"]
+            check("transcription primed with the page",
+                  bool(heard) and any("מאימתי" in e["prompt"] for e in heard),
+                  heard[0]["prompt"][-60:] if heard else "")
+            report = page.evaluate("sessionReport()")
+            check("session export has the whole sitting",
+                  "heard as reading" in report and "differs from the page" in report and
+                  "Tur, Orach Chayim 235" in report and "while fetching" in report and "quick reply" in report,
+                  "(%d chars)" % len(report))
+            if args.shots:
+                open(os.path.join(args.shots, "session.md"), "w").write(report)
+            recorded = os.listdir(os.environ["CHAVRUTA_SESSIONS"])
+            check("each turn is recorded on disk", bool(recorded), str(recorded))
+            page.click("#mic", delay=900)              # held down: everything stops
+            page.wait_for_function("!saying && !speakingDone", timeout=15000)
+            check("a long press on the mic stops everything", page.evaluate("!S.listening && !speechQ.length"),
+                  page.evaluate("JSON.stringify([S.listening, speechQ.length, document.querySelector('#mic').dataset.state, S.turns.slice(-3).map(t => [t.asked.slice(0, 30), t.status])])"))
+            # Citations sit in the sentence and open what they cite.
+            page.evaluate("showReply(S.log.find((t) => /can't be right/.test(t.text)).text)")
+            check("a citation sits inside the sentence", page.locator("#reply .chip.inline").count() >= 1)
+            page.click("#reply .chip.inline")
+            page.wait_for_selector("#over.open", timeout=5000)
+            check("chip opens the source", page.locator(".src.flash").count() == 1)
+            shot("05-source")
+            page.keyboard.press("Escape")
+            page.evaluate("showReply(S.log.find((t) => /rules like Rabban Gamliel/.test(t.text)).text)")
+            page.click("#reply .chip.inline")
+            page.wait_for_function("/הלכה כר/.test((document.querySelector('.tl .body') || {}).textContent || '')",
+                                   timeout=8000)
+            check("a code off the page opens in the panel, fetched from Sefaria", True)
+            shot("06-tur")
+            page.keyboard.press("Escape")
+            check("mic closes", page.get_attribute("#mic", "data-state") == "idle")
+
+            # ⏸ stops it without talking over it; ▶ carries on.
+            page.evaluate("void say('Rabban Gamliel holds the whole night is bedtime, and the Sages set midnight "
+                          "as a fence so that a person does not come to miss it altogether. ' .repeat(2))")
+            page.wait_for_selector("#hold:not([hidden])", timeout=15000)
+            page.click("#hold")
+            check("⏸ pauses the voice", page.get_attribute("#mic", "data-state") == "paused"
+                  and page.get_attribute("#hold", "aria-label") == "להמשיך")
+            page.click("#hold")
+            check("▶ resumes it", page.get_attribute("#mic", "data-state") == "speaking"
+                  and page.get_attribute("#hold", "aria-label") == "לעצור", page.get_attribute("#mic", "data-state"))
+            page.keyboard.press("Escape")
+            page.wait_for_selector("#hold", state="hidden", timeout=5000)
+            check("Esc stops it", True)
+
+            # A tap on the mic is the mic: closed while it speaks, and it goes on speaking.
+            long_text = ("Rabban Gamliel holds the whole night is bedtime, and the Sages set midnight as a fence "
+                         "so that a person does not come to miss it altogether. ") * 6
+            page.evaluate("document.documentElement.style.setProperty('--talk-h', '70px')")   # a small area
+            page.evaluate("answered('tell me more', %s)" % json.dumps(long_text))
+            page.wait_for_function("!!(saying && speakingDone)", timeout=10000)
+            # (An open mic without the test's looping recording, which would talk over it.)
+            page.evaluate("S.listening = true; syncMic()")
+            page.click("#mic")
+            page.wait_for_timeout(300)
+            check("a tap on the mic while it speaks only closes the mic",
+                  page.evaluate("!S.listening && !!speakingDone && document.querySelector('#mic').classList.contains('muted')"))
+            # And the words follow the voice, the conversation scrolling itself.
+            page.wait_for_selector("#reply.speaking .sw.in", timeout=5000)
+            marked = page.evaluate("[document.querySelectorAll('#reply .sw.in').length, document.querySelectorAll('#reply .sw').length]")
+            check("the sentence being said is marked as it speaks -- that sentence only",
+                  0 < marked[0] < marked[1], str(marked))
+            page.wait_for_function("document.querySelector('#talk').scrollTop > 20", timeout=15000)
+            check("…and the conversation scrolls to keep up", True)
+            page.evaluate("document.documentElement.style.removeProperty('--talk-h')")
+            page.keyboard.press("Escape")
+            page.wait_for_selector("#hold", state="hidden", timeout=5000)
+
+            # Mic on/off/on quickly: never stuck, never two microphones.
+            for _ in range(3):
+                page.click("#mic")
+            page.wait_for_function("['listening','capturing','hearing'].includes(document.querySelector('#mic').dataset.state)",
+                                   timeout=8000)
+            page.click("#mic")
+            check("mic toggles cleanly", page.get_attribute("#mic", "data-state") == "idle"
+                  and page.evaluate("ears === null && !S.listening"))
+
+            # Typing: the panel stays open, the gemara stays in view, the turn appears.
+            page.click("#open-log")
+            page.fill("#panel input", "can you hear me?")
+            page.press("#panel input", "Enter")
+            page.wait_for_function("/hear you|I'm here/.test(document.querySelector('#turns').textContent)",
+                                   timeout=15000)
+            check("typing answers in the open transcript", page.locator("#over.open").count() == 1)
+            # Their question is a commentator's: whose, and read it together or the gist.
+            page.fill("#panel input", "why does the mishna need to say the priests at all?")
+            page.press("#panel input", "Enter")
+            page.wait_for_function("/it's exactly the/.test(document.querySelector('#turns').textContent)",
+                                   timeout=15000)
+            check("their question is a commentator's, and it offers to read it", True)
+            page.fill("#panel input", "let's read it together")
+            page.press("#panel input", "Enter")
+            page.wait_for_function("/why the priests are named/.test(document.querySelector('#turns').textContent)",
+                                   timeout=15000)
+            chose = [json.loads(l) for f in os.listdir(os.environ["CHAVRUTA_SESSIONS"]) if f.endswith(".jsonl")
+                     for l in open(os.path.join(os.environ["CHAVRUTA_SESSIONS"], f))
+                     if '"chose"' in l]
+            check("…and reads it with them, in full", chose and chose[-1]["trace"]["chose"] == "read")
+            # The desk: what is read opens beside the page, the words lit as they are read.
+            page.wait_for_selector("#desk:not([hidden]) .dc", timeout=5000)
+            check("reading it together opens it on the desk", page.locator("#desk .dc").count() == 1)
+            page.wait_for_function("document.querySelectorAll('#desk .dw.quoted').length >= 3", timeout=8000)
+            check("…with the words being read lit", True)
+            check("…at the comment being read", page.locator("#desk .dc-entry.focus").count() == 1)
+            page.fill("#panel input", "put the Meiri and the Rashba on the side")
+            page.press("#panel input", "Enter")
+            page.wait_for_function("document.querySelectorAll('#desk .dc').length === 3", timeout=15000)
+            names = lambda: page.evaluate("[...document.querySelectorAll('#desk .dc-name')].map((n) => n.textContent)")
+            check("more commentators by voice", names()[1:] == ["מאירי", "רשב״א"], str(names()))
+            page.locator("#desk .dc").nth(2).locator(".dc-btn").first.click()
+            check("rearranged", names()[1:] == ["רשב״א", "מאירי"], str(names()))
+            page.click("#desk-below")
+            check("the desk under the page", page.evaluate(
+                "getComputedStyle(document.querySelector('main')).flexDirection") == "column")
+            page.click("#desk-side")
+            page.click("#desk-add")
+            page.locator("#desk-pick .chip:not(.on)").first.click()
+            check("＋ adds from everyone on the amud", page.locator("#desk .dc").count() == 4)
+            page.locator("#desk .dc").nth(3).locator(".dc-btn[title='להוריד מהשולחן']").click()
+            page.wait_for_function("document.querySelectorAll('#desk .dc').length === 3", timeout=3000)
+            check("✕ takes one off", True)
+            # Carried by the hand: ⋮⋮ onto another card, and they change places.
+            page.click("#desk-add")            # the list closed, for room
+            page.evaluate("document.querySelector('#desk-cards').scrollTop = 0")
+            page.locator("#desk .dc").nth(2).locator(".dc-grip").scroll_into_view_if_needed()
+            grip = page.locator("#desk .dc").nth(2).locator(".dc-grip").bounding_box()
+            target = page.locator("#desk .dc").nth(1).bounding_box()
+            page.mouse.move(grip["x"] + 4, grip["y"] + 4)
+            page.mouse.down()
+            page.mouse.move(grip["x"] + 14, grip["y"] + 4)                      # past the tap threshold
+            page.mouse.move(target["x"] + target["width"] / 2, target["y"] + 30)
+            page.mouse.move(target["x"] + target["width"] / 2 + 3, target["y"] + 32)
+            check("…lifted while carried", page.locator("#desk .dc.lifted").count() == 1)
+            page.mouse.up()
+            page.wait_for_function("!document.querySelector('#desk .dc.lifted')", timeout=3000)
+            page.wait_for_timeout(400)
+            check("dragged into a new place", names()[1:] == ["מאירי", "רשב״א"], str(names()))
+            # Saved: one tap, a name, Enter.
+            page.click(".lay-save")
+            page.fill(".lay-form input", "הלימוד שלי")
+            page.press(".lay-form input", "Enter")
+            check("a layout saved under a name", page.locator(".lay.on", has_text="הלימוד שלי").count() == 1)
+            shot("07-desk")
+            page.click("#desk-close")
+            check("the desk closes", page.locator("#desk[hidden]").count() == 1)
+            # Settings by voice: done at once, and said in a few words.
+            page.fill("#panel input", "answer in Hebrew from now on")
+            page.press("#panel input", "Enter")
+            page.wait_for_function("S.settings.language === 'he'", timeout=15000)
+            page.wait_for_function("S.turns.some(t => /מעכשיו בעברית/.test(t.text || ''))", timeout=15000)
+            check("a setting changed by voice", True)
+            # Turning the voice off is asked first.
+            page.fill("#panel input", "turn off your voice")
+            page.press("#panel input", "Enter")
+            page.wait_for_function("S.pendingSettings && S.pendingSettings.length === 1", timeout=15000)
+            check("turning the voice off is asked first", page.evaluate("S.settings.speak") is True)
+            page.fill("#panel input", "no")
+            page.press("#panel input", "Enter")
+            page.wait_for_function("!S.pendingSettings", timeout=15000)
+            check("…and 'no' keeps it", page.evaluate("S.settings.speak") is True)
+            page.evaluate("S.settings.language = 'en'; saveSettings()")
+            page.wait_for_function("!saying && !speechQ.length", timeout=20000)
+            # A follow-up said while the first question is still being thought
+            # about is answered with it, once. (The model is slowed down here so
+            # the first is certainly still thinking.)
+            latency = lambda s: urllib.request.urlopen(urllib.request.Request(
+                control + "/control/latency", data=json.dumps({"seconds": s}).encode(),
+                headers={"Content-Type": "application/json"}))
+            latency(0.8)
+            page.fill("#panel input", "so he's saying you read shema whenever you happen to go to sleep")
+            page.press("#panel input", "Enter")
+            page.fill("#panel input", "and was this codified in the Tur or Shulchan Aruch or the Rama?")
+            page.press("#panel input", "Enter")
+            page.wait_for_function("S.turns.some(t => /so he's saying/.test(t.asked) && /codified/.test(t.asked))",
+                                   timeout=15000)
+            check("a follow-up while it thinks is answered with the question, once",
+                  page.evaluate("S.turns.filter(t => /^and was this codified/.test(t.asked) && open(t)).length") == 0,
+                  page.evaluate("JSON.stringify(S.turns.map(t => [t.asked.slice(0, 30), t.status]))"))
+            # Spoken over an answer: it stops and holds its place, and what was
+            # said is judged against that answer.
+            # An aside ("what does chatzot mean?"): answered at once, briefly,
+            # then back to where it was.
+            page.wait_for_function("saying && saying.turn && /codified/.test(saying.turn.asked)", timeout=20000)
+            page.fill("#panel input", "what does chatzot mean here?")
+            page.press("#panel input", "Enter")
+            page.wait_for_function("S.turns.some(t => /codified/.test(t.asked) && t.held)", timeout=8000)
+            check("speaking over an answer holds it where it was", True)
+            check("…and it shows as waiting to go on", "להמשיך" in page.inner_text("#queue"), page.inner_text("#queue"))
+            shot("08-queue")
+            page.wait_for_function("S.log.some(t => !t.me && /Chatzot is midnight/.test(t.text))", timeout=15000)
+            check("a quick aside is answered at once, briefly", True)
+            page.wait_for_function("(() => { const t = S.turns.filter(t => /codified/.test(t.asked)).pop();"
+                                   " return t && !t.held && (saying && saying.turn === t || t.status === 'done'); })()",
+                                   timeout=20000)
+            check("…then it goes back to the answer it cut into", True)
+            latency(0)
+            page.wait_for_function("!saying && !speechQ.length", timeout=30000)
+            long_answer = ("The Tur brings the Rosh, who rules like Rabban Gamliel even at the outset, and the "
+                           "Beit Yosef explains why the Shulchan Aruch follows him; the Rama adds nothing here. ") * 2
+            # A correction ("no, I mean ..."): the rest is dropped, the question as it now stands answered.
+            page.evaluate("answered('what does the Tur say?', %s)" % json.dumps(long_answer))
+            page.wait_for_function("saying && saying.turn && /what does the Tur say/.test(saying.turn.asked)", timeout=10000)
+            page.evaluate("pauseSpeaking()")          # held on a word, then something is said
+            page.fill("#panel input", "no, I mean in the Rambam")
+            page.press("#panel input", "Enter")
+            page.wait_for_function("S.log.some(t => !t.me && /For that it is the same/.test(t.text))", timeout=15000)
+            check("a correction replaces the answer it cut into",
+                  page.evaluate("S.turns.some(t => /what does the Tur say.*Rambam/.test(t.asked)) && "
+                                "S.turns.find(t => t.asked === 'what does the Tur say?').status === 'skipped'"),
+                  page.evaluate("JSON.stringify(S.turns.slice(-3).map(t => [t.asked.slice(0, 40), t.status]))"))
+            page.wait_for_function("!saying && !speechQ.length", timeout=30000)
+            # For later ("let's come back to that"): kept in the queue, and on it goes.
+            page.evaluate("answered('what does the Tur say?', %s)" % json.dumps(long_answer))
+            page.wait_for_function("saying && saying.turn && /what does the Tur say/.test(saying.turn.asked)", timeout=10000)
+            page.evaluate("pauseSpeaking()")          # held on a word, then something is said
+            page.fill("#panel input", "remind me later to ask about the Rama")
+            page.press("#panel input", "Enter")
+            page.wait_for_function("S.later.length === 1", timeout=15000)
+            check("something for later is kept in the queue", "לאחר כך" in page.inner_text("#queue"), page.inner_text("#queue"))
+            page.wait_for_function("(() => { const t = S.turns.filter(t => t.asked === 'what does the Tur say?').pop();"
+                                   " return t && !t.held && saying && saying.turn === t; })()", timeout=15000)
+            check("…and the answer goes on", True)
+            page.evaluate("skipCurrent()")
+            page.wait_for_function("!saying && !speechQ.length", timeout=30000)
+            # A new question: answered now; the other waits, and "yes" brings it back.
+            page.evaluate("answered('what does the Tur say?', %s)" % json.dumps(long_answer))
+            page.wait_for_function("saying && saying.turn && /what does the Tur say/.test(saying.turn.asked)", timeout=10000)
+            page.evaluate("pauseSpeaking()")          # held on a word, then something is said
+            page.fill("#panel input", "a different question: what does chatzot mean here?")
+            page.press("#panel input", "Enter")
+            page.wait_for_function("S.offerResume && S.offerResume.held", timeout=20000)
+            check("a new question is answered, and it offers to go back", True)
+            page.fill("#panel input", "yes")
+            page.press("#panel input", "Enter")
+            page.wait_for_function("(() => { const t = S.offerResume === null && S.turns.filter(t => t.asked === 'what does the Tur say?').pop();"
+                                   " return t && !t.held; })()", timeout=15000)
+            check("…and goes back when asked", True)
+            page.evaluate("skipCurrent()")
+            page.evaluate("S.later.length = 0; renderBar()")
+            page.wait_for_function("!saying && !speechQ.length", timeout=30000)
+            # Taken back: "never mind" drops what was just asked; so does the ✕ beside it.
+            latency(2.0)
+            page.fill("#panel input", "what about the Rambam on this?")
+            page.press("#panel input", "Enter")
+            page.wait_for_function("S.turns.some(t => /Rambam on this/.test(t.asked) && t.status === 'thinking')", timeout=10000)
+            page.fill("#panel input", "never mind")
+            page.press("#panel input", "Enter")
+            page.wait_for_function("S.turns.some(t => /Rambam on this/.test(t.asked) && t.discarded)", timeout=10000)
+            page.wait_for_timeout(2500)
+            check("'never mind' takes back what was just asked, unanswered",
+                  page.evaluate("(() => { const t = S.turns.find(t => /Rambam on this/.test(t.asked));"
+                                " return t.status === 'skipped' && !t.text; })()"))
+            page.fill("#panel input", "and the Rif on this?")
+            page.press("#panel input", "Enter")
+            page.wait_for_selector("#asked .asked-x", timeout=10000)
+            page.click("#asked .asked-x")
+            check("…and so does the ✕ beside it",
+                  page.evaluate("S.turns.some(t => /Rif on this/.test(t.asked) && t.discarded && t.status === 'skipped')"))
+            latency(0)
+            page.wait_for_function("!saying && !speechQ.length", timeout=30000)
+            # The fast path: a plain question started before the router answered, and the export says where time went.
+            heads = [json.loads(l) for f in os.listdir(os.environ["CHAVRUTA_SESSIONS"]) if f.endswith(".jsonl")
+                     for l in open(os.path.join(os.environ["CHAVRUTA_SESSIONS"], f)) if '"head_start": true' in l]
+            check("a plain question begins before the router has answered", bool(heads),
+                  heads[0]["said"] if heads else "")
+            check("the export shows where the time went", "[timing:" in page.evaluate("sessionReport()"))
+            # "I'm still waiting" while it gathers: a word back at once, and the work goes on.
+            latency(2.5)
+            page.fill("#panel input", "why does the mishna mention the priests at all?")
+            page.press("#panel input", "Enter")
+            page.wait_for_function("S.turns.some(t => /mention the priests/.test(t.asked) && t.status === 'thinking')",
+                                   timeout=10000)
+            page.fill("#panel input", "I'm still waiting")
+            page.press("#panel input", "Enter")
+            page.wait_for_function("S.log.some(t => !t.me && /Still on it/.test(t.text))", timeout=10000)
+            check("'still waiting' gets a word back at once", True)
+            page.wait_for_function("(() => { const t = S.turns.filter(t => /mention the priests/.test(t.asked)).pop();"
+                                   " return t && t.text && t.status !== 'skipped'; })()", timeout=20000)
+            check("…and the answer it was working on still comes", True)
+            latency(0)
+            page.wait_for_function("!saying && !speechQ.length", timeout=30000)
+            box = page.evaluate("(() => { const g = document.querySelector('#col-gemara').getBoundingClientRect();"
+                                " const p = document.querySelector('#panel').getBoundingClientRect();"
+                                " return [g.left, g.right, p.left, p.right]; })()")
+            check("the gemara stays in view beside the panel", box[1] <= box[2] + 1 or box[0] >= box[3] - 1, str(box))
+            shot("07-docked")
+            # ✕ is always in reach, however far down the panel is scrolled.
+            page.evaluate("document.querySelector('#panel').scrollTo({top: 99999})")
+            close = page.evaluate("(() => { const r = document.querySelector('#close-panel').getBoundingClientRect();"
+                                  " return r.top >= 0 && r.bottom <= innerHeight; })()")
+            check("✕ stays in reach when the panel is scrolled", close)
+            # Drag the edge: the panel takes more of the screen, and it is remembered.
+            before = page.evaluate("document.querySelector('#over').getBoundingClientRect().width")
+            g = page.locator("#grip").bounding_box()
+            page.mouse.move(g["x"] + 5, g["y"] + g["height"] / 2)
+            page.mouse.down()
+            page.mouse.move(g["x"] - 200, g["y"] + g["height"] / 2, steps=8)
+            page.mouse.up()
+            after = page.evaluate("document.querySelector('#over').getBoundingClientRect().width")
+            check("dragging the edge resizes the panel", after > before + 100, "%d -> %d" % (before, after))
+            page.mouse.move(g["x"] - 350, g["y"] + g["height"] / 2, steps=4)
+            check("…and once let go, it stays where it was left",
+                  abs(page.evaluate("document.querySelector('#over').getBoundingClientRect().width") - after) < 2)
+            page.click("#close-panel")
+            check("✕ closes it", page.locator("#over.open").count() == 0)
+
+        page.click("#open-settings")
+        check("settings open", page.locator(".set").count() >= 8)
+        # Seat the Ritva, leave out the Meiri: kept, and sent with every question.
+        page.wait_for_selector(".seat[title='Ritva']", timeout=8000)
+        page.click(".seat[title='Ritva']")
+        page.click(".seat[title='Meiri']")
+        page.click(".seat[title='Meiri']")
+        # What I'm learning: Berakhot goes to the top of the picker.
+        page.click(".learning .btn[data-masechta='Berakhot']")
+        page.wait_for_selector(".prepline", timeout=8000)
+        check("my tractates come first in the picker",
+              page.evaluate("document.querySelector('#mas optgroup').label") == "שלי"
+              and page.evaluate("document.querySelectorAll('#mas option').length") >= 37,
+              page.inner_text(".prep")[:60])
+        # 📅 goes to today's daf (the fake calendar says Berakhot 2).
+        page.click("#today")
+        page.wait_for_function("S.pack && S.pack.ref === 'Berakhot 2a'", timeout=15000)
+        check("📅 opens today's daf", "ברכות" in page.inner_text("#today"), page.inner_text("#today"))
+        check("who sits at the table is chosen in settings",
+              page.evaluate("JSON.stringify(S.settings.favor)") == '{"Ritva":1,"Meiri":-1}',
+              page.inner_text(".seats")[:80])
+        shot("06-settings")
+        page.keyboard.press("Escape")
+        page.click("#open-log")
+        check("transcript shows the turns", page.locator(".turn").count() >= 2 if args.part != "picker" else True)
+        page.keyboard.press("Escape")
+
+        errors = [e for e in errors if "favicon" not in e and "fonts.g" not in e and "ERR_TUNNEL" not in e
+                  and "ERR_CERT" not in e]  # this sandbox's proxy blocks Google Fonts
+        # One pace for every sentence: measured as they are said, in both languages alike.
+        check("each sentence's pace is measured", page.evaluate("PACES.length") >= 2, str(page.evaluate("PACES.length")))
+        check("syllables counted alike in Hebrew and English",
+              page.evaluate("syllables('מאימתי קורין את שמע')") == 9 and page.evaluate("syllables('from when do we read the Shema')") == 8,
+              str(page.evaluate("[syllables('מאימתי קורין את שמע'), syllables('from when do we read the Shema')]")))
+        # Progress, in settings: days in a row, pages per tractate.
+        page.click("#open-settings")
+        page.wait_for_selector(".progress .prog-row", timeout=10000)
+        check("progress shows pages learned", "ברכות" in page.inner_text(".progress"), page.inner_text(".progress")[:80])
+        # A note by voice: kept, and 📝 on its line.
+        page.evaluate("S.settings.view = 'daf'; render(); selectLine(3)")
+        page.evaluate("onUtterance({ text: 'note: check what Tosafot says here' })")
+        page.wait_for_selector("#gtext .note-mark", timeout=15000)
+        check("a note by voice is pinned to its line", page.locator("#gtext .note-mark").count() == 1)
+        # Reading on past the last line turns to the next amud.
+        page.evaluate("selectLine(14)")
+        page.evaluate("onUtterance({ text: 'אמר רבה בר רב שילא אם כן לימא קרא ויטהר מאי וטהר טהר יומא' })")
+        page.wait_for_function("S.pack && S.pack.ref === 'Berakhot 2b'", timeout=20000)
+        check("reading on turns the page", page.evaluate("S.line") <= 3, "line %s" % page.evaluate("S.line"))
+        # The conversation area: drag its top edge up for more of it.
+        before = page.evaluate("document.querySelector('#talk').getBoundingClientRect().height")
+        g = page.locator("#foot-grip").bounding_box()
+        page.mouse.move(g["x"] + g["width"] / 2, g["y"] + 7)
+        page.mouse.down()
+        page.mouse.move(g["x"] + g["width"] / 2, g["y"] - 150, steps=5)
+        page.mouse.up()
+        check("the conversation area drags taller",
+              page.evaluate("parseInt(getComputedStyle(document.documentElement).getPropertyValue('--talk-h'))") > 150,
+              str(before))
+        page.dblclick("#foot-grip")
+        # Back at the same line after closing and opening.
+        page.evaluate("selectLine(7)")
+        page.reload(wait_until="domcontentloaded")
+        page.wait_for_function("S.pack && S.pack.ref === 'Berakhot 2b' && S.line === 7", timeout=20000)
+        check("opens again at the line you were on", True)
+        check("the desk was for that sitting only", page.evaluate("DESK.cards.length === 0 && !DESK.open"))
+        page.click("#open-desk")
+        page.click(".lay-go:has-text('הלימוד שלי')")
+        check("…but a saved layout opens in one tap", page.locator("#desk .dc").count() == 3)
+        page.click(".lay.on .lay-x[title='לפתוח מעצמו עם כל דף']")
+        page.reload(wait_until="domcontentloaded")
+        page.wait_for_function("S.pack && DESK.open && document.querySelectorAll('#desk .dc').length === 3",
+                               timeout=20000)
+        check("the ★ layout opens by itself", page.evaluate("DESK.place") == "side")
+        check("no JavaScript errors", not errors, "; ".join(errors[:3]))
+        if args.part in ("all", "phone"):
+            phone(browser, app, check, args.shots)
+        browser.close()
+    print("\n%s" % ("ALL PASSED" if not problems else "FAILED: " + ", ".join(problems)))
+    return 1 if problems else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

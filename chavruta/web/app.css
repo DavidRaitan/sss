@@ -1,0 +1,752 @@
+/* חברותא — the page, the voice, and nothing that looks like a chat app. */
+
+:root {
+  --ink: #1f1a14;  --dim: #6a5f52;  --faint: #a2968a;
+  --paper: #fbf7ee; --desk: #ece5d7; --rule: #ddd3c1; --edge: #c6b89f;
+  --mark: #9a3a20;  --glow: #f6e6c2; --read: #eadbb4; --quote: #f3cf8a;
+  --ok: #4d7a3a; --warn: #b07a12; --bad: #a33a2a;
+  --square: "Frank Ruhl Libre", "Frank Ruehl CLM", "Times New Roman", serif;
+  --rashi: "Noto Rashi Hebrew", "Frank Ruhl Libre", "Times New Roman", serif;
+  --scale: 1;   /* the reader's text size, from תצוגה */
+  --ui: -apple-system, BlinkMacSystemFont, "Segoe UI", "Heebo", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --ink:#ece3d3; --dim:#a79b8b; --faint:#6d6356; --paper:#1c1812; --desk:#130f0b;
+          --rule:#342c21; --edge:#4a3f30; --mark:#e08c63; --glow:#382b17; --read:#2d2415;
+          --quote:#6a4a14; }
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+@supports (height: 100dvh) { body { height: 100dvh; } }   /* the visible screen, as the phone's bars come and go */
+body { background: var(--desk); color: var(--ink); font-family: var(--ui);
+  display: grid; grid-template-rows: auto 1fr auto; overflow: hidden; }
+button, select { font: inherit; color: inherit; }
+[hidden] { display: none !important; }
+
+/* ---- the header: turning to a page ------------------------------------ */
+header { display: flex; align-items: center; gap: 10px; padding: 8px 14px;
+  background: var(--paper); border-bottom: 1px solid var(--rule); flex-wrap: wrap; }
+.brand { font-family: var(--square); font-size: 21px; font-weight: 500; margin-inline-end: 6px; }
+.picker { display: flex; align-items: center; gap: 9px; }
+.pick { display: flex; align-items: center; gap: 5px; }
+.pick label { font-size: 11px; color: var(--faint); }
+select, .btn { font-size: 13.5px; background: var(--paper); border: 1px solid var(--rule);
+  border-radius: 7px; padding: 5px 9px; cursor: pointer; }
+select#daf { font-family: var(--square); font-size: 17px; padding: 2px 8px; min-width: 64px; }
+select#mas { font-family: var(--square); font-size: 16px; padding: 3px 8px; }
+.seg2 { display: flex; }
+.seg2 .btn { border-radius: 0; margin-inline-start: -1px; font-family: var(--square);
+  font-size: 16px; padding: 2px 12px; }
+.seg2 .btn:first-child { border-start-start-radius: 7px; border-end-start-radius: 7px; margin: 0; }
+.seg2 .btn:last-child { border-start-end-radius: 7px; border-end-end-radius: 7px; }
+.btn[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.today { font-size: 13px; white-space: nowrap; gap: 6px; }
+@media (max-width: 760px) { #today-label { display: none; } }
+.learning .opts .btn { font-size: 12px; padding: 3px 8px; }
+.prep { margin-top: 8px; display: grid; gap: 6px; font-size: 13px; }
+.prepline { display: flex; align-items: center; gap: 10px; }
+.prepline .btn { font-size: 12px; }
+.grow { flex: 1; }
+.status { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--dim); }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); }
+.dot.ok { background: var(--ok); } .dot.warn { background: var(--warn); } .dot.bad { background: var(--bad); }
+.icon { padding: 5px 9px; font-size: 15px; line-height: 1; }
+
+/* ---- the page ------------------------------------------------------------ */
+main { overflow: hidden; display: flex; justify-content: center; padding: 14px; min-height: 0; }
+.sheet { width: 100%; max-width: 1320px; background: var(--paper); border: 1px solid var(--rule);
+  border-radius: 3px; box-shadow: 0 1px 0 var(--rule), 0 12px 30px -18px rgba(60,40,10,.35);
+  display: flex; flex-direction: column; min-height: 0; }
+.runner { display: flex; justify-content: space-between; align-items: baseline; padding: 10px 22px 6px;
+  font-family: var(--square); color: var(--dim); font-size: 15px; border-bottom: 1px solid var(--rule); }
+.runner .where { font-family: var(--ui); font-size: 11.5px; color: var(--faint); }
+.loading { padding: 60px; text-align: center; color: var(--faint); font-size: 14px; }
+
+/* צורת הדף: gemara in the middle, Rashi toward the binding, Tosafot outside */
+.daf { flex: 1; min-height: 0; display: grid; gap: 0;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.55fr) minmax(0, 1fr); }
+.daf.aleph { grid-template-areas: "inner gemara outer"; }
+.daf.bet   { grid-template-areas: "outer gemara inner"; }
+.col { overflow-y: auto; padding: 14px 18px 60px; min-height: 0; scroll-behavior: smooth; }
+.col.gemara { grid-area: gemara; border-inline: 1px solid var(--rule); }
+.col.inner { grid-area: inner; } .col.outer { grid-area: outer; }
+.colname { font-family: var(--square); font-size: 13px; color: var(--faint); text-align: center;
+  letter-spacing: .08em; margin-bottom: 10px; }
+.gtext { font-family: var(--square); font-size: calc(23px * var(--scale)); line-height: 1.9; text-align: justify;
+  text-align-last: right; }
+.seg { cursor: pointer; border-radius: 4px; transition: background .25s; padding: 1px 0; }
+.seg.on { background: var(--glow); box-shadow: 0 0 0 3px var(--glow); }
+.note-mark { border: 0; background: none; cursor: pointer; font-size: 13px; padding: 0 3px; vertical-align: super; color: var(--mark); }
+/* Read words fade a little, like a karaoke line: where it thinks you are,
+   never a mark on how you read. */
+.w.read { color: var(--dim); }
+.w.here { color: var(--ink); box-shadow: 0 2px 0 var(--mark); }
+.w.quoted, .ctext .quoted { background: var(--quote); border-radius: 2px; transition: background .4s; }
+.w.head { font-weight: 700; }
+.stops .clause-end::after { content: "·"; color: var(--mark); font-weight: 700; margin-inline: 1px; }
+
+.c { font-family: var(--cfont); font-size: calc(15.5px * var(--scale)); line-height: 1.72; text-align: justify;
+  margin-bottom: 7px; padding: 2px 5px; border-radius: 4px; cursor: pointer; }
+.c .dib { font-family: var(--square); font-weight: 700; font-size: 1em; }
+.c.on { background: var(--glow); }
+.c.flash { animation: flash 1.4s ease-out; }
+@keyframes flash { 0% { background: var(--quote); } 100% { background: transparent; } }
+.c.dim { opacity: .55; } .c.dim.on { opacity: 1; }
+.empty { color: var(--faint); font-size: 12.5px; text-align: center; font-family: var(--ui); }
+
+/* שטיינזלץ: vocalized, punctuated, line by line, translation on request */
+.linear { flex: 1; overflow-y: auto; padding: 18px 26px 70px; min-height: 0; }
+.line { font-family: var(--square); font-size: 25px; line-height: 2; padding: 4px 12px;
+  border-radius: 6px; cursor: pointer; max-width: 860px; margin: 0 auto; }
+.line.on { background: var(--glow); box-shadow: inset 3px 0 0 var(--mark); }
+.line .en { display: none; font-family: var(--ui); font-size: 14.5px; line-height: 1.6;
+  color: var(--dim); direction: ltr; text-align: left; margin: 4px 0 8px; }
+.showen .line .en { display: block; }
+.line .en .add { color: var(--faint); font-style: italic; }
+
+@media (max-width: 920px) {
+  main { padding: 0; }
+  .sheet { border: 0; border-radius: 0; }
+  .daf { grid-template-columns: minmax(0, 1fr); grid-template-areas: "gemara" !important; }
+  .col.inner, .col.outer { display: none; }
+  .col.gemara { border: 0; }
+  .gtext { font-size: calc(21px * var(--scale)); text-align: right; }   /* justify leaves gaps on a narrow line */
+  .hide-narrow { display: none; }
+}
+
+/* ---- the voice bar: this is the conversation ----------------------------- */
+:root { --talk-h: 30vh; }
+footer { position: relative; background: var(--paper); border-top: 1px solid var(--rule); padding: 12px 18px 12px; }
+/* Its top edge is a handle: drag it up for more conversation, down for more page. */
+.foot-grip { position: absolute; inset-inline: 0; top: -7px; height: 14px; cursor: row-resize; touch-action: none; z-index: 2; }
+.foot-grip::after { content: ""; position: absolute; top: 5px; inset-inline: calc(50% - 22px); width: 44px; height: 4px;
+  border-radius: 2px; background: var(--edge); opacity: .5; transition: opacity 160ms, width 160ms; }
+body.resizing-v, body.resizing-v * { cursor: row-resize !important; user-select: none; }
+.bar { max-width: 1100px; margin: 0 auto; display: grid; grid-template-columns: auto minmax(0, 1fr);
+  gap: 18px; align-items: start; }
+.talkcol { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.talk-top { display: flex; align-items: center; gap: 12px; min-height: 28px; }
+.talk { min-width: 0; max-height: var(--talk-h); overflow-y: auto; padding-inline-end: 2px; }
+
+/* The icons: drawn in the colour and weight of the text beside them. */
+.ic { width: 1.2em; height: 1.2em; flex: none; fill: none; stroke: currentColor; stroke-width: 1.7;
+  stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.24em; }
+.ic.solid { fill: currentColor; }
+#i-grip, .dc-grip .ic { stroke-width: 2.6; }
+button:has(> .ic) { display: inline-flex; align-items: center; justify-content: center; gap: .35em; }
+
+/* The microphone: one round control whose ring says what is happening --
+   your voice while it listens, a turning arc while it thinks, a slow breath while it speaks. */
+.micwrap { position: relative; width: 60px; height: 60px; margin-top: 2px; }
+#mic { position: relative; z-index: 1; width: 60px; height: 60px; border-radius: 50%; border: 1px solid var(--edge);
+  background: var(--paper); color: var(--ink); cursor: pointer; padding: 0;
+  box-shadow: 0 1px 0 rgba(255,255,255,.4) inset, 0 6px 16px -10px rgba(40,25,5,.5); }
+#mic .ic { width: 26px; height: 26px; stroke-width: 1.6; }
+#mic[data-state="listening"], #mic[data-state="capturing"] { background: var(--mark); border-color: var(--mark); color: #fff; }
+#mic[data-state="thinking"], #mic[data-state="hearing"] { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+#mic[data-state="speaking"], #mic[data-state="paused"] { background: var(--glow); border-color: var(--edge); }
+.level { position: absolute; inset: -5px; border-radius: 50%; border: 2.5px solid var(--mark);
+  opacity: 0; transform: scale(1); transition: transform .08s, opacity .2s; pointer-events: none; }
+.ring { position: absolute; inset: -4px; border-radius: 50%; pointer-events: none; opacity: 0;
+  transition: opacity 200ms; }
+.micwrap:has(#mic[data-state="thinking"]) .ring, .micwrap:has(#mic[data-state="hearing"]) .ring {
+  opacity: 1; border: 2px solid transparent; border-top-color: var(--ink); animation: spin .9s linear infinite; }
+.micwrap:has(#mic[data-state="speaking"]) .ring {
+  opacity: 1; border: 2px solid var(--quote); animation: breathe 2.4s ease-in-out infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes breathe { 0%, 100% { transform: scale(1); opacity: .9; } 50% { transform: scale(1.07); opacity: .35; } }
+.hold { position: absolute; z-index: 2; bottom: -4px; inset-inline-end: -10px; width: 28px; height: 28px; border-radius: 50%;
+  border: 1px solid var(--edge); background: var(--paper); color: var(--ink); cursor: pointer; padding: 0;
+  box-shadow: 0 3px 8px -4px rgba(40,25,5,.45); }
+.hold .ic { width: 15px; height: 15px; stroke-width: 2; }
+
+.state { flex: 1; min-width: 0; font-size: 12px; color: var(--faint); letter-spacing: .01em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.state.err { color: var(--bad); white-space: normal; }
+/* Three tabs, side by side: what is open is filled. */
+.tabs { display: flex; flex: none; border: 1px solid var(--rule); border-radius: 9px; padding: 2px; gap: 2px;
+  background: var(--desk); }
+.tab { border: 0; background: none; color: var(--dim); font-size: 12.5px; padding: 4px 12px; border-radius: 7px;
+  cursor: pointer; transition: background-color 160ms, color 160ms, transform 110ms ease-out; }
+.tab[aria-pressed="true"] { background: var(--paper); color: var(--ink);
+  box-shadow: 0 1px 3px -1px rgba(40,25,5,.35); }
+.tab:active { transform: scale(.96); }
+.mine { font-size: 14px; color: var(--dim); margin-top: 2px; display: flex; gap: 6px; align-items: baseline; }
+.mine .ic { color: var(--faint); }
+.mine.interim { opacity: .6; }
+.reply { font-size: 17px; line-height: 1.65; margin-top: 4px; }
+/* Each caption takes its direction from its own words: an English answer in
+   this right-to-left page must still read left to right. */
+.mine, .reply, .turn { unicode-bidi: plaintext; text-align: start; }
+.reply q { unicode-bidi: isolate; direction: rtl; quotes: none; font-family: var(--square); background: var(--quote); border-radius: 3px; padding: 0 3px; }
+.reply.hint { color: var(--dim); font-size: 15px; }
+/* The question the answer below is answering: quiet, set off by a rule. */
+.asked { font-size: 13.5px; color: var(--dim); margin-top: 4px; padding-inline-start: 9px;
+  border-inline-start: 2px solid var(--rule); unicode-bidi: plaintext; text-align: start; }
+/* What is waiting behind it, and the two ways past it. */
+.queue { display: flex; align-items: center; gap: 10px; margin-top: 6px; padding-top: 7px;
+  border-top: 1px solid var(--rule); font-size: 12.5px; }
+.qitems { flex: 1; min-width: 0; display: flex; gap: 6px; align-items: center; overflow: hidden; }
+.qlabel { color: var(--faint); flex: none; }
+.qitem { flex: 0 1 auto; min-width: 0; display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--rule);
+  border-radius: 14px; padding: 2px 10px; color: var(--dim); max-width: 260px; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; unicode-bidi: plaintext; }
+.qitem > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qitem .ic { color: var(--faint); }
+.qitem.ready .ic { color: var(--ok); }
+.qacts { display: flex; gap: 6px; flex: none; }
+.qbtn { border: 1px solid var(--edge); background: var(--paper); color: var(--ink); border-radius: 8px;
+  padding: 3px 10px; font-size: 12.5px; cursor: pointer; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 7px; }
+.chip { font-size: 12.5px; border: 1px solid var(--edge); border-radius: 20px; padding: 2px 10px;
+  background: var(--paper); cursor: pointer; font-family: var(--square); color: var(--ink); }
+.chip.warn { border-color: var(--bad); color: var(--bad); font-family: var(--ui); }
+.chip.again { font-family: var(--ui); padding: 2px 10px; color: var(--dim); }
+.turn.err { color: var(--bad); font-size: 13px; }
+/* A citation where it stands in the sentence: small, tappable, not a hole. */
+.chip.inline { font-size: 11.5px; padding: 0 7px; margin: 0 2px; vertical-align: 1px; unicode-bidi: isolate; }
+.turn q { unicode-bidi: isolate; direction: rtl; quotes: none; font-family: var(--square); background: var(--quote); border-radius: 3px; padding: 0 3px; }
+.turn .ic { color: var(--faint); margin-inline-end: 5px; }
+
+/* ---- panels sit beside the page, so the gemara stays in view ------------- */
+:root { --side: min(440px, 40vw); --sheet: 52vh; }
+.over { position: fixed; inset-block: 0; inset-inline-start: 0; width: var(--side); z-index: 40;
+  visibility: hidden; transform: translateX(calc(100% + 24px));
+  transition: transform var(--t-out), visibility 0s linear var(--t-dur); }
+/* In from the side it lives on, and back out the same way. */
+.over.open { visibility: visible; transform: none; transition: transform var(--t-in), visibility 0s; }
+body.docked { padding-inline-start: var(--side); }
+body.resizing, body.resizing * { cursor: col-resize !important; user-select: none; }
+.panel { position: absolute; inset: 0;
+  background: var(--paper); border-inline-end: 1px solid var(--rule); overflow-y: auto;
+  padding: 18px 20px 40px; padding-inline-end: 52px; box-shadow: 8px 0 30px -18px rgba(0,0,0,.25); }
+/* Always in reach, however far the panel is scrolled. */
+.over .close { position: absolute; top: 10px; inset-inline-end: 16px; z-index: 3;
+  width: 34px; height: 34px; padding: 0; border-radius: 50%; font-size: 15px;
+  box-shadow: 0 2px 8px -3px rgba(0,0,0,.3); }
+/* The edge toward the page: drag it to give the panel more or less room. */
+.over .grip { position: absolute; inset-block: 0; inset-inline-end: -5px; width: 10px; z-index: 4;
+  cursor: col-resize; touch-action: none; }
+.over .grip::after { content: ""; position: absolute; inset-block: calc(50% - 26px); inset-inline-start: 3px;
+  width: 4px; border-radius: 2px; background: var(--edge); opacity: .55; }
+.panel h2 { margin: 0 0 2px; font-size: 16px; font-family: var(--square); }
+.panel .sub { font-size: 12px; color: var(--faint); margin-bottom: 12px; }
+.grp { font-size: 11px; letter-spacing: .08em; color: var(--faint); margin: 16px 0 8px;
+  padding-bottom: 4px; border-bottom: 1px solid var(--rule); }
+.src { margin-bottom: 14px; }
+.src .who { font-size: 13px; font-weight: 600; }
+.src .who .dib { font-family: var(--square); color: var(--mark); font-weight: 700; margin-inline-start: 4px; }
+.src .body { font-family: var(--pfont); font-size: calc(16px * var(--scale)); line-height: 1.75; margin-top: 3px;
+  max-height: 5.3em; overflow: hidden; }
+.src.open .body { max-height: none; }
+.src.flash { animation: flash 1.6s ease-out; }
+.src .meta { display: flex; gap: 10px; align-items: center; margin-top: 4px; }
+.more, .lnk { border: 0; background: none; padding: 0; font-size: 12px; color: var(--dim);
+  cursor: pointer; text-decoration: none; }
+.lnk { direction: ltr; }
+.shape { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 5px; }
+.mv { font-size: 10.5px; border-radius: 3px; padding: 1px 6px; border: 1px solid var(--rule); color: var(--dim); }
+.mv.difficulty { color: var(--mark); border-color: var(--mark); }
+.mv.conclusion, .mv.alternative { border-color: var(--edge); color: var(--ink); }
+.shape .arrow { font-size: 10px; color: var(--faint); align-self: center; }
+.mv.by { font-weight: 600; color: var(--ink); border-color: var(--edge); }
+.others { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
+.rel .tref { display: block; font-size: 12.5px; color: var(--dim); direction: ltr; text-align: left;
+  padding: 2px 0; border: 0; background: none; cursor: pointer; font-family: var(--ui); width: 100%; }
+.tl > .tref { border: 0; background: none; cursor: pointer; color: var(--dim); font-size: 12.5px; padding: 2px 0; }
+.tl .body { font-family: var(--square); font-size: 14px; line-height: 1.65; margin: 4px 0 10px;
+  padding: 8px 10px; background: var(--paper); border: 1px solid var(--rule); border-radius: 6px; }
+.turn { margin-bottom: 14px; font-size: 14.5px; line-height: 1.6; }
+.turn.me { color: var(--dim); font-style: italic; }
+.turn .trace { display: block; font-size: 10.5px; color: var(--faint); margin-top: 3px; direction: ltr; text-align: left; }
+.set { margin-bottom: 16px; }
+.set .lbl { font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+.set .help { font-size: 12px; color: var(--faint); margin-top: 5px; line-height: 1.5; }
+.opts { display: flex; flex-wrap: wrap; gap: 6px; }
+.opts .btn { font-size: 13px; }
+.seats .sub { font-size: 12px; color: var(--faint); margin: 10px 0 4px; }
+.seats .help { margin: 0 0 4px; }
+.seat[data-v="-1"] { opacity: .55; text-decoration: line-through; }
+.seats > .btn { margin-top: 10px; font-size: 12px; }
+.addsite { display: flex; gap: 6px; margin-top: 8px; }
+.addsite input { flex: 1; font-size: 13px; }
+.kbd { font-size: 12px; color: var(--dim); line-height: 1.9; }
+kbd { font-family: var(--ui); font-size: 11px; border: 1px solid var(--rule); border-bottom-width: 2px;
+  border-radius: 4px; padding: 0 5px; }
+
+/* Where a unit of learning opens -- mishna, gemara, a baraita -- as the page itself marks it. */
+.unit { font-family: var(--ui); font-size: 10.5px; letter-spacing: .04em; color: var(--mark);
+  background: none; border: 1px solid var(--mark); border-radius: 3px; padding: 0 5px;
+  vertical-align: 4px; cursor: pointer; line-height: 1.5; }
+
+/* Three opinions or more come as a table. */
+.positions { border-collapse: collapse; margin: 6px 0 8px; font-size: 14px; max-width: 100%; }
+.positions th, .positions td { border: 1px solid var(--rule); padding: 4px 8px; text-align: start; vertical-align: top; }
+.positions th { background: var(--glow); font-weight: 600; }
+.reply .para + .para { margin-top: 4px; }
+
+.prog { display: grid; gap: 6px; font-size: 13px; }
+.prog-top { margin-bottom: 2px; }
+.prog-row { display: grid; grid-template-columns: 90px 1fr auto; align-items: center; gap: 8px; }
+.prog-row .bar { height: 6px; border-radius: 3px; background: color-mix(in srgb, var(--faint) 25%, transparent); overflow: hidden; }
+.prog-row .fill { height: 100%; background: var(--mark); }
+.prog-n { color: var(--faint); font-size: 12px; }
+
+/* ---- the desk: commentaries beside the page, arranged to taste --------- */
+main.with-desk { justify-content: stretch; gap: 10px; }
+main.with-desk .sheet { flex: 1 1 0; min-width: 0; max-width: none; }
+main.with-desk[data-place="side"] { flex-direction: row; }
+main.with-desk.swap[data-place="side"] { flex-direction: row-reverse; }
+main.with-desk[data-place="below"] { flex-direction: column; }
+main.with-desk.swap[data-place="below"] { flex-direction: column-reverse; }
+main.with-desk[data-place="full"] .sheet { display: none; }
+.desk { position: relative; flex: 0 0 var(--desk-w, min(520px, 42vw)); min-width: 0; min-height: 0;
+  display: flex; flex-direction: column; background: var(--paper); border: 1px solid var(--rule);
+  border-radius: 3px; box-shadow: 0 12px 30px -18px rgba(60,40,10,.35); --desk-font: 16px; }
+main[data-place="below"] .desk { flex-basis: var(--desk-h, 42vh); }
+main[data-place="full"] .desk { flex: 1 1 auto; }
+.desk-grip { position: absolute; z-index: 3; touch-action: none; inset-block: 0; width: 10px;
+  inset-inline-start: -8px; cursor: col-resize; }
+main.swap[data-place="side"] .desk-grip { inset-inline-start: auto; inset-inline-end: -8px; }
+main[data-place="below"] .desk-grip { inset-inline: 0; width: auto; height: 10px; inset-block: -8px auto; cursor: row-resize; }
+main.swap[data-place="below"] .desk-grip { inset-block: auto -8px; }
+main[data-place="full"] .desk-grip { display: none; }
+.desk-grip::after { content: ""; position: absolute; inset-block: calc(50% - 26px); inset-inline-start: 3px;
+  width: 4px; border-radius: 2px; background: var(--edge); opacity: .55; }
+main[data-place="below"] .desk-grip::after { inset-block: 3px auto; inset-inline: calc(50% - 26px); width: 52px; height: 4px; }
+.desk-bar { display: flex; align-items: center; gap: 6px; padding: 7px 10px; border-bottom: 1px solid var(--rule);
+  flex-wrap: wrap; }
+.desk-title { font-family: var(--square); font-size: 16px; color: var(--dim); margin-inline-end: 4px; }
+.desk-bar .btn { font-size: 12.5px; padding: 3px 8px; }
+.seg2.small .btn { font-family: var(--ui); font-size: 12px; padding: 3px 9px; }
+.desk-pick { padding: 8px 10px; border-bottom: 1px solid var(--rule); max-height: 40%; overflow-y: auto;
+  background: var(--desk); }
+.dp-row { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; margin-bottom: 6px; }
+.dp-grp { font-size: 11px; color: var(--faint); min-width: 54px; }
+.desk-pick .chip { font-family: var(--square); background: var(--paper); cursor: pointer; }
+.desk-pick .chip.on { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.dp-hint { font-size: 11px; color: var(--faint); }
+.desk-cards { flex: 1; min-height: 0; overflow-y: auto; padding: 10px; display: flex; flex-wrap: wrap;
+  gap: 10px; align-content: flex-start; }
+.desk-empty { color: var(--faint); font-size: 13.5px; padding: 30px 10px; text-align: center; width: 100%; }
+.dc { flex: 1 1 240px; min-width: 0; border: 1px solid var(--rule); border-radius: 6px; background: var(--paper);
+  display: flex; flex-direction: column; }
+.dc.wide { flex-basis: 100%; }
+.dc-head { display: flex; align-items: center; gap: 6px; padding: 5px 8px; border-bottom: 1px solid var(--rule);
+  background: var(--desk); border-radius: 6px 6px 0 0; }
+.dc-grip { cursor: grab; color: var(--faint); letter-spacing: -2px; user-select: none; padding: 0 2px; }
+.dc-name { font-family: var(--square); font-size: 15.5px; font-weight: 500; flex: 1; }
+.dc-tools { display: flex; gap: 2px; }
+.dc-btn { border: 0; background: none; cursor: pointer; color: var(--dim); font-size: 13px; padding: 2px 5px;
+  border-radius: 4px; }
+.dc-body { height: 300px; min-height: 90px; overflow-y: auto; resize: vertical; padding: 8px 12px;
+  font-family: var(--pfont); font-size: var(--desk-font); line-height: 1.65; }
+main[data-place="full"] .dc-body { height: 60vh; }
+.dc-entry { padding: 6px 4px 8px; border-bottom: 1px dotted var(--rule); border-radius: 3px; }
+.dc-entry.here { background: color-mix(in srgb, var(--glow) 35%, transparent); }
+.dc-entry.focus { border-inline-start: 3px solid var(--mark); }
+.dc-top { display: flex; gap: 8px; align-items: baseline; margin-bottom: 2px; }
+.dc-line { font-family: var(--ui); font-size: 11px; color: var(--faint); border: 1px solid var(--rule);
+  background: none; border-radius: 10px; padding: 0 7px; cursor: pointer; }
+.dc-dib { font-weight: 600; font-family: var(--square); }
+.dc-none { color: var(--faint); font-family: var(--ui); font-size: 13px; padding: 10px 0; }
+.dw.quoted { background: var(--quote); border-radius: 2px; transition: background .4s; }
+@media (max-width: 760px) {
+  main.with-desk[data-place="side"], main.with-desk[data-place="below"] { flex-direction: column; }
+  main.with-desk.swap[data-place="side"], main.with-desk.swap[data-place="below"] { flex-direction: column-reverse; }
+  main.with-desk .desk { flex-basis: var(--desk-h, 46vh); }
+  main.with-desk .desk-grip { inset-inline: 0; width: auto; height: 12px; inset-block: -8px auto; cursor: row-resize; }
+  main.with-desk.swap .desk-grip { inset-block: auto -8px; }
+  .desk-title { display: none; }
+}
+
+/* Saved layouts: a row of names; the one you are in shows ☆ and ✕. */
+.desk-layouts { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 10px; border-bottom: 1px solid var(--rule); }
+.desk-layouts:empty { display: none; }
+.lay { display: inline-flex; align-items: center; border: 1px solid var(--edge); border-radius: 20px;
+  background: var(--paper); overflow: hidden; }
+.lay.on { background: var(--ink); border-color: var(--ink); }
+.lay.on button { color: var(--paper); }
+.lay-go, .lay-x, .lay-save { border: 0; background: none; cursor: pointer; font-size: 12.5px; padding: 3px 10px; }
+.lay-go { font-family: var(--square); font-size: 14px; }
+.lay-x { padding: 3px 7px; opacity: .8; }
+.lay-save { color: var(--dim); border: 1px dashed var(--edge); border-radius: 20px; }
+.lay-form { display: inline-flex; gap: 4px; }
+.lay-form input { font: inherit; font-family: var(--square); font-size: 14px; border: 1px solid var(--ink);
+  border-radius: 20px; padding: 2px 10px; background: var(--paper); color: var(--ink); width: 14em; }
+.lay-form .lay-go { border: 1px solid var(--ink); border-radius: 20px; }
+
+
+/* ---- touch, the phone, and motion ---------------------------------------
+   The platform layer: what makes it feel like an app on the phone and not a
+   website -- and the motion rules everything above uses. */
+:root {
+  --ease: cubic-bezier(.32, .72, 0, 1);          /* critically damped: arrives, no bounce */
+  --t-dur: 260ms;
+  --t-in: var(--t-dur) var(--ease);
+  --t-out: 200ms cubic-bezier(.4, 0, 1, 1);
+}
+html { -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%; overscroll-behavior: none;
+  overflow: clip; }   /* the panel waiting off-screen must not make a phone zoom out to show it */
+body { overscroll-behavior: none; }
+/* Scroll stays in the box it started in: the page behind it never moves. */
+.panel, .desk-cards, .dc-body, .desk-pick, .col, .linear, .talk { overscroll-behavior: contain; }
+/* A control is not text: no selection or callout on a long press, no double-tap wait. */
+button, .btn, .chip, select, [role="button"], .dc-grip, .desk-grip, .grip {
+  touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+/* Under 16px, iPhone zooms into the field and never zooms back. */
+@media (pointer: coarse) { input, textarea, select { font-size: 16px !important; } }
+/* The notch, the home bar, a phone on its side. */
+header { padding-top: max(8px, env(safe-area-inset-top, 0px));
+  padding-inline: max(14px, env(safe-area-inset-right, 0px)) max(14px, env(safe-area-inset-left, 0px)); }
+footer { padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
+
+/* Pressed is felt on the press, not on the release. */
+.btn, .chip, .hold, .dc-btn, .dc-line, .lay-go, .lay-x, .lay-save, .qbtn, #mic, .more, .tref {
+  transition: transform 110ms ease-out, background-color 160ms, border-color 160ms, color 160ms; }
+.btn:active, .chip:active, .hold:active, .dc-btn:active, .dc-line:active, .lay-go:active, .lay-x:active,
+.lay-save:active, .more:active, .tref:active, .qbtn:active { transform: scale(.96); }
+#mic:active { transform: scale(.94); }
+#mic { transition: transform 110ms ease-out, background-color 200ms, color 200ms, border-color 200ms; }
+:focus-visible { outline: 2px solid var(--mark); outline-offset: 2px; border-radius: 4px; }
+button:focus:not(:focus-visible) { outline: none; }
+
+/* Hover only where there is a mouse: on a phone the first tap would leave it stuck. */
+@media (hover: hover) and (pointer: fine) {
+  select:hover, .btn:hover { border-color: var(--edge); }
+  .seg:hover { background: color-mix(in srgb, var(--glow) 45%, transparent); }
+  .hold:hover { background: var(--glow); }
+  .chip:hover { background: var(--glow); }
+  .over .grip:hover::after { opacity: 1; }
+  .more:hover, .lnk:hover { color: var(--mark); }
+  .rel .tref:hover, .tl > .tref:hover { color: var(--mark); }
+  .unit:hover { background: var(--glow); }
+  .desk-grip:hover::after { opacity: 1; }
+  .dc-btn:hover { background: var(--glow); color: var(--ink); }
+  .dc-line:hover { border-color: var(--edge); color: var(--ink); }
+  .lay-x:hover, .lay-go:hover { opacity: 1; text-decoration: underline; }
+  .lay-save:hover { color: var(--ink); border-color: var(--ink); }
+}
+
+/* The desk and its cards arrive as things, not as a jump. */
+.desk { transition: opacity var(--t-in), transform var(--t-in); }
+@starting-style { .desk { opacity: 0; transform: scale(.985); } }
+.dc { transition: box-shadow 200ms ease; }
+.desk-pick, .desk-layouts { transition: opacity 180ms ease; }
+@starting-style { .desk-pick, .desk-layouts { opacity: 0; } }
+/* A card being carried: lifted off the desk, following the finger. */
+.dc.lifted { z-index: 5; position: relative; box-shadow: 0 18px 40px -16px rgba(40, 25, 5, .45);
+  cursor: grabbing; transition: box-shadow 200ms ease; }
+.dc.lifted .dc-body { pointer-events: none; }
+.dc.leaving { opacity: 0; transform: scale(.96); transition: opacity 160ms ease, transform 160ms ease; }
+.dc-grip { touch-action: none; cursor: grab; }
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --t-in: 120ms linear; --t-out: 120ms linear; }
+  .over, .over.open { transform: none !important; transition: opacity 120ms linear, visibility 0s; }
+  .over { opacity: 0; } .over.open { opacity: 1; }
+  .btn:active, .chip:active, #mic:active, .hold:active, .dc-btn:active { transform: none; }
+  @starting-style { .desk { transform: none; } }
+  .c.flash, .src.flash { animation-duration: .01s; }
+}
+@media (prefers-contrast: more) {
+  :root { --rule: #8a7d68; --edge: #5e5241; --faint: #5e5241; }
+}
+
+/* One column as wide as the screen -- never as wide as the widest header row. */
+body { grid-template-columns: minmax(0, 1fr); }
+/* A fingertip needs room: small controls grow on touch screens. */
+@media (pointer: coarse) {
+  .dc-btn { padding: 6px 9px; font-size: 15px; }
+  .dc-grip { padding: 6px 6px; font-size: 16px; }
+  .lay-go, .lay-x, .lay-save { padding-block: 7px; }
+  .chip { padding: 5px 12px; }
+  .chip.inline { padding: 1px 8px; }
+  .desk-bar .btn, .btn.icon { min-height: 36px; min-width: 36px; }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .foot-grip:hover::after { opacity: 1; width: 64px; inset-inline: calc(50% - 32px); }
+  .tab:hover { color: var(--ink); }
+  .qbtn:hover { background: var(--glow); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ring { animation: none !important; }
+}
+
+/* What waits: an answer that was cut into (tap to go on), and what was kept for later. */
+button.qitem { cursor: pointer; font: inherit; background: var(--paper); }
+.qitem b { font-weight: 600; color: var(--ink); flex: none; }
+.qitem .qtext { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; unicode-bidi: isolate; }
+.qitem.held { border-color: var(--edge); }
+.qitem.held .ic { color: var(--mark); }
+.qitem.later { border-style: dashed; }
+
+/* The Steinsaltz view, as Sefaria sets him: a paragraph a line, the daf's
+   words bold, his words plain in the same ink, his translations of the
+   Aramaic smaller and in another face (no brackets), references in small print. */
+.linear { padding: 0 26px 90px; }
+.linear .line { max-width: 740px; margin: 0 auto 4px; padding: 12px 22px; border-radius: 12px;
+  font-size: calc(26px * var(--scale)); line-height: 1.95; transition: background-color 220ms ease; }
+.linear .line.on { background: color-mix(in srgb, var(--glow) 50%, transparent); box-shadow: none; }
+.ex-bar { position: sticky; top: 0; z-index: 2; display: flex; justify-content: center;
+  padding: 12px 0 14px; margin-bottom: 4px;
+  background: linear-gradient(var(--paper) 70%, color-mix(in srgb, var(--paper) 0%, transparent)); }
+/* Two hands, so it is clear at a glance which words are the Talmud's: the
+   daf's words in the book face (Frank Ruhl), bold; Steinsaltz's own words in
+   a clean modern Hebrew sans; his translations of the Aramaic in that sans,
+   smaller and softer. (Bold alone, in one face, was not enough.) */
+:root { --sans: "Assistant", "Heebo", -apple-system, "Segoe UI", sans-serif; }
+.stz { font-family: var(--sans); font-size: calc(19.5px * var(--scale)); line-height: 1.95; color: var(--ink);
+  text-align: right; font-weight: 400; }
+.stz .d, .stz .w { font-family: var(--square); font-weight: 700; font-size: 1.1em; color: var(--ink); }
+.stz .ghost { display: none; }
+.stz .tr { font-family: var(--sans); font-size: .84em; color: var(--dim); font-weight: 400; }
+.stz .cite { font-family: var(--sans); font-size: .7em; color: var(--faint); white-space: nowrap; }
+.stz-head { font-family: var(--ui); font-size: 11.5px; font-weight: 600; color: var(--mark);
+  border: 1px solid color-mix(in srgb, var(--mark) 45%, transparent); border-radius: 5px;
+  padding: 1px 7px; vertical-align: .3em; letter-spacing: .02em; }
+.linear .line.stzline + .line.stzline { margin-top: 2px; }
+@media (max-width: 620px) {
+  .linear { padding: 0 8px 80px; }
+  .linear .line { padding: 10px 12px; font-size: calc(22px * var(--scale)); }
+  .stz { font-size: calc(18.5px * var(--scale)); line-height: 1.85; }
+}
+
+/* The commentaries' letters: plain by default; Rashi script for those on the
+   page, or for every one, from settings. */
+:root { --cfont: var(--square); --pfont: var(--square); }
+body.rashi-page { --cfont: var(--rashi); }
+body.rashi-all { --cfont: var(--rashi); --pfont: var(--rashi); }
+/* A second commentary in the same margin, named on its comments. */
+.c.other { border-inline-start: 2px solid var(--rule); padding-inline-start: 6px; }
+.c .who { font-family: var(--ui); font-size: 10.5px; color: var(--mark); letter-spacing: .02em;
+  display: block; margin-bottom: 1px; }
+.linear .line { scroll-margin-top: 64px; scroll-margin-bottom: 16px; }
+
+/* Following the voice: the sentence being said in full ink, the rest softer. */
+#reply.speaking .sw { color: color-mix(in srgb, var(--dim) 70%, var(--paper)); transition: color 220ms ease; }
+#reply.speaking .sw.in { color: var(--ink); }
+.talk { scroll-behavior: smooth; }
+/* The mic closed: drawn crossed out, quieter -- whatever it is doing goes on. */
+#mic.muted { color: var(--faint); border-style: dashed; }
+#mic.muted[data-state="speaking"], #mic.muted[data-state="paused"] { color: var(--dim); }
+@media (prefers-reduced-motion: reduce) { #reply.speaking .sw { transition: none; } .talk { scroll-behavior: auto; } }
+
+/* Taking back what was said: a quiet ✕ beside the question, and on each one waiting. */
+.asked { display: flex; align-items: baseline; gap: 6px; }
+.asked-text { min-width: 0; }
+.asked-x, .qx { border: 0; background: none; color: var(--faint); cursor: pointer; padding: 0 3px;
+  border-radius: 4px; flex: none; }
+.asked-x .ic, .qx .ic { width: 13px; height: 13px; stroke-width: 2; vertical-align: -2px; }
+.turn.discarded { text-decoration: line-through; opacity: .55; }
+@media (hover: hover) and (pointer: fine) { .asked-x:hover, .qx:hover { color: var(--bad); background: var(--glow); } }
+@media (pointer: coarse) { .asked-x, .qx { padding: 4px 8px; } }
+
+/* ==== the phone ===========================================================
+   Held in one hand, used by voice. Three layers, top to bottom:
+     · a one-line bar: the page you are on (tap it to turn to another) and its two sides;
+     · the page itself, edge to edge, as much of the screen as can be spared;
+     · the conversation, and under it a toolbar with the microphone in the
+       middle, where the thumb rests.
+   Everything else -- the commentaries, the transcript, settings, the view --
+   is a sheet that rises from the toolbar, and goes back down into it. */
+
+button.m-title, .m-amud, .pick-head, #open-view, .scrim, button.skipnow { display: none; }
+.tab .ic { display: none; }
+.tab { display: inline-flex; align-items: center; }
+
+@media (max-width: 760px), (max-height: 500px) and (pointer: coarse) {
+  :root { --talk-h: 22vh; --sheet: 55dvh; }
+  body { background: var(--paper); }
+
+  /* -- the bar ---------------------------------------------------------------- */
+  header { flex-wrap: nowrap; gap: 6px; min-height: 52px; border-bottom: .5px solid var(--rule);
+    padding-block: max(4px, env(safe-area-inset-top, 0px)) 4px;
+    padding-inline: max(8px, env(safe-area-inset-right, 0px)) max(8px, env(safe-area-inset-left, 0px)); }
+  .brand, .hide-narrow, #statustext, .runner { display: none; }
+  .dot.ok { display: none; }                         /* only trouble is worth a mark */
+  .status { padding-inline: 4px; }
+  button.m-title { display: inline-flex; align-items: center; gap: 3px; min-width: 0; min-height: 44px;
+    border: 0; background: none; padding: 0 8px; border-radius: 10px; color: var(--ink); cursor: pointer;
+    font-family: var(--square); font-size: 21px; font-weight: 500; white-space: nowrap; }
+  #m-title-text { overflow: hidden; text-overflow: ellipsis; }
+  .m-title .ic { width: 17px; height: 17px; stroke-width: 2.2; color: var(--faint); vertical-align: 0; }
+  .m-title:active { background: var(--desk); transform: none; }
+  #open-settings { border: 0; background: none; width: 44px; height: 44px; font-size: 21px; color: var(--ink); }
+  #open-settings:active { background: var(--desk); }
+
+  /* Segmented, the way the phone draws it: a track, and a raised thumb on the one chosen. */
+  .m-amud, .pick .seg2 { display: inline-flex; padding: 2px; gap: 2px; border-radius: 9px; background: var(--desk); }
+  .m-amud .btn, .pick .seg2 .btn { margin: 0; border: 0; border-radius: 7px !important; background: none;
+    color: var(--ink); font-family: var(--square); font-size: 18px; min-width: 42px; min-height: 34px; padding: 0 10px; }
+  .m-amud .btn[aria-pressed="true"], .pick .seg2 .btn[aria-pressed="true"] { background: var(--paper); color: var(--ink);
+    box-shadow: 0 1px 3px rgba(40,25,5,.22), 0 0 0 .5px rgba(40,25,5,.06); }
+  .m-amud .btn:disabled, .pick .seg2 .btn:disabled { opacity: .35; }
+
+  /* -- turning to a page: a sheet with the three choices and today's daf ----- */
+  .picker { position: fixed; z-index: 70; inset-inline: 0; bottom: 0; display: flex; flex-direction: column;
+    align-items: stretch; gap: 0; padding: 8px 16px calc(18px + env(safe-area-inset-bottom, 0px));
+    background: var(--paper); border-radius: 16px 16px 0 0; box-shadow: 0 -12px 40px -14px rgba(30,18,4,.4);
+    transform: translateY(calc(100% + 30px)); visibility: hidden;
+    transition: transform var(--t-out), visibility 0s linear var(--t-dur); }
+  body.picking .picker { transform: none; visibility: visible; transition: transform var(--t-in), visibility 0s; }
+  .picker::before { content: ""; align-self: center; width: 36px; height: 5px; border-radius: 3px; background: var(--edge);
+    opacity: .6; margin-bottom: 4px; }
+  .pick-head { display: flex; align-items: center; justify-content: space-between; padding: 2px 2px 10px; }
+  .pick-title { font-family: var(--square); font-size: 20px; font-weight: 500; }
+  .pick-done { border: 0; background: none; color: var(--mark); font: inherit; font-size: 17px; font-weight: 600;
+    min-height: 44px; padding: 0 6px; cursor: pointer; }
+  /* The three as one grouped list: a label at the start, the choice at the end. */
+  .picker .pick { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 54px;
+    padding: 0 14px; background: color-mix(in srgb, var(--desk) 55%, var(--paper)); }
+  .picker .pick:nth-of-type(1) { border-radius: 12px 12px 0 0; }
+  .picker .pick:nth-of-type(3) { border-radius: 0 0 12px 12px; }
+  .picker .pick + .pick { box-shadow: inset 0 .5px 0 var(--rule); }
+  .picker .pick label { display: block; font-size: 16px; color: var(--ink); }
+  .picker .pick:first-of-type { flex: none; }
+  .picker select, .picker select#mas, .picker select#daf { width: auto; min-width: 0; border: 0; background: none;
+    font-family: var(--square); font-size: 19px !important; padding: 8px 0; color: var(--ink); text-align: end; }
+  .picker .today { margin-top: 14px; min-height: 50px; border: 0; border-radius: 12px; justify-content: center;
+    background: var(--ink); color: var(--paper); font-size: 16px; font-weight: 500; }
+  .picker #today-label { display: inline; }
+  .picker #today-label[data-day]::before { content: "הדף היומי · "; opacity: .7; font-weight: 400; }
+  .scrim { display: block; position: fixed; inset: 0; z-index: 65; background: rgba(20, 12, 4, .34);
+    opacity: 0; pointer-events: none; transition: opacity 220ms ease; }
+  body.picking .scrim { opacity: 1; pointer-events: auto; }
+
+  /* -- the page: paper to the edges ------------------------------------------- */
+  main, main.with-desk { padding: 0; gap: 0; }
+  .sheet { border: 0; border-radius: 0; box-shadow: none; }
+  .col { padding: 12px 18px 48px; }
+  .col.gemara { scroll-padding-block: 24px; }
+  .linear { padding: 0 6px 60px; }
+  .ex-bar { padding: 10px 0; }
+
+  /* -- the conversation and the toolbar --------------------------------------- */
+  footer { position: relative; z-index: 50; padding: 0 0 env(safe-area-inset-bottom, 0px);
+    border-top: .5px solid var(--rule); background: var(--paper); }
+  .bar { display: grid; gap: 0; max-width: none; align-items: center;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas: "state state state state state" "talk talk talk talk talk"
+                         "queue queue queue queue queue" "src desk mic log view"; }
+  .talkcol, .talk-top, .tabs { display: contents; }
+  /* The toolbar's own hairline, across the row the tabs sit in. */
+  .bar::before { content: ""; grid-row: 4; grid-column: 1 / -1; align-self: stretch;
+    border-top: .5px solid var(--rule); background: var(--paper); }
+  .state { grid-area: state; padding: 9px 18px 0; font-size: 12.5px; text-align: start; }
+  .state:empty { display: none; }
+  .talk { grid-area: talk; padding: 0 18px 8px; max-height: var(--talk-h); }
+  .queue { grid-area: queue; margin: 0 16px 8px; padding-top: 6px; }
+  .qbtn span { display: none; }
+  .reply { font-size: 16.5px; line-height: 1.6; }
+  .micwrap { grid-area: mic; width: 62px; height: 62px; margin: 7px 10px 5px; justify-self: center; }
+  #mic { width: 62px; height: 62px; }
+  #mic .ic { width: 27px; height: 27px; }
+  .hold { width: 32px; height: 32px; bottom: -2px; inset-inline-end: -14px; }
+  #open-sources { grid-area: src; } #open-desk { grid-area: desk; } #open-log { grid-area: log; }
+  #open-view { grid-area: view; }
+  .tab, #open-view { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    min-height: 58px; padding: 6px 0 2px; border-radius: 12px; background: none; box-shadow: none;
+    font-size: 10.5px; font-weight: 500; color: var(--dim); letter-spacing: .01em; }
+  .tab .ic { display: block; width: 25px; height: 25px; stroke-width: 1.55; }
+  .tab[aria-pressed="true"] { background: none; box-shadow: none; color: var(--mark); }
+  .tab[aria-pressed="true"] .ic { stroke-width: 1.9; }
+  .tab:active { transform: scale(.92); }
+  .foot-grip { top: -10px; height: 20px; }
+  .foot-grip::after { top: 8px; }
+
+  /* While a sheet is up, the toolbar stays and the conversation steps aside for it. */
+  body.docked .state, body.docked .talk, body.docked .queue, body.docked .foot-grip { display: none; }
+  /* With the desk open, the page and the desk share the screen; the conversation
+     keeps to its one line of state (and is still heard). */
+  main.with-desk ~ footer .talk, main.with-desk ~ footer .queue, main.with-desk ~ footer .foot-grip { display: none; }
+  main.with-desk ~ footer .state { padding-bottom: 8px; }
+  /* What waits behind the answer, only when something does; skipping it is beside the mic. */
+  .queue:not(:has(.qitem)) { display: none; }
+  .queue .qbtn.skip { display: none; }
+  button.skipnow { display: inline-flex; inset-inline-end: auto; inset-inline-start: -14px; }
+
+
+  /* -- the desk, under the page ------------------------------------------------ */
+  main.with-desk .desk { border: 0; border-top: .5px solid var(--rule); border-radius: 0; box-shadow: none; }
+  #desk-side, #desk-below { display: none; }
+  .desk-bar { gap: 4px; padding: 6px 10px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .desk-bar .btn { border: 0; background: var(--desk); min-height: 36px; border-radius: 9px; }
+  .desk-bar .btn.icon { min-width: 38px; }
+  .desk-cards { padding: 8px; gap: 8px; }
+  .dc { flex-basis: 100%; }
+  .dc-btn.dc-wide { display: none; }                       /* every card is the width of the screen */
+  /* A card a screenful of the desk: its own scroll follows the line, the desk scrolls between cards. */
+  .dc-body { height: max(150px, calc(var(--desk-h, 46dvh) - 130px)) !important; resize: none; }
+  .desk-layouts { padding: 6px 10px; }
+  .lay-save { padding-block: 5px; font-size: 12px; }
+
+  /* The transcript: what you type is at the bottom, where a message is written. */
+  .say-label { display: none; }
+  .say-form { position: sticky; bottom: -28px; margin: 14px -18px -28px; padding: 10px 18px 14px;
+    background: var(--paper); box-shadow: 0 -.5px 0 var(--rule); }
+  .say-form input { border-radius: 20px; padding: 9px 14px; min-height: 42px; }
+  .say-form button { border-radius: 20px; min-height: 42px; padding-inline: 16px; background: var(--ink);
+    color: var(--paper); border-color: var(--ink); }
+}
+
+/* Sheets, where the screen is narrow (on its side a phone has room for the panel beside the page). */
+@media (max-width: 760px) {
+  /* -- sheets: they rise from the toolbar and go back into it ------------------ */
+  .over { inset-block: auto var(--foot-h, 76px); inset-inline: 0; width: auto; height: var(--sheet);
+    transform: translateY(calc(100% + var(--foot-h, 76px) + 20px)); }
+  .over.open { transform: none; }
+  .over.settle { transition: transform var(--t-in), height 320ms var(--ease); }
+  body.docked { padding-inline-start: 0; }
+  body.docked main { margin-bottom: min(var(--sheet), calc(100dvh - var(--foot-h, 76px) - 200px)); }
+  body.settling main { transition: margin-bottom 320ms var(--ease); }
+  .over .panel { border: 0; border-radius: 16px 16px 0 0; padding: 30px 18px 28px;
+    box-shadow: 0 -14px 40px -18px rgba(30, 18, 4, .38), 0 -.5px 0 var(--rule); }
+  .over .grip { inset-inline: 0; inset-block: 0 auto; width: auto; height: 30px; cursor: grab; }
+  .over .grip::after { inset-block: 8px auto; inset-inline: calc(50% - 18px); width: 36px; height: 5px; border-radius: 3px; opacity: .6; }
+  .over .close { z-index: 5; top: 14px; inset-inline-end: 14px; width: 30px; height: 30px; border: 0;
+    background: var(--desk); color: var(--dim); box-shadow: none; }
+  .over .close .ic { width: 16px; height: 16px; stroke-width: 2.2; }
+  body.resizing, body.resizing * { cursor: grabbing !important; }
+}
+
+/* A phone on its side: less of everything that is not the page. */
+@media (max-height: 500px) and (pointer: coarse) {
+  :root { --talk-h: 16vh; }
+  header { min-height: 44px; }
+  .tab span, #open-view span { display: none; }
+  .tab, #open-view { min-height: 46px; }
+  .micwrap, #mic { width: 48px; height: 48px; }
+  .micwrap { margin-block: 4px 3px; }
+}
+
+/* The view sheet: how the page looks, in one place. */
+.view-set .opts { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px; padding: 2px;
+  border-radius: 10px; background: var(--desk); }
+.view-set .opts .btn { border: 0; background: none; border-radius: 8px; min-height: 38px; font-size: 14.5px; }
+.view-set .opts .btn[aria-pressed="true"] { background: var(--paper); color: var(--ink);
+  box-shadow: 0 1px 3px rgba(40,25,5,.22); }
+.sizer { display: flex; align-items: center; gap: 10px; }
+.sizer .btn { width: 46px; min-height: 40px; font-family: var(--square); border-radius: 10px; }
+.sizer .btn:first-child { font-size: 15px; } .sizer .btn:last-child { font-size: 22px; }
+.sizer .sample { flex: 1; text-align: center; font-family: var(--square); font-size: calc(21px * var(--scale));
+  white-space: nowrap; overflow: hidden; }
+@media (prefers-reduced-motion: reduce) {
+  .picker, body.picking .picker { transform: none !important; transition: opacity 120ms linear, visibility 0s; }
+  .picker { opacity: 0; } body.picking .picker { opacity: 1; }
+  .over.settle, body.settling main { transition: none; }
+}
+
+/* Typing instead of talking. */
+.say-form { display: flex; gap: 6px; }
+.say-form input { flex: 1; min-width: 0; }
+/* The Steinsaltz switch, drawn like the other segmented choices: a track and a raised thumb. */
+.ex-bar .seg2 { padding: 2px; gap: 2px; border-radius: 9px; background: var(--desk); }
+.ex-bar .seg2 .btn { margin: 0; border: 0; border-radius: 7px !important; background: none; color: var(--dim);
+  font-family: var(--ui); font-size: 13px; padding: 5px 14px; }
+.ex-bar .seg2 .btn[aria-pressed="true"] { background: var(--paper); color: var(--ink);
+  box-shadow: 0 1px 3px rgba(40,25,5,.22); }
+/* A citation inside an English sentence, in the sentence's own letters. */
+.chip.inline { font-family: var(--ui); font-size: 11.5px; }

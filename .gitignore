@@ -7,3 +7,15 @@ service-account*.json
 .env
 
 .DS_Store
+__pycache__/
+*.pyc
+.env
+.venv/
+chavruta/packs/*
+!chavruta/packs/berakhot_2a.json
+!chavruta/packs/berakhot_2b.json
+chavruta/chavruta.log
+chavruta/sessions/
+# Personal, and secret: your notes, and the phone link's key and certificate.
+chavruta/notes.jsonl
+chavruta/.phone/
