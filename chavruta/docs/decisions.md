@@ -713,3 +713,27 @@ to the mishna the gemara is on, brings its text, and recaps the pages since.
   "כותב תשובה…". The export gives each answer a timing line: sorted in, the
   head start used or not, sources, first sentence, first word heard, and from
   the end of their sentence to the first word.
+
+**67. The phone is its own shape, not the desktop squeezed.**
+- Most learning may happen on a phone, held in one hand, by voice. So three
+  layers, top to bottom: a one-line bar (the page's name -- tap it to turn to
+  another -- its two sides, settings); the page, paper to the edges; and the
+  conversation over a toolbar with the microphone in the middle, where the
+  thumb rests, and four tabs around it: מפרשים, שולחן, תמליל, תצוגה.
+- Turning to a page is a sheet: מסכת, דף, עמוד as one grouped list, and
+  today's daf as one wide button. The last choice closes it.
+- Everything else is a sheet that rises from the toolbar and goes back into
+  it, sized for what it holds: the commentaries at half the screen (the line
+  they are on still visible above), the transcript and settings tall, the
+  view as tall as its three choices. Its edge follows the finger 1:1, gives
+  less and less past the top, and on release settles where a flick was
+  taking it -- fast enough downward, it goes away.
+- One thing at a time: a sheet puts the desk away and the desk lowers a sheet.
+  While either is up the conversation steps aside (it is still heard); the
+  mic never moves.
+- תצוגה gathers how the page looks: צורת הדף or Steinsaltz, the size of the
+  letters (for every view and the commentaries), and Rashi script.
+- On its side, a phone has room beside the page, so the panel is beside it.
+- No keyboard hints where there is no keyboard; the transcript does not open
+  the keyboard by itself; it can be added to the home screen and opens
+  full-screen with its own icon.

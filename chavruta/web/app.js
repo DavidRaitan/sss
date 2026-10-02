@@ -6,6 +6,11 @@
    is pointing at, the sources it cites. */
 
 const $ = (id) => document.getElementById(id);
+// A phone: narrow, or a touch screen on its side. A keyboard: a fine pointer that hovers.
+const PHONE = window.matchMedia("(max-width: 760px), (max-height: 500px) and (pointer: coarse)");
+const KEYS = window.matchMedia("(hover: hover) and (pointer: fine)");
+// Panels as sheets from below: where the screen is too narrow to put them beside the page.
+const SHEET = window.matchMedia("(max-width: 760px)");
 // One set of line icons (the sprite in index.html), sized and coloured like the text around them.
 function icon(name, cls) {
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -35,7 +40,7 @@ function el(tag, cls, text) {
 
 const DEFAULTS = { view: "daf", depth: "daf", language: "en", voice: "natural",
   hearing: "api", speak: true, pause: "normal", nudges: true, checks: true, translate: false, stops: false,
-  speakers: false, rate: 1, favor: {}, voices: 3, open: "last", mine: [], explain: "stz", script: "plain", voice_name: "cedar",
+  speakers: false, rate: 1, favor: {}, voices: 3, open: "last", mine: [], explain: "stz", script: "plain", voice_name: "cedar", scale: 1,
   sites: ["halachayomit.co.il", "he.wikisource.org", "dafyomi.co.il"], sites_halacha: true };
 const PAUSES = { short: 1000, normal: 1500, long: 2400 };
 function loadSettings() {
@@ -144,11 +149,24 @@ async function buildPickers() {
     if (back) return turnTo(back, +recall("line." + back) || 1);
     fillDapim(); turnTo(pickedRef());
   };
-  $("today").onclick = openToday;
-  $("daf").onchange = () => turnTo(pickedRef());
-  $("am-a").onclick = () => { setAmud("a"); turnTo(pickedRef()); };
-  $("am-b").onclick = () => { setAmud("b"); turnTo(pickedRef()); };
+  $("today").onclick = () => { picking(false); openToday(); };
+  $("daf").onchange = () => { picking(false); turnTo(pickedRef()); };
+  $("am-a").onclick = () => { picking(false); setAmud("a"); turnTo(pickedRef()); };
+  $("am-b").onclick = () => { picking(false); setAmud("b"); turnTo(pickedRef()); };
+  $("m-am-a").onclick = () => $("am-a").click();
+  $("m-am-b").onclick = () => $("am-b").click();
 }
+
+// On a phone, the page picker is a sheet: the title opens it; a choice, סיום,
+// or a tap above it closes it.
+function picking(on) {
+  if (on && !PHONE.matches) return;
+  document.body.classList.toggle("picking", !!on);
+  $("m-title").setAttribute("aria-expanded", String(!!on));
+}
+$("m-title").onclick = () => picking(!document.body.classList.contains("picking"));
+$("pick-done").onclick = () => picking(false);
+$("scrim").onclick = () => picking(false);
 
 // The tractates you are learning first, then all of Shas by seder.
 function fillMasechtot() {
@@ -191,7 +209,7 @@ async function today() {
     const r = await fetch("/api/today");
     if (r.ok) S.today = await r.json();
   } catch (e) {}
-  if (S.today) $("today-label").textContent = S.today.he;
+  if (S.today) { $("today-label").textContent = S.today.he; $("today-label").dataset.day = "1"; }
   fetch("/api/progress").then((r) => r.json()).then((p) => {
     if (p.daf_yomi && p.daf_yomi.done) $("today-label").textContent = (S.today ? S.today.he : "") + " ✓";
     if (p.streak > 1) $("today").title = "הדף היומי · " + p.streak + " ימים ברצף";
@@ -223,6 +241,10 @@ function setAmud(a) {
   const m = masechta(), last = m && +$("daf").value === m.last && m.last_amud === "a";
   $("am-b").disabled = !!last;
   $("am-a").disabled = !!(m && +$("daf").value === m.first && m.first_amud === "b");   // Tamid opens on 25b
+  for (const x of ["a", "b"]) {           // the same two, in the phone's bar
+    $("m-am-" + x).setAttribute("aria-pressed", $("am-" + x).getAttribute("aria-pressed"));
+    $("m-am-" + x).disabled = $("am-" + x).disabled;
+  }
 }
 const pickedAmud = () => ($("am-b").getAttribute("aria-pressed") === "true" ? "b" : "a");
 
@@ -238,6 +260,8 @@ function showRefInPicker(ref) {
   const p = parseRef(ref); if (!p) return;
   $("mas").value = p.masechta; fillDapim();
   $("daf").value = p.daf; setAmud(p.amud);
+  const m = S.masechtot.find((x) => x.name === p.masechta);
+  $("m-title-text").textContent = (m ? m.he : p.masechta) + " " + geresh(hebNum(p.daf));
 }
 
 function flip(dir) {
@@ -883,7 +907,7 @@ function pauseSpeaking() {
   if (player) { if (paused) player.pause(); else player.play().catch(() => {}); }
   if (window.speechSynthesis) { if (paused) speechSynthesis.pause(); else speechSynthesis.resume(); }
   showHold();
-  setMode(paused ? "paused" : "speaking", paused ? "עצרתי — רווח כדי להמשיך, או פשוט דבר." : "מדבר…");
+  setMode(paused ? "paused" : "speaking", paused ? (KEYS.matches ? "עצרתי — רווח כדי להמשיך, או פשוט דבר." : "עצרתי — ▶ כדי להמשיך, או פשוט דבר.") : "מדבר…");
 }
 
 function showHold() {
@@ -1605,6 +1629,7 @@ function renderBar() {
   const held = S.turns.filter((x) => open(x) && x !== t && x.held);
   const q = $("queue");
   q.replaceChildren();
+  $("skipnow").hidden = !(saying && saying.turn);
   q.hidden = !waiting.length && !held.length && !S.later.length && !(saying && saying.turn);
   if (q.hidden) return;
   const items = el("div", "qitems");
@@ -1642,7 +1667,7 @@ function renderBar() {
   }
   const acts = el("div", "qacts");
   if (saying && saying.turn) {
-    const skip = ibtn("qbtn", "skip", "דלג", "לדלג על התשובה הזאת");
+    const skip = ibtn("qbtn skip", "skip", "דלג", "לדלג על התשובה הזאת");
     skip.onclick = skipCurrent;
     acts.append(skip);
   }
@@ -1985,7 +2010,7 @@ async function pump() {
   while (live() && ears && ears.talking && performance.now() - since < 30000) await sleep(120);
   if (live()) {
     renderBar();
-    setMode("speaking", "מדבר… · רווח לעצור");
+    setMode("speaking", KEYS.matches ? "מדבר… · רווח לעצור" : "מדבר…");
     if (ears) ears.guard = true;
     // The next sentence's voice is made while this one plays.
     if (naturalVoice() && speechQ[0] && S.settings.speak) prepare(speechQ[0]);
@@ -2075,9 +2100,16 @@ function openPanel(build, kind) {
   const panel = $("panel"); panel.replaceChildren();
   build(panel);
   panel.scrollTop = 0;
+  const was = $("over").classList.contains("open") && S.panel;
   S.panel = kind || "other";
+  if (PHONE.matches) {
+    picking(false);
+    if (DESK.open) deskClose();            // one thing at a time on a phone
+  }
+  document.body.classList.add("docked");   // first: the conversation steps aside, and the room is known
+  // Its height for what it holds -- unless it is already up showing the same kind of thing.
+  if (SHEET.matches && was !== S.panel) sheetTo(SHEETS[S.panel] || "half", !was);
   $("over").classList.add("open");
-  document.body.classList.add("docked");
   syncTabs();
 }
 function closePanel() {
@@ -2090,6 +2122,7 @@ function closePanel() {
 function syncTabs() {
   $("open-sources").setAttribute("aria-pressed", String(S.panel === "sources"));
   $("open-log").setAttribute("aria-pressed", String(S.panel === "log"));
+  $("open-view").setAttribute("aria-pressed", String(S.panel === "view"));
 }
 
 // The conversation area: drag its top edge for more or less of it. Kept.
@@ -2107,25 +2140,76 @@ function syncTabs() {
 // ✕ sits outside the scrolling panel, so it is always in reach.
 $("close-panel").onclick = closePanel;
 
-// Drag the panel's edge to give it more or less of the screen; remembered.
-// Beside the page it is a width, on a phone (a sheet from below) a height.
+// Drag the panel's edge to give it more or less of the screen. Beside the
+// page it is a width, and remembered. On a phone it is a sheet from the
+// toolbar with three resting heights -- a peek at the page above it, most of
+// the screen, or its own size -- and it settles where a flick was taking it:
+// fast enough downward, it goes back into the toolbar.
+const SHEETS = { sources: "half", desk: "half", view: "fit", log: "full", settings: "full" };
+function sheetRoom() {
+  return Math.max(200, innerHeight - $("foot").getBoundingClientRect().height - 8);
+}
+function sheetHeights() {
+  const last = $("panel").lastElementChild;      // what it holds, not the room it was given
+  const room = sheetRoom(), fit = last ? last.offsetTop + last.offsetHeight + 34 : 300;
+  return { half: Math.round(Math.min(room, Math.max(260, room * 0.56))), full: Math.round(room - 40),
+    fit: Math.round(Math.min(room - 40, Math.max(200, fit))) };
+}
+function setSheet(px) { document.documentElement.style.setProperty("--sheet", Math.round(px) + "px"); }
+function sheetTo(which, fresh) {
+  const h = typeof which === "number" ? which : sheetHeights()[which];
+  if (fresh || REDUCED.matches) return setSheet(h);
+  settle(() => setSheet(h));
+}
+function settle(change) {
+  const over = $("over");
+  over.classList.add("settle"); document.body.classList.add("settling");
+  change();
+  clearTimeout(settle.t);
+  settle.t = setTimeout(() => { over.classList.remove("settle"); document.body.classList.remove("settling"); }, 360);
+}
+// Where a flick would come to rest -- the way a list coasts to a stop.
+const project = (v, rate = 0.99) => (v / 1000) * rate / (1 - rate);
+// Past the last stop it gives, but less and less.
+const rubberband = (over, dim, c = 0.55) => (over * dim * c) / (dim + c * Math.abs(over));
 (function sizePanel() {
-  const narrow = () => window.matchMedia("(max-width: 760px)").matches;
-  const apply = (px) => {
-    const root = document.documentElement.style;
-    if (narrow()) root.setProperty("--sheet", Math.round(Math.min(Math.max(px, 160), innerHeight * 0.9)) + "px");
-    else root.setProperty("--side", Math.round(Math.min(Math.max(px, 260), innerWidth * 0.75)) + "px");
-  };
-  const saved = +(recall(narrow() ? "sheet" : "side") || 0);
-  if (saved) apply(saved);
+  const narrow = () => SHEET.matches;
+  const side = (px) => document.documentElement.style.setProperty("--side",
+    Math.round(Math.min(Math.max(px, 260), innerWidth * 0.75)) + "px");
+  const saved = +(recall("side") || 0);
+  if (saved) side(saved);
+  let grabY = 0, startH = 0, trail = [];
+  $("grip").addEventListener("pointerdown", (e) => {
+    grabY = e.clientY; startH = $("over").getBoundingClientRect().height; trail = [[e.timeStamp, e.clientY]];
+  });
   onDrag($("grip"), "resizing", (ev) => {
-    const rtl = getComputedStyle(document.body).direction === "rtl";
-    apply(narrow() ? innerHeight - ev.clientY : rtl ? innerWidth - ev.clientX : ev.clientX);
+    if (!narrow()) {
+      const rtl = getComputedStyle(document.body).direction === "rtl";
+      return side(rtl ? innerWidth - ev.clientX : ev.clientX);
+    }
+    trail.push([ev.timeStamp, ev.clientY]);
+    if (trail.length > 6) trail.shift();
+    const full = sheetHeights().full, want = startH + (grabY - ev.clientY);   // 1:1 with the finger
+    setSheet(want > full ? full + rubberband(want - full, full) : Math.max(0, want));
   }, () => {
-    const v = getComputedStyle(document.documentElement).getPropertyValue(narrow() ? "--sheet" : "--side");
-    remember(narrow() ? "sheet" : "side", parseInt(v, 10) || "");
+    if (!narrow()) {
+      const v = getComputedStyle(document.documentElement).getPropertyValue("--side");
+      return remember("side", parseInt(v, 10) || "");
+    }
+    const [[t0, y0], [t1, y1]] = [trail[0], trail[trail.length - 1]];
+    const speed = t1 > t0 ? ((y0 - y1) / (t1 - t0)) * 1000 : 0;            // px/s, upward positive
+    const now = $("over").getBoundingClientRect().height, aim = now + project(speed);
+    const h = sheetHeights(), stops = [["shut", 0], ["half", h.half], ["full", h.full]];
+    if (S.panel === "view" || h.fit < h.half) stops.splice(1, 1, ["fit", h.fit]);
+    const [name] = stops.reduce((a, b) => (Math.abs(b[1] - aim) < Math.abs(a[1] - aim) ? b : a));
+    if (name === "shut") return settle(closePanel);
+    sheetTo(name);
   });
 })();
+$("skipnow").onclick = skipCurrent;
+// The toolbar's height, for the sheets that rise from it.
+new ResizeObserver(() => document.documentElement.style.setProperty("--foot-h",
+  Math.round($("foot").getBoundingClientRect().height) + "px")).observe($("foot"));
 
 function tier(name) {
   const w = (S.pack.weights || {})[name] || 20;
@@ -2436,7 +2520,8 @@ function deskCard(c, i) {
   const btn = (name, tip, go) => { const b = ibtn("dc-btn", name, null, tip); b.onclick = go; tools.append(b); return b; };
   btn("prev", "להזיז קודם", () => deskMove(i, i - 1));
   btn("next", "להזיז אחר כך", () => deskMove(i, i + 1));
-  btn(c.wide ? "narrow" : "wide", c.wide ? "צר" : "רחב", () => deskFlip(() => { c.wide = !c.wide; renderDesk(); }));
+  btn(c.wide ? "narrow" : "wide", c.wide ? "צר" : "רחב", () => deskFlip(() => { c.wide = !c.wide; renderDesk(); }))
+    .classList.add("dc-wide");
   btn("close", "להוריד מהשולחן", () => {
     // It fades where it is, then the others close the gap.
     card.classList.add("leaving");
@@ -2656,7 +2741,11 @@ function deskPicker() {
   $("desk-add").setAttribute("aria-expanded", "true");
 }
 
-$("open-desk").onclick = () => (DESK.open ? deskClose() : (DESK.open = true, renderDesk()));
+$("open-desk").onclick = () => {
+  if (DESK.open) return deskClose();
+  if (PHONE.matches && S.panel) closePanel();      // one thing at a time on a phone
+  DESK.open = true; renderDesk();
+};
 $("desk-close").onclick = deskClose;
 $("desk-add").onclick = deskPicker;
 for (const p of ["side", "below", "full"]) $("desk-" + p).onclick = () => { DESK.place = p; renderDesk(); };
@@ -2693,8 +2782,8 @@ function openLog() {
     };
     // For a quiet room: say it by typing. The panel stays open and the turn
     // appears here; the answer still comes aloud.
-    panel.append(el("div", "grp", "להקליד במקום לדבר"));
-    const form = el("form"); form.style.display = "flex"; form.style.gap = "6px";
+    panel.append(el("div", "grp say-label", "להקליד במקום לדבר"));
+    const form = el("form", "say-form");
     const input = el("input"); input.style.flex = "1"; input.className = "btn"; input.placeholder = "מה אתה חושב שכתוב כאן?";
     input.dir = "auto";
     const go = el("button", "btn", "שלח"); go.type = "submit";
@@ -2707,7 +2796,8 @@ function openLog() {
     };
     panel.append(form, el("div", "grp", "לשתף"), copy);
     renderTurns();
-    setTimeout(() => input.focus(), 30);
+    // With a keyboard, ready to type; on a phone, not -- its keyboard would cover the conversation.
+    if (KEYS.matches) setTimeout(() => input.focus(), 30);
   }, "log");
 }
 
@@ -2941,6 +3031,43 @@ function seatsBox() {
   return box;
 }
 
+// How the page looks, together: which view, how big the letters, which script.
+function openView() {
+  openPanel((panel) => {
+    panel.append(el("h2", null, "תצוגה"), el("div", "sub", "איך הדף נראה"));
+    const seg = (key, options, after) => {
+      const box = el("div", "set view-set"), row = el("div", "opts");
+      for (const [value, text] of options) {
+        const b = el("button", "btn", text);
+        b.setAttribute("aria-pressed", String(S.settings[key] === value));
+        b.onclick = () => {
+          S.settings[key] = value; saveSettings();
+          for (const x of row.children) x.setAttribute("aria-pressed", String(x === b));
+          after();
+        };
+        row.append(b);
+      }
+      box.append(row);
+      return box;
+    };
+    panel.append(seg("view", [["daf", "צורת הדף"], ["lin", "שטיינזלץ"]],
+      () => { if (S.pack) { render(); selectLine(S.line); } }));
+    const size = el("div", "set"); size.append(el("div", "lbl", "גודל האותיות"));
+    const row = el("div", "sizer");
+    const less = el("button", "btn", "א"), more = el("button", "btn", "א");
+    less.setAttribute("aria-label", "אותיות קטנות יותר"); more.setAttribute("aria-label", "אותיות גדולות יותר");
+    const sample = el("div", "sample", "מאימתי קורין את שמע");
+    const step = (d) => { S.settings.scale = Math.round(Math.min(1.5, Math.max(0.8, (S.settings.scale || 1) + d)) * 100) / 100;
+      saveSettings(); applyScale(); };
+    less.onclick = () => step(-0.1); more.onclick = () => step(0.1);
+    row.append(less, sample, more); size.append(row);
+    const script = el("div", "set"); script.append(el("div", "lbl", "כתב רש״י"));
+    script.append(seg("script", [["plain", "בלי"], ["page", "על הדף"], ["all", "כל המפרשים"]], applyScript));
+    panel.append(size, script);
+  }, "view");
+}
+function applyScale() { document.documentElement.style.setProperty("--scale", S.settings.scale || 1); }
+
 function openSettings() {
   const choice = (key, label, options, help) => {
     const box = el("div", "set");
@@ -3012,7 +3139,8 @@ function openSettings() {
 
 $("open-sources").onclick = () => (S.panel === "sources" ? closePanel() : openSources(S.line));
 $("open-log").onclick = () => (S.panel === "log" ? closePanel() : openLog());
-$("open-settings").onclick = openSettings;
+$("open-settings").onclick = () => (S.panel === "settings" ? closePanel() : openSettings());
+$("open-view").onclick = () => (S.panel === "view" ? closePanel() : openView());
 $("v-daf").onclick = () => { S.settings.view = "daf"; saveSettings(); if (S.pack) { render(); selectLine(S.line); } };
 $("v-lin").onclick = () => { S.settings.view = "lin"; saveSettings(); if (S.pack) { render(); selectLine(S.line); } };
 
@@ -3021,6 +3149,7 @@ $("v-lin").onclick = () => { S.settings.view = "lin"; saveSettings(); if (S.pack
 document.addEventListener("keydown", (e) => {
   const tag = (document.activeElement || {}).tagName;
   if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA") return;
+  if (e.key === "Escape" && document.body.classList.contains("picking")) return picking(false);
   if (e.key === "Escape") return speakingDone ? skipCurrent() : closePanel();   // the whole answer, not one sentence
   if (e.key === " ") { e.preventDefault(); return speakingDone ? pauseSpeaking() : $("mic").click(); }
   else if (e.key === "ArrowLeft") flip(1);             // right to left: left is forward
@@ -3043,6 +3172,7 @@ document.addEventListener("touchend", (e) => {
 
 (async function start() {
   applyScript();
+  applyScale();
   syncMic();
   checkHealth();          // not awaited: a slow Sefaria must not hold up a cached page
   await buildPickers();

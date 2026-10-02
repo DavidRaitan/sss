@@ -9,7 +9,10 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <title>חברותא</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E📖%3C/text%3E%3C/svg%3E">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-title" content="חברותא">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@400;500;700&family=Noto+Rashi+Hebrew:wght@400;600&family=Assistant:wght@400;500;600&display=swap">
@@ -41,12 +44,22 @@
   <symbol id="i-wide" viewBox="0 0 24 24"><path d="M4 12h16M7.5 8.5L4 12l3.5 3.5M16.5 8.5L20 12l-3.5 3.5"/></symbol>
   <symbol id="i-narrow" viewBox="0 0 24 24"><path d="M3 12h6.5M14.5 12H21M6.5 8.5L10 12l-3.5 3.5M17.5 8.5L14 12l3.5 3.5"/></symbol>
   <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5.5v13M5.5 12h13"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24"><path d="M5.5 5.5h13a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2H11l-4.5 3.5V17h-1a2 2 0 0 1-2-2V7.5a2 2 0 0 1 2-2zM8 10h8M8 13h5"/></symbol>
+  <symbol id="i-type" viewBox="0 0 24 24"><path d="M2.5 18.5L7.5 5.5l5 13M4.4 14h6.2M13.5 18.5l3.5-8.5 3.5 8.5M14.7 15.7h4.6"/></symbol>
   <symbol id="i-grip" viewBox="0 0 24 24"><path d="M9 6.5h.01M15 6.5h.01M9 12h.01M15 12h.01M9 17.5h.01M15 17.5h.01"/></symbol>
 </svg>
 
 <header>
   <span class="brand">חברותא</span>
-  <div class="picker" role="group" aria-label="לאן לפתוח">
+  <!-- On a phone the bar is one line: the page you are on (tap to turn to another), and its two sides. -->
+  <button class="m-title" id="m-title" aria-haspopup="dialog" aria-controls="picker" aria-label="לבחור דף"><span id="m-title-text">…</span><svg class="ic"><use href="#i-down"/></svg></button>
+  <span class="seg2 m-amud" role="group" aria-label="עמוד">
+    <button class="btn" id="m-am-a" aria-pressed="true">א</button>
+    <button class="btn" id="m-am-b" aria-pressed="false">ב</button>
+  </span>
+  <div class="picker" id="picker" role="group" aria-label="לאן לפתוח">
+    <div class="pick-head"><span class="pick-title">לפתוח דף</span><button class="pick-done" id="pick-done">סיום</button></div>
     <span class="pick"><label for="mas">מסכת</label><select id="mas" aria-label="מסכת"></select></span>
     <span class="pick"><label for="daf">דף</label><select id="daf" aria-label="דף"></select></span>
     <span class="pick"><label>עמוד</label>
@@ -64,6 +77,8 @@
   <span class="status" id="status" title=""><span class="dot" id="dot"></span><span id="statustext"></span></span>
   <button class="btn icon" id="open-settings" title="הגדרות" aria-label="הגדרות"><svg class="ic"><use href="#i-settings"/></svg></button>
 </header>
+
+<div class="scrim" id="scrim"></div>
 
 <main>
   <div class="sheet">
@@ -107,14 +122,16 @@
       <span class="ring" aria-hidden="true"></span>
       <button id="mic" data-state="idle" title="מיקרופון: לחיצה פותחת וסוגרת · לחיצה ארוכה עוצרת הכול" aria-label="מיקרופון" aria-pressed="false"><svg class="ic"><use href="#i-mic"/></svg></button>
       <button id="hold" class="hold" hidden title="לעצור (רווח)" aria-label="לעצור את הדיבור"><svg class="ic"><use href="#i-pause"/></svg></button>
+      <button id="skipnow" class="hold skipnow" hidden title="לדלג על התשובה הזאת" aria-label="לדלג על התשובה הזאת"><svg class="ic"><use href="#i-skip"/></svg></button>
     </div>
     <div class="talkcol">
       <div class="talk-top">
         <div class="state" id="state">לחץ על המיקרופון — וקרא, או תגיד מה אתה חושב שכתוב.</div>
         <nav class="tabs" aria-label="חלוניות">
-          <button class="tab" id="open-sources">מפרשים</button>
-          <button class="tab" id="open-desk" aria-pressed="false" title="מפרשים לצד הדף, לקריאה">שולחן</button>
-          <button class="tab" id="open-log">תמליל</button>
+          <button class="tab" id="open-sources"><svg class="ic"><use href="#i-book"/></svg><span>מפרשים</span></button>
+          <button class="tab" id="open-desk" aria-pressed="false" title="מפרשים לצד הדף, לקריאה"><svg class="ic"><use href="#i-desk"/></svg><span>שולחן</span></button>
+          <button class="tab" id="open-log"><svg class="ic"><use href="#i-chat"/></svg><span>תמליל</span></button>
+          <button class="tab" id="open-view" title="תצוגה וגודל אותיות"><svg class="ic"><use href="#i-type"/></svg><span>תצוגה</span></button>
         </nav>
       </div>
       <div class="talk" id="talk" aria-live="polite">

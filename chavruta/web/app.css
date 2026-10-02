@@ -7,6 +7,7 @@
   --ok: #4d7a3a; --warn: #b07a12; --bad: #a33a2a;
   --square: "Frank Ruhl Libre", "Frank Ruehl CLM", "Times New Roman", serif;
   --rashi: "Noto Rashi Hebrew", "Frank Ruhl Libre", "Times New Roman", serif;
+  --scale: 1;   /* the reader's text size, from תצוגה */
   --ui: -apple-system, BlinkMacSystemFont, "Segoe UI", "Heebo", sans-serif;
 }
 @media (prefers-color-scheme: dark) {
@@ -72,7 +73,7 @@ main { overflow: hidden; display: flex; justify-content: center; padding: 14px; 
 .col.inner { grid-area: inner; } .col.outer { grid-area: outer; }
 .colname { font-family: var(--square); font-size: 13px; color: var(--faint); text-align: center;
   letter-spacing: .08em; margin-bottom: 10px; }
-.gtext { font-family: var(--square); font-size: 23px; line-height: 1.9; text-align: justify;
+.gtext { font-family: var(--square); font-size: calc(23px * var(--scale)); line-height: 1.9; text-align: justify;
   text-align-last: right; }
 .seg { cursor: pointer; border-radius: 4px; transition: background .25s; padding: 1px 0; }
 .seg.on { background: var(--glow); box-shadow: 0 0 0 3px var(--glow); }
@@ -85,9 +86,9 @@ main { overflow: hidden; display: flex; justify-content: center; padding: 14px; 
 .w.head { font-weight: 700; }
 .stops .clause-end::after { content: "·"; color: var(--mark); font-weight: 700; margin-inline: 1px; }
 
-.c { font-family: var(--cfont); font-size: 15.5px; line-height: 1.72; text-align: justify;
+.c { font-family: var(--cfont); font-size: calc(15.5px * var(--scale)); line-height: 1.72; text-align: justify;
   margin-bottom: 7px; padding: 2px 5px; border-radius: 4px; cursor: pointer; }
-.c .dib { font-family: var(--square); font-weight: 700; font-size: 15.5px; }
+.c .dib { font-family: var(--square); font-weight: 700; font-size: 1em; }
 .c.on { background: var(--glow); }
 .c.flash { animation: flash 1.4s ease-out; }
 @keyframes flash { 0% { background: var(--quote); } 100% { background: transparent; } }
@@ -110,15 +111,8 @@ main { overflow: hidden; display: flex; justify-content: center; padding: 14px; 
   .daf { grid-template-columns: minmax(0, 1fr); grid-template-areas: "gemara" !important; }
   .col.inner, .col.outer { display: none; }
   .col.gemara { border: 0; }
-  .gtext { font-size: 21px; text-align: right; }   /* justify leaves gaps on a narrow line */
+  .gtext { font-size: calc(21px * var(--scale)); text-align: right; }   /* justify leaves gaps on a narrow line */
   .hide-narrow { display: none; }
-}
-@media (max-width: 620px) {
-  header { gap: 8px; }
-  .picker { order: 3; width: 100%; justify-content: space-between; }
-  .pick label { display: none; }
-  .brand { font-size: 19px; }
-  footer { padding: 8px 12px 10px; }
 }
 
 /* ---- the voice bar: this is the conversation ----------------------------- */
@@ -214,18 +208,6 @@ button:has(> .ic) { display: inline-flex; align-items: center; justify-content: 
 .chip.inline { font-size: 11.5px; padding: 0 7px; margin: 0 2px; vertical-align: 1px; unicode-bidi: isolate; }
 .turn q { unicode-bidi: isolate; direction: rtl; quotes: none; font-family: var(--square); background: var(--quote); border-radius: 3px; padding: 0 3px; }
 .turn .ic { color: var(--faint); margin-inline-end: 5px; }
-@media (max-width: 620px) {
-  :root { --talk-h: 24vh; }
-  footer { padding: 10px 12px 10px; }
-  .bar { gap: 12px; }
-  .micwrap, #mic { width: 52px; height: 52px; }
-  .talk-top { flex-wrap: wrap; row-gap: 4px; }
-  .state { flex-basis: 100%; order: 2; }
-  .tabs { width: 100%; }
-  .tab { flex: 1; }
-  .reply { font-size: 16px; }
-  .qbtn span { display: none; }            /* on a phone the icons alone, with their names on long-press */
-}
 
 /* ---- panels sit beside the page, so the gemara stays in view ------------- */
 :root { --side: min(440px, 40vw); --sheet: 52vh; }
@@ -248,17 +230,6 @@ body.resizing, body.resizing * { cursor: col-resize !important; user-select: non
   cursor: col-resize; touch-action: none; }
 .over .grip::after { content: ""; position: absolute; inset-block: calc(50% - 26px); inset-inline-start: 3px;
   width: 4px; border-radius: 2px; background: var(--edge); opacity: .55; }
-@media (max-width: 760px) {
-  /* A phone has no room beside the page: the panel is a sheet from below,
-     and the page above it still scrolls; its top edge is the handle. */
-  .over { inset-block-start: auto; height: var(--sheet); width: 100vw; transform: translateY(calc(100% + 24px)); }
-  .over.open { transform: none; }
-  .over .panel { border-inline-end: 0; border-top: 1px solid var(--rule); border-radius: 12px 12px 0 0; padding-top: 24px; }
-  .over .grip { inset-inline: 0; inset-block: -6px auto; width: auto; height: 22px; cursor: row-resize; }
-  .over .grip::after { inset-block: 8px auto; inset-inline: calc(50% - 26px); width: 52px; height: 4px; }
-  body.docked { padding-inline-start: 0; padding-bottom: var(--sheet); }
-  body.resizing, body.resizing * { cursor: row-resize !important; }
-}
 .panel h2 { margin: 0 0 2px; font-size: 16px; font-family: var(--square); }
 .panel .sub { font-size: 12px; color: var(--faint); margin-bottom: 12px; }
 .grp { font-size: 11px; letter-spacing: .08em; color: var(--faint); margin: 16px 0 8px;
@@ -266,7 +237,7 @@ body.resizing, body.resizing * { cursor: col-resize !important; user-select: non
 .src { margin-bottom: 14px; }
 .src .who { font-size: 13px; font-weight: 600; }
 .src .who .dib { font-family: var(--square); color: var(--mark); font-weight: 700; margin-inline-start: 4px; }
-.src .body { font-family: var(--pfont); font-size: 16px; line-height: 1.75; margin-top: 3px;
+.src .body { font-family: var(--pfont); font-size: calc(16px * var(--scale)); line-height: 1.75; margin-top: 3px;
   max-height: 5.3em; overflow: hidden; }
 .src.open .body { max-height: none; }
 .src.flash { animation: flash 1.6s ease-out; }
@@ -430,7 +401,6 @@ button, .btn, .chip, select, [role="button"], .dc-grip, .desk-grip, .grip {
 header { padding-top: max(8px, env(safe-area-inset-top, 0px));
   padding-inline: max(14px, env(safe-area-inset-right, 0px)) max(14px, env(safe-area-inset-left, 0px)); }
 footer { padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
-@media (max-width: 760px) { .over .panel { padding-bottom: calc(40px + env(safe-area-inset-bottom, 0px)); } }
 
 /* Pressed is felt on the press, not on the release. */
 .btn, .chip, .hold, .dc-btn, .dc-line, .lay-go, .lay-x, .lay-save, .qbtn, #mic, .more, .tref {
@@ -486,18 +456,6 @@ button:focus:not(:focus-visible) { outline: none; }
 
 /* One column as wide as the screen -- never as wide as the widest header row. */
 body { grid-template-columns: minmax(0, 1fr); }
-@media (max-width: 760px) {
-  header { gap: 8px; row-gap: 6px; }
-  .picker { order: 3; flex: 1 1 100%; min-width: 0; gap: 6px; }
-  .picker .pick:first-of-type { flex: 1; min-width: 0; }
-  .picker select#mas { width: 100%; min-width: 0; }
-  .pick label { display: none; }
-  main { padding: 8px; }
-  main.with-desk { gap: 8px; }
-  /* On a phone the desk is always under (or over) the page: "beside" has no room. */
-  #desk-side, #desk-below { display: none; }
-  .desk-bar { gap: 4px; padding: 6px 8px; }
-}
 /* A fingertip needs room: small controls grow on touch screens. */
 @media (pointer: coarse) {
   .dc-btn { padding: 6px 9px; font-size: 15px; }
@@ -530,7 +488,7 @@ button.qitem { cursor: pointer; font: inherit; background: var(--paper); }
    Aramaic smaller and in another face (no brackets), references in small print. */
 .linear { padding: 0 26px 90px; }
 .linear .line { max-width: 740px; margin: 0 auto 4px; padding: 12px 22px; border-radius: 12px;
-  font-size: 26px; line-height: 1.95; transition: background-color 220ms ease; }
+  font-size: calc(26px * var(--scale)); line-height: 1.95; transition: background-color 220ms ease; }
 .linear .line.on { background: color-mix(in srgb, var(--glow) 50%, transparent); box-shadow: none; }
 .ex-bar { position: sticky; top: 0; z-index: 2; display: flex; justify-content: center;
   padding: 12px 0 14px; margin-bottom: 4px;
@@ -540,7 +498,7 @@ button.qitem { cursor: pointer; font: inherit; background: var(--paper); }
    a clean modern Hebrew sans; his translations of the Aramaic in that sans,
    smaller and softer. (Bold alone, in one face, was not enough.) */
 :root { --sans: "Assistant", "Heebo", -apple-system, "Segoe UI", sans-serif; }
-.stz { font-family: var(--sans); font-size: 19.5px; line-height: 1.95; color: var(--ink);
+.stz { font-family: var(--sans); font-size: calc(19.5px * var(--scale)); line-height: 1.95; color: var(--ink);
   text-align: right; font-weight: 400; }
 .stz .d, .stz .w { font-family: var(--square); font-weight: 700; font-size: 1.1em; color: var(--ink); }
 .stz .ghost { display: none; }
@@ -552,8 +510,8 @@ button.qitem { cursor: pointer; font: inherit; background: var(--paper); }
 .linear .line.stzline + .line.stzline { margin-top: 2px; }
 @media (max-width: 620px) {
   .linear { padding: 0 8px 80px; }
-  .linear .line { padding: 10px 12px; font-size: 22px; }
-  .stz { font-size: 18.5px; line-height: 1.85; }
+  .linear .line { padding: 10px 12px; font-size: calc(22px * var(--scale)); }
+  .stz { font-size: calc(18.5px * var(--scale)); line-height: 1.85; }
 }
 
 /* The commentaries' letters: plain by default; Rashi script for those on the
@@ -585,3 +543,210 @@ body.rashi-all { --cfont: var(--rashi); --pfont: var(--rashi); }
 .turn.discarded { text-decoration: line-through; opacity: .55; }
 @media (hover: hover) and (pointer: fine) { .asked-x:hover, .qx:hover { color: var(--bad); background: var(--glow); } }
 @media (pointer: coarse) { .asked-x, .qx { padding: 4px 8px; } }
+
+/* ==== the phone ===========================================================
+   Held in one hand, used by voice. Three layers, top to bottom:
+     · a one-line bar: the page you are on (tap it to turn to another) and its two sides;
+     · the page itself, edge to edge, as much of the screen as can be spared;
+     · the conversation, and under it a toolbar with the microphone in the
+       middle, where the thumb rests.
+   Everything else -- the commentaries, the transcript, settings, the view --
+   is a sheet that rises from the toolbar, and goes back down into it. */
+
+button.m-title, .m-amud, .pick-head, #open-view, .scrim, button.skipnow { display: none; }
+.tab .ic { display: none; }
+.tab { display: inline-flex; align-items: center; }
+
+@media (max-width: 760px), (max-height: 500px) and (pointer: coarse) {
+  :root { --talk-h: 22vh; --sheet: 55dvh; }
+  body { background: var(--paper); }
+
+  /* -- the bar ---------------------------------------------------------------- */
+  header { flex-wrap: nowrap; gap: 6px; min-height: 52px; border-bottom: .5px solid var(--rule);
+    padding-block: max(4px, env(safe-area-inset-top, 0px)) 4px;
+    padding-inline: max(8px, env(safe-area-inset-right, 0px)) max(8px, env(safe-area-inset-left, 0px)); }
+  .brand, .hide-narrow, #statustext, .runner { display: none; }
+  .dot.ok { display: none; }                         /* only trouble is worth a mark */
+  .status { padding-inline: 4px; }
+  button.m-title { display: inline-flex; align-items: center; gap: 3px; min-width: 0; min-height: 44px;
+    border: 0; background: none; padding: 0 8px; border-radius: 10px; color: var(--ink); cursor: pointer;
+    font-family: var(--square); font-size: 21px; font-weight: 500; white-space: nowrap; }
+  #m-title-text { overflow: hidden; text-overflow: ellipsis; }
+  .m-title .ic { width: 17px; height: 17px; stroke-width: 2.2; color: var(--faint); vertical-align: 0; }
+  .m-title:active { background: var(--desk); transform: none; }
+  #open-settings { border: 0; background: none; width: 44px; height: 44px; font-size: 21px; color: var(--ink); }
+  #open-settings:active { background: var(--desk); }
+
+  /* Segmented, the way the phone draws it: a track, and a raised thumb on the one chosen. */
+  .m-amud, .pick .seg2 { display: inline-flex; padding: 2px; gap: 2px; border-radius: 9px; background: var(--desk); }
+  .m-amud .btn, .pick .seg2 .btn { margin: 0; border: 0; border-radius: 7px !important; background: none;
+    color: var(--ink); font-family: var(--square); font-size: 18px; min-width: 42px; min-height: 34px; padding: 0 10px; }
+  .m-amud .btn[aria-pressed="true"], .pick .seg2 .btn[aria-pressed="true"] { background: var(--paper); color: var(--ink);
+    box-shadow: 0 1px 3px rgba(40,25,5,.22), 0 0 0 .5px rgba(40,25,5,.06); }
+  .m-amud .btn:disabled, .pick .seg2 .btn:disabled { opacity: .35; }
+
+  /* -- turning to a page: a sheet with the three choices and today's daf ----- */
+  .picker { position: fixed; z-index: 70; inset-inline: 0; bottom: 0; display: flex; flex-direction: column;
+    align-items: stretch; gap: 0; padding: 8px 16px calc(18px + env(safe-area-inset-bottom, 0px));
+    background: var(--paper); border-radius: 16px 16px 0 0; box-shadow: 0 -12px 40px -14px rgba(30,18,4,.4);
+    transform: translateY(calc(100% + 30px)); visibility: hidden;
+    transition: transform var(--t-out), visibility 0s linear var(--t-dur); }
+  body.picking .picker { transform: none; visibility: visible; transition: transform var(--t-in), visibility 0s; }
+  .picker::before { content: ""; align-self: center; width: 36px; height: 5px; border-radius: 3px; background: var(--edge);
+    opacity: .6; margin-bottom: 4px; }
+  .pick-head { display: flex; align-items: center; justify-content: space-between; padding: 2px 2px 10px; }
+  .pick-title { font-family: var(--square); font-size: 20px; font-weight: 500; }
+  .pick-done { border: 0; background: none; color: var(--mark); font: inherit; font-size: 17px; font-weight: 600;
+    min-height: 44px; padding: 0 6px; cursor: pointer; }
+  /* The three as one grouped list: a label at the start, the choice at the end. */
+  .picker .pick { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 54px;
+    padding: 0 14px; background: color-mix(in srgb, var(--desk) 55%, var(--paper)); }
+  .picker .pick:nth-of-type(1) { border-radius: 12px 12px 0 0; }
+  .picker .pick:nth-of-type(3) { border-radius: 0 0 12px 12px; }
+  .picker .pick + .pick { box-shadow: inset 0 .5px 0 var(--rule); }
+  .picker .pick label { display: block; font-size: 16px; color: var(--ink); }
+  .picker .pick:first-of-type { flex: none; }
+  .picker select, .picker select#mas, .picker select#daf { width: auto; min-width: 0; border: 0; background: none;
+    font-family: var(--square); font-size: 19px !important; padding: 8px 0; color: var(--ink); text-align: end; }
+  .picker .today { margin-top: 14px; min-height: 50px; border: 0; border-radius: 12px; justify-content: center;
+    background: var(--ink); color: var(--paper); font-size: 16px; font-weight: 500; }
+  .picker #today-label { display: inline; }
+  .picker #today-label[data-day]::before { content: "הדף היומי · "; opacity: .7; font-weight: 400; }
+  .scrim { display: block; position: fixed; inset: 0; z-index: 65; background: rgba(20, 12, 4, .34);
+    opacity: 0; pointer-events: none; transition: opacity 220ms ease; }
+  body.picking .scrim { opacity: 1; pointer-events: auto; }
+
+  /* -- the page: paper to the edges ------------------------------------------- */
+  main, main.with-desk { padding: 0; gap: 0; }
+  .sheet { border: 0; border-radius: 0; box-shadow: none; }
+  .col { padding: 12px 18px 48px; }
+  .col.gemara { scroll-padding-block: 24px; }
+  .linear { padding: 0 6px 60px; }
+  .ex-bar { padding: 10px 0; }
+
+  /* -- the conversation and the toolbar --------------------------------------- */
+  footer { position: relative; z-index: 50; padding: 0 0 env(safe-area-inset-bottom, 0px);
+    border-top: .5px solid var(--rule); background: var(--paper); }
+  .bar { display: grid; gap: 0; max-width: none; align-items: center;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas: "state state state state state" "talk talk talk talk talk"
+                         "queue queue queue queue queue" "src desk mic log view"; }
+  .talkcol, .talk-top, .tabs { display: contents; }
+  /* The toolbar's own hairline, across the row the tabs sit in. */
+  .bar::before { content: ""; grid-row: 4; grid-column: 1 / -1; align-self: stretch;
+    border-top: .5px solid var(--rule); background: var(--paper); }
+  .state { grid-area: state; padding: 9px 18px 0; font-size: 12.5px; text-align: start; }
+  .state:empty { display: none; }
+  .talk { grid-area: talk; padding: 0 18px 8px; max-height: var(--talk-h); }
+  .queue { grid-area: queue; margin: 0 16px 8px; padding-top: 6px; }
+  .qbtn span { display: none; }
+  .reply { font-size: 16.5px; line-height: 1.6; }
+  .micwrap { grid-area: mic; width: 62px; height: 62px; margin: 7px 10px 5px; justify-self: center; }
+  #mic { width: 62px; height: 62px; }
+  #mic .ic { width: 27px; height: 27px; }
+  .hold { width: 32px; height: 32px; bottom: -2px; inset-inline-end: -14px; }
+  #open-sources { grid-area: src; } #open-desk { grid-area: desk; } #open-log { grid-area: log; }
+  #open-view { grid-area: view; }
+  .tab, #open-view { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    min-height: 58px; padding: 6px 0 2px; border-radius: 12px; background: none; box-shadow: none;
+    font-size: 10.5px; font-weight: 500; color: var(--dim); letter-spacing: .01em; }
+  .tab .ic { display: block; width: 25px; height: 25px; stroke-width: 1.55; }
+  .tab[aria-pressed="true"] { background: none; box-shadow: none; color: var(--mark); }
+  .tab[aria-pressed="true"] .ic { stroke-width: 1.9; }
+  .tab:active { transform: scale(.92); }
+  .foot-grip { top: -10px; height: 20px; }
+  .foot-grip::after { top: 8px; }
+
+  /* While a sheet is up, the toolbar stays and the conversation steps aside for it. */
+  body.docked .state, body.docked .talk, body.docked .queue, body.docked .foot-grip { display: none; }
+  /* With the desk open, the page and the desk share the screen; the conversation
+     keeps to its one line of state (and is still heard). */
+  main.with-desk ~ footer .talk, main.with-desk ~ footer .queue, main.with-desk ~ footer .foot-grip { display: none; }
+  main.with-desk ~ footer .state { padding-bottom: 8px; }
+  /* What waits behind the answer, only when something does; skipping it is beside the mic. */
+  .queue:not(:has(.qitem)) { display: none; }
+  .queue .qbtn.skip { display: none; }
+  button.skipnow { display: inline-flex; inset-inline-end: auto; inset-inline-start: -14px; }
+
+
+  /* -- the desk, under the page ------------------------------------------------ */
+  main.with-desk .desk { border: 0; border-top: .5px solid var(--rule); border-radius: 0; box-shadow: none; }
+  #desk-side, #desk-below { display: none; }
+  .desk-bar { gap: 4px; padding: 6px 10px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .desk-bar .btn { border: 0; background: var(--desk); min-height: 36px; border-radius: 9px; }
+  .desk-bar .btn.icon { min-width: 38px; }
+  .desk-cards { padding: 8px; gap: 8px; }
+  .dc { flex-basis: 100%; }
+  .dc-btn.dc-wide { display: none; }                       /* every card is the width of the screen */
+  /* A card a screenful of the desk: its own scroll follows the line, the desk scrolls between cards. */
+  .dc-body { height: max(150px, calc(var(--desk-h, 46dvh) - 130px)) !important; resize: none; }
+  .desk-layouts { padding: 6px 10px; }
+  .lay-save { padding-block: 5px; font-size: 12px; }
+
+  /* The transcript: what you type is at the bottom, where a message is written. */
+  .say-label { display: none; }
+  .say-form { position: sticky; bottom: -28px; margin: 14px -18px -28px; padding: 10px 18px 14px;
+    background: var(--paper); box-shadow: 0 -.5px 0 var(--rule); }
+  .say-form input { border-radius: 20px; padding: 9px 14px; min-height: 42px; }
+  .say-form button { border-radius: 20px; min-height: 42px; padding-inline: 16px; background: var(--ink);
+    color: var(--paper); border-color: var(--ink); }
+}
+
+/* Sheets, where the screen is narrow (on its side a phone has room for the panel beside the page). */
+@media (max-width: 760px) {
+  /* -- sheets: they rise from the toolbar and go back into it ------------------ */
+  .over { inset-block: auto var(--foot-h, 76px); inset-inline: 0; width: auto; height: var(--sheet);
+    transform: translateY(calc(100% + var(--foot-h, 76px) + 20px)); }
+  .over.open { transform: none; }
+  .over.settle { transition: transform var(--t-in), height 320ms var(--ease); }
+  body.docked { padding-inline-start: 0; }
+  body.docked main { margin-bottom: min(var(--sheet), calc(100dvh - var(--foot-h, 76px) - 200px)); }
+  body.settling main { transition: margin-bottom 320ms var(--ease); }
+  .over .panel { border: 0; border-radius: 16px 16px 0 0; padding: 30px 18px 28px;
+    box-shadow: 0 -14px 40px -18px rgba(30, 18, 4, .38), 0 -.5px 0 var(--rule); }
+  .over .grip { inset-inline: 0; inset-block: 0 auto; width: auto; height: 30px; cursor: grab; }
+  .over .grip::after { inset-block: 8px auto; inset-inline: calc(50% - 18px); width: 36px; height: 5px; border-radius: 3px; opacity: .6; }
+  .over .close { z-index: 5; top: 14px; inset-inline-end: 14px; width: 30px; height: 30px; border: 0;
+    background: var(--desk); color: var(--dim); box-shadow: none; }
+  .over .close .ic { width: 16px; height: 16px; stroke-width: 2.2; }
+  body.resizing, body.resizing * { cursor: grabbing !important; }
+}
+
+/* A phone on its side: less of everything that is not the page. */
+@media (max-height: 500px) and (pointer: coarse) {
+  :root { --talk-h: 16vh; }
+  header { min-height: 44px; }
+  .tab span, #open-view span { display: none; }
+  .tab, #open-view { min-height: 46px; }
+  .micwrap, #mic { width: 48px; height: 48px; }
+  .micwrap { margin-block: 4px 3px; }
+}
+
+/* The view sheet: how the page looks, in one place. */
+.view-set .opts { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px; padding: 2px;
+  border-radius: 10px; background: var(--desk); }
+.view-set .opts .btn { border: 0; background: none; border-radius: 8px; min-height: 38px; font-size: 14.5px; }
+.view-set .opts .btn[aria-pressed="true"] { background: var(--paper); color: var(--ink);
+  box-shadow: 0 1px 3px rgba(40,25,5,.22); }
+.sizer { display: flex; align-items: center; gap: 10px; }
+.sizer .btn { width: 46px; min-height: 40px; font-family: var(--square); border-radius: 10px; }
+.sizer .btn:first-child { font-size: 15px; } .sizer .btn:last-child { font-size: 22px; }
+.sizer .sample { flex: 1; text-align: center; font-family: var(--square); font-size: calc(21px * var(--scale));
+  white-space: nowrap; overflow: hidden; }
+@media (prefers-reduced-motion: reduce) {
+  .picker, body.picking .picker { transform: none !important; transition: opacity 120ms linear, visibility 0s; }
+  .picker { opacity: 0; } body.picking .picker { opacity: 1; }
+  .over.settle, body.settling main { transition: none; }
+}
+
+/* Typing instead of talking. */
+.say-form { display: flex; gap: 6px; }
+.say-form input { flex: 1; min-width: 0; }
+/* The Steinsaltz switch, drawn like the other segmented choices: a track and a raised thumb. */
+.ex-bar .seg2 { padding: 2px; gap: 2px; border-radius: 9px; background: var(--desk); }
+.ex-bar .seg2 .btn { margin: 0; border: 0; border-radius: 7px !important; background: none; color: var(--dim);
+  font-family: var(--ui); font-size: 13px; padding: 5px 14px; }
+.ex-bar .seg2 .btn[aria-pressed="true"] { background: var(--paper); color: var(--ink);
+  box-shadow: 0 1px 3px rgba(40,25,5,.22); }
+/* A citation inside an English sentence, in the sentence's own letters. */
+.chip.inline { font-family: var(--ui); font-size: 11.5px; }

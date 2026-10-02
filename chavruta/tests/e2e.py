@@ -80,6 +80,103 @@ def queue_transcript(control, text):
                            headers={"Content-Type": "application/json"}))
 
 
+def phone(browser, app, check, shots):
+    """The same app held in one hand: an iPhone-sized screen, touch only."""
+    ctx = browser.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=2, is_mobile=True,
+                              has_touch=True, permissions=["microphone"])
+    page = ctx.new_page()
+    errors = []
+    page.on("pageerror", lambda e: errors.append(str(e)))
+    box = lambda sel: page.locator(sel).bounding_box()
+    shot = lambda name: shots and page.screenshot(path=os.path.join(shots, name + ".png"))
+    page.goto(app, wait_until="domcontentloaded")
+    page.wait_for_function("S.pack && document.querySelectorAll('.seg').length", timeout=20000)
+    page.evaluate("S.settings.view = 'daf'; render()")
+    check("phone: nothing wider than the screen", page.evaluate("document.documentElement.scrollWidth") <= 390)
+    head = box("header")
+    check("phone: the bar is one line", head["height"] < 64, str(head))
+    check("phone: it names the page", "ברכות" in page.inner_text("#m-title"), page.inner_text("#m-title"))
+    mic, tabs = box("#mic"), [box(t) for t in ("#open-sources", "#open-desk", "#open-log", "#open-view")]
+    row = lambda b: b["y"] + b["height"] / 2
+    check("phone: the mic in a toolbar at the bottom, between the tabs",
+          all(abs(row(t) - row(mic)) < 8 for t in tabs) and mic["y"] + mic["height"] > 844 - 90
+          and tabs[1]["x"] > mic["x"] > tabs[2]["x"], str([mic] + tabs))
+    check("phone: every control a fingertip wide", all(t["height"] >= 44 for t in tabs + [box("#m-title"), box("#open-settings")]))
+    # Turning to a page: the title opens a sheet; the last choice closes it.
+    page.tap("#m-title")
+    page.wait_for_timeout(350)
+    check("phone: the title opens the page picker", page.evaluate("document.body.classList.contains('picking')")
+          and box("#picker")["y"] > 300)
+    shot("p1-picker")
+    page.select_option("#daf", "3")
+    page.wait_for_function("S.pack && S.pack.ref === 'Berakhot 3a'", timeout=20000)
+    check("phone: choosing the daf turns to it and closes the picker",
+          not page.evaluate("document.body.classList.contains('picking')") and "ג׳" in page.inner_text("#m-title"))
+    page.tap("#m-am-b")
+    page.wait_for_function("S.pack && S.pack.ref === 'Berakhot 3b'", timeout=20000)
+    check("phone: the other side is one tap in the bar", page.get_attribute("#m-am-b", "aria-pressed") == "true")
+    # The view: Steinsaltz, and bigger letters.
+    page.tap("#open-view")
+    page.wait_for_selector("#over.open .view-set")
+    page.tap("#panel .view-set .btn:has-text('שטיינזלץ')")
+    page.wait_for_selector("#linear .line")
+    check("phone: Steinsaltz from the view sheet", page.evaluate("S.settings.view") == "lin")
+    size = page.evaluate("parseFloat(getComputedStyle(document.querySelector('#linear .line')).fontSize)")
+    page.tap("#panel .sizer .btn >> nth=1")
+    check("phone: bigger letters at a tap",
+          page.evaluate("parseFloat(getComputedStyle(document.querySelector('#linear .line')).fontSize)") > size)
+    check("phone: the view sheet as tall as what it holds", box("#over")["height"] < 520, str(box("#over")))
+    page.tap("#panel .sizer .btn >> nth=0")
+    page.tap("#panel .view-set .btn:has-text('צורת הדף')")
+    # The commentaries: a sheet that rises from the toolbar, the page still above it.
+    page.tap("#open-sources")
+    page.wait_for_selector("#over.open .src")
+    page.wait_for_timeout(400)
+    over, foot, main = box("#over"), box("footer"), box("main")
+    check("phone: the commentaries rise from the toolbar", abs(over["y"] + over["height"] - foot["y"]) < 2
+          and page.locator("#mic").is_visible(), str([over, foot]))
+    check("phone: …and the page stays in view above them", main["height"] > 200 and main["y"] + main["height"] <= over["y"] + 2,
+          str([main, over]))
+    shot("p2-sources")
+    g = box("#grip")
+    x, y = g["x"] + g["width"] / 2, g["y"] + 12
+    page.mouse.move(x, y); page.mouse.down()
+    for k in range(1, 9):
+        page.mouse.move(x, y - 30 * k)
+        page.wait_for_timeout(16)
+    page.mouse.up()
+    page.wait_for_timeout(500)
+    check("phone: drawn up, it settles tall", box("#over")["height"] > over["height"] + 150, str(box("#over")))
+    g = box("#grip")
+    page.mouse.move(x, g["y"] + 12); page.mouse.down()
+    page.mouse.move(x, g["y"] + 60); page.mouse.move(x, g["y"] + 260)
+    page.mouse.up()
+    page.wait_for_timeout(500)
+    check("phone: flicked down, it goes away", page.locator("#over.open").count() == 0)
+    # One thing at a time: the desk and a sheet do not stack.
+    page.tap("#open-sources"); page.wait_for_selector("#over.open")
+    page.tap("#open-desk")
+    check("phone: opening the desk lowers the sheet", page.locator("#over.open").count() == 0 and
+          page.locator("#desk:not([hidden])").count() == 1)
+    page.tap("#open-sources"); page.wait_for_selector("#over.open")
+    check("phone: …and a sheet puts the desk away", page.evaluate("!DESK.open"))
+    page.tap("#close-panel")
+    # The transcript: no keyboard jumping up unasked.
+    page.tap("#open-log"); page.wait_for_selector("#over.open #turns")
+    page.wait_for_timeout(100)
+    check("phone: the transcript does not open the keyboard", page.evaluate("document.activeElement.tagName") != "INPUT")
+    page.tap("#close-panel")
+    # On its side: the panel goes beside the page.
+    page.set_viewport_size({"width": 844, "height": 390})
+    page.wait_for_timeout(200)
+    page.tap("#open-sources"); page.wait_for_selector("#over.open"); page.wait_for_timeout(400)
+    check("phone on its side: the commentaries beside the page", box("#over")["width"] < 844 * 0.6 and
+          box("main")["width"] > 400, str([box("#over"), box("main")]))
+    shot("p3-landscape")
+    check("phone: no JavaScript errors", not errors, "; ".join(errors[:3]))
+    ctx.close()
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--shots", default=None)
@@ -124,6 +221,8 @@ def main():
               str(page.locator(".unit").all_inner_texts()))
         check("status ready", page.inner_text("#statustext") in ("מוכן", "ספריא לא זמינה"), page.inner_text("#statustext"))
         check("printed text has no nikud", not any(0x591 <= ord(c) <= 0x5c7 for c in page.inner_text("#gtext")))
+        check("the phone's own controls stay on the phone",
+              not any(page.is_visible(x) for x in ("#m-title", ".m-amud", "#open-view", "#skipnow", ".pick-head")))
         shot("01-daf")
 
         # Coming back after a day: where you were, and a review on one tap.
@@ -636,6 +735,8 @@ def main():
                                timeout=20000)
         check("the ★ layout opens by itself", page.evaluate("DESK.place") == "side")
         check("no JavaScript errors", not errors, "; ".join(errors[:3]))
+        if args.part in ("all", "phone"):
+            phone(browser, app, check, args.shots)
         browser.close()
     print("\n%s" % ("ALL PASSED" if not problems else "FAILED: " + ", ".join(problems)))
     return 1 if problems else 0
