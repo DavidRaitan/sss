@@ -942,6 +942,7 @@ async function speak(text, item) {
       // The length is known only once the voice is all here: set the pace then.
       player.ondurationchange = () => pace(audio);
       player.onended = () => { heardPace(audio); stopSpeaking(); };
+      player.onplaying = () => { if (item.turn && !item.turn.voiceAt) item.turn.voiceAt = performance.now(); };
       player.onerror = () => { logVoiceTrouble("playback"); stopSpeaking(); };
       if (!paused) await player.play();                      // ⏸ pressed before the first word
       return done;
@@ -992,6 +993,13 @@ function browserSpeak(text) {
 
 // Ears: an open microphone that finds where you start and stop talking.
 // Silence ends a turn, the way it does between two people.
+// One piece of a sentence to words, sent as soon as the speaker pauses.
+function transcribePiece(blob) {
+  const q = "ref=" + encodeURIComponent(S.pack ? S.pack.ref : "") + "&line=" + S.line;
+  return fetch("/api/transcribe?" + q, { method: "POST", headers: { "Content-Type": blob.type || "audio/webm" }, body: blob })
+    .then((r) => (r.ok ? r.json() : { said: "" })).catch(() => ({ said: "" }));
+}
+
 class Ears {
   constructor(onUtterance, onBarge) {
     this.onUtterance = onUtterance; this.onBarge = onBarge;
@@ -1009,6 +1017,7 @@ class Ears {
     this.mime = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg"]
       .find((t) => window.MediaRecorder && MediaRecorder.isTypeSupported(t)) || "";
     this.floor = 0.006; this.loud = 0; this.quiet = 0; this.talking = false;
+    this.pieces = []; this.piecesOverlap = false;
     this.active = true;
     this.record();
     this.timer = setInterval(() => this.tick(), 40);
@@ -1018,6 +1027,7 @@ class Ears {
     this.rec = new MediaRecorder(this.stream, this.mime ? { mimeType: this.mime } : undefined);
     const rec = this.rec, chunks = this.chunks, began = performance.now();
     this.overlap = false;   // set if it was talking during this recording
+    this.recSpeech = 0;     // how much of this recording is speech
     rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
     rec.onstop = () => {
       // A scrap is not an utterance. In use, recorders stopped moments after
@@ -1026,10 +1036,28 @@ class Ears {
       const long = performance.now() - began >= 500;
       const keep = !this.discard && chunks.length && long;
       const blob = keep ? new Blob(chunks, { type: rec.mimeType || this.mime || "audio/webm" }) : null;
-      const spoke = this.lastSpeech || 0, overlap = this.overlap;
+      const spoke = this.lastSpeech || 0, overlap = this.overlap, speech = this.recSpeech;
+      const cut = this.cutting; this.cutting = false;
+      if (cut) {
+        // A piece of a sentence still being spoken: off to be heard now, while
+        // they go on -- so when they stop, only the last piece is left.
+        if (this.active) this.record();
+        if (blob && blob.size > 2000 && speech >= 400) this.pieces.push(transcribePiece(blob));
+        this.piecesOverlap = this.piecesOverlap || overlap;
+        return;
+      }
       this.lastSpeech = 0;
       if (this.active) this.record();
-      if (blob && blob.size > 3000 && spoke >= 350) this.onUtterance({ blob, overlap });
+      const pieces = this.pieces || [];
+      this.pieces = [];
+      const anyOverlap = overlap || this.piecesOverlap; this.piecesOverlap = false;
+      if (pieces.length) {
+        // The last piece, if it holds speech (silence is where hearing invents words).
+        if (blob && blob.size > 2000 && speech >= 250) pieces.push(transcribePiece(blob));
+        if (spoke >= 350) this.onUtterance({ pieces, overlap: anyOverlap });
+        return;
+      }
+      if (blob && blob.size > 3000 && spoke >= 350) this.onUtterance({ blob, overlap: anyOverlap });
     };
     rec.start();
     this.recAt = began;
@@ -1053,7 +1081,7 @@ class Ears {
     // the answer off after 20 ms -- until 🔊 was pressed.
     if (this.guard && !this.wasGuard) this.loud = 0;
     this.wasGuard = this.guard;
-    if (rms > threshold) { this.loud = Math.min(1500, this.loud + 40); this.quiet = 0; }
+    if (rms > threshold) { this.loud = Math.min(1500, this.loud + 40); this.quiet = 0; this.recSpeech += 40; }
     else { this.quiet += 40; this.loud = Math.max(0, this.loud - 20); }
 
     // Speaker mode (no earbuds): while it talks, and a moment after, it does
@@ -1074,6 +1102,12 @@ class Ears {
       setMode("capturing", "שומע אותך…");
     }
     const pause = PAUSES[S.settings.pause] || 1500;
+    // A breath in the middle of a sentence: the piece so far goes to be heard.
+    if (this.talking && !this.cutting && live && this.quiet >= 320 && this.quiet < pause - 200 &&
+        now - this.recAt > 2500 && this.recSpeech >= 1200) {
+      this.cutting = true;
+      this.stopRec();
+    }
     if (this.talking && (this.quiet >= pause || now - this.startedAt > 45000)) {
       this.talking = false; this.lastSpeech = now - this.startedAt - this.quiet;
       this.loud = 0;
@@ -1264,7 +1298,7 @@ async function postStream(path, body, onLine, signal) {
     if (!line.trim()) return;
     const msg = JSON.parse(line);
     if (msg.error) throw Object.assign(new Error(msg.error), { code: msg.error });
-    if (["interim", "part", "read", "cut_in"].includes(msg.mode)) onLine(msg); else last = msg;
+    if (["interim", "part", "read", "cut_in", "stage"].includes(msg.mode)) onLine(msg); else last = msg;
   };
   for (;;) {
     const { value, done } = await reader.read();
@@ -1304,9 +1338,16 @@ async function hearOne(u, g, t0) {
     const q = "ref=" + encodeURIComponent(S.pack.ref) + "&line=" + S.line + "&session=" + S.session +
       "&language=" + S.settings.language + "&checks=" + (S.settings.checks ? 1 : 0) +
       "&overlap=" + (u.overlap ? 1 : 0);
+    let text = u.text;
+    if (u.pieces) {
+      // Heard piece by piece while it was spoken: put back together.
+      const parts = await Promise.all(u.pieces);
+      text = parts.map((p) => (p.said || "").trim()).filter(Boolean).join(" ");
+      if (!text) { goOn(); return idleMode(); }
+    }
     heard = u.blob ? await post("/api/hear?" + q, u.blob, u.blob.type || "audio/webm", ctl.signal)
       : await post("/api/heard", { ref: S.pack.ref, line: S.line, session: S.session,
-          language: S.settings.language, said: u.text, checks: S.settings.checks }, null, ctl.signal);
+          language: S.settings.language, said: text, checks: S.settings.checks, overlap: !!u.overlap }, null, ctl.signal);
   } catch (e) { if (g === S.gen) { failed(e, "hear", t0); goOn(); } return; }
   finally { aborts.delete(ctl); }
   if (g !== S.gen) return;
@@ -1412,7 +1453,7 @@ async function hearOne(u, g, t0) {
     return;
   }
   showMine("");
-  ask({ heard, line: S.line });
+  ask({ heard, line: S.line, t0 });
 }
 
 /* ------------------------------------------------------------ cutting in */
@@ -1428,6 +1469,8 @@ async function hearOne(u, g, t0) {
 //             the queue ("go back" / "תמשיך במה שאמרת", or tap it);
 //   later  -- "let's come back to that": kept in the queue, and on it goes.
 // In use a clarifying question waited behind the whole of a long answer.
+// What it is doing, while it does it.
+const STAGES = { asking: "מבין את השאלה…", writing: "כותב תשובה…", sources: "מביא מקורות…" };
 const RESUME = /\b(go back|where were we|back to (it|that|what you were saying)|(continue|finish) (what you were saying|your answer|that)|as you were saying)\b|תמשיך (במה|את מה|מאיפה) ש|תחזור ל(מה ש|זה)|איפה היינו|נחזור למה ש|תסיים את מה ש/i;
 const STILL = /^\W*((i'?m |i am )?still waiting|(hello|hey)\W*$|are you (still )?(there|with me)|what'?s taking (so long|you)|is it (coming|working)|anything yet|any news|נו|אני (עדיין )?מחכה|עדיין מחכה|אתה (עדיין )?(שם|איתי)|הלו|מה קורה עם זה)\b/i;
 const DISCARD = /^\W*(never ?mind|forget (it|that|about (it|that)|what i (just )?said)|ignore (that|it|what i (just )?said)|scratch that|cancel (that|it|the question)|(i was )?not (talking|speaking) to you|(i )?wasn'?t (talking|speaking) to you|disregard( that)?|לא משנה|עזוב|תעזוב|תתעלם( מזה)?|בטל|תבטל|לא דיברתי אליך|לא אליך|תשכח מזה|לא חשוב)\W*$/i;
@@ -1770,7 +1813,7 @@ async function respond(batch, g) {
   const said = batch.length === 1 ? last.heard.said
     : batch.map((q, i) => (i < batch.length - 1 ? "(a moment earlier) " : "(and then) ") + q.heard.said).join("\n");
   const extra = batch.length === 1 ? last.extra || {} : {};
-  if (!speakingDone) setMode("thinking", "חושב…");
+  if (!speakingDone) setMode("thinking", STAGES.asking);
   const t1 = performance.now();
   // They read on while it thought: say what this answers before answering it.
   const moved = Math.abs(S.line - (batch[0].line || S.line)) >= 2;
@@ -1795,6 +1838,11 @@ async function respond(batch, g) {
           // Reading a comment together: it opens on the desk to read along.
           turn.whole = true;
           for (const d of msg.desk || []) deskAdd({ name: d.name }, d.ref);
+          return;
+        }
+        if (msg.mode === "stage") {
+          // Where it is: so a wait reads as work, not as nothing.
+          if (!speakingDone && !first) setMode("thinking", STAGES[msg.stage] || "חושב…");
           return;
         }
         if (msg.mode === "cut_in") {
@@ -1898,6 +1946,11 @@ async function respond(batch, g) {
   }
   spoken.then(() => {
     entry.ms_spoken = Math.round(performance.now() - t2);
+    // Where the time went, for the export: from the end of their sentence to the first word said.
+    if (turn.voiceAt) {
+      entry.ms_voice = Math.round(turn.voiceAt - t1);
+      if (last.t0) entry.ms_total = Math.round(turn.voiceAt - last.t0);
+    }
     if (g !== S.gen || !into || !into.held) return;
     // An aside is a breath: back to the answer it cut into. A new question
     // leaves that answer waiting, and asks.
@@ -2703,6 +2756,16 @@ function sessionReport() {
       if (t.error) { lines.push("ERROR at " + t.stage + " after " + t.ms + " ms (" + t.at + "): " + t.detail, ""); continue; }
       lines.push("CHAVRUTA" + (t.ms_answer ? " (" + t.ms_answer + " ms to answer" +
         (t.ms_spoken ? ", " + t.ms_spoken + " ms speaking" : "") + ")" : "") + ":");
+      if (t.ms_answer && !(t.trace || {}).quick) {
+        const tr0 = t.trace || {}, sec = (ms) => (ms / 1000).toFixed(1) + "s";
+        lines.push("   [timing: " + [
+          tr0.router_ms != null ? "sorted in " + sec(tr0.router_ms) + (tr0.head_start ? " (answer already under way)" : "") : null,
+          tr0.fetch_seconds ? "sources " + tr0.fetch_seconds + "s" : null,
+          t.ms_first ? "first sentence at " + sec(t.ms_first) : null,
+          t.ms_voice ? "voice at " + sec(t.ms_voice) : null,
+          t.ms_total ? "end of your sentence to first word: " + sec(t.ms_total) : null,
+        ].filter(Boolean).join(" · ") + "]");
+      }
       lines.push(t.text);
       const tr = t.trace || {};
       if (tr.kind) lines.push("   [routed: " + tr.kind + (tr.claim ? ", claim" : "") +

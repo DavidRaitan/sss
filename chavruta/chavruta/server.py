@@ -329,6 +329,60 @@ KEYWORDS = ["גמרא", "משנה", "סוגיא", "מחלוקת", "רש\"י", "�
 
 # -- handler ---------------------------------------------------------------------
 
+class Cancelled(Exception):
+    pass
+
+
+class HeadStart:
+    """An answer begun on a guessed route while the router decides.
+
+    It runs on its own partner and its own copy of the sitting's memory, and
+    holds every sentence it writes until it is told the guess stood
+    (relay), or is dropped (cancel) -- then whatever it wrote is never seen
+    and the real answer starts at once, so a wrong guess costs tokens, never
+    time. In use the router took one to two and a half seconds before a word
+    of the answer was begun."""
+
+    def __init__(self, partner, line, state, said, heard, recent, route, cut):
+        import copy
+        import queue
+        self.out = queue.Queue()
+        self.cancelled = threading.Event()
+        self.memory = copy.deepcopy(state.setdefault("memory", {}))
+        self.args = dict(n=line, history=list(state["history"]), said=said, heard=heard, route=route,
+                         recent=recent, spoke=state.get("spoke"), memory=self.memory,
+                         cut=dict(cut, kind=route["cut_in"]) if cut and route.get("cut_in") else None)
+        self.partner = partner
+
+    def start(self):
+        def run():
+            def part(text):
+                if self.cancelled.is_set():
+                    raise Cancelled()
+                self.out.put(("part", text))
+            try:
+                self.out.put(("done", self.partner.ask(on_part=part, **self.args)))
+            except Cancelled:
+                pass
+            except Exception as exc:
+                self.out.put(("error", exc))
+        threading.Thread(target=run, daemon=True).start()
+        return self
+
+    def cancel(self):
+        self.cancelled.set()
+
+    def relay(self, emit):
+        while True:
+            kind, value = self.out.get()
+            if kind == "part":
+                emit(value)
+            elif kind == "done":
+                return value
+            else:
+                raise value
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "chavruta"
 
@@ -457,6 +511,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.hear()
             if route == "/api/heard":
                 return self.heard()
+            if route == "/api/transcribe":
+                return self.transcribe()
             if route == "/api/say":
                 return self.say()
             if route == "/api/speak":
@@ -511,15 +567,38 @@ class Handler(BaseHTTPRequestHandler):
         overlap = (q.get("overlap") or ["0"])[0] == "1"
         return self.after_hearing(pack, ref, line, sid, language, said, checks, overlap)
 
+    def transcribe(self):
+        """One piece of a sentence still being spoken, to words -- nothing else.
+        The page sends each piece as the speaker pauses, so by the time they
+        stop only the last piece is left to hear."""
+        q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+        ref = (q.get("ref") or [""])[0]
+        line = int((q.get("line") or ["1"])[0] or 1)
+        length = int(self.headers.get("Content-Length") or 0)
+        if not length or not allowed(ref):
+            return self.fail(400, "no_audio")
+        audio = self.rfile.read(length)
+        started = time.time()
+        try:
+            said = LLM().hear(audio, hint=hint_for(load_pack(ref), line), keywords=KEYWORDS,
+                              mime=self.headers.get("Content-Type", "audio/webm"))
+        except ModelError as exc:
+            if re.search(r"corrupt|unsupported|too short|invalid_value", str(exc), re.I):
+                return self.send_json({"said": ""})
+            raise
+        return self.send_json({"said": said, "ms": int((time.time() - started) * 1000)})
+
     def heard(self):
-        """The same, for words the browser already recognised itself."""
+        """The same, for words already turned to text -- by the browser, typed,
+        or heard piece by piece as they were spoken."""
         body = self.body_json()
         ref = (body.get("ref") or "").strip()
         if not allowed(ref):
             return self.fail(400, "not_available")
         return self.after_hearing(load_pack(ref), ref, int(body.get("line") or 1),
                                   body.get("session"), body.get("language") or "auto",
-                                  (body.get("said") or "").strip(), body.get("checks", True) is not False)
+                                  (body.get("said") or "").strip(), body.get("checks", True) is not False,
+                                  bool(body.get("overlap")))
 
     def after_hearing(self, pack, ref, line, sid, language, said, checks=True, overlap=False):
         if not said:
@@ -650,6 +729,7 @@ class Handler(BaseHTTPRequestHandler):
         pack = load_pack(ref)
         llm = LLM()
         heard = body.get("heard") or state.get("heard")
+        head, router_ms = None, None
 
         desk = None if body.get("about_reading") else desk_command(said, pack, body.get("language") or "en")
         if desk:
@@ -676,8 +756,22 @@ class Handler(BaseHTTPRequestHandler):
             # what these words are to that answer (an aside, a correction, a
             # new question, or something for later).
             cut = body.get("cut_in") if isinstance(body.get("cut_in"), dict) else None
-            route = retrieve.classify(llm, said, cut)
             recent = state["recent"]
+            # A head start: for a plain question about the page, the answer
+            # begins on a guess while the router decides (see HeadStart).
+            guessed = retrieve.guess(said, pack, line, cut) if body.get("stream") else None
+            if guessed:
+                head = HeadStart(self.partner_for(body, pack, llm), line, state, said, heard, recent,
+                                 guessed, cut).start()
+            t_route = time.time()
+            route = retrieve.classify(llm, said, cut)
+            router_ms = int((time.time() - t_route) * 1000)
+            if head and not retrieve.agrees(route, guessed, (body.get("language") or "en") == "auto"):
+                head.cancel()
+                head = None
+        if head and (route.get("cut_in") == "later" or route["kind"] in ("navigate", "settings")):
+            head.cancel()
+            head = None
         if route.get("cut_in") == "later":
             # "Let's come back to that": kept on the page, and on it goes.
             lang = body.get("language") if body.get("language") in ("he", "en") else route.get("language") or "en"
@@ -725,15 +819,10 @@ class Handler(BaseHTTPRequestHandler):
         def announce(text):
             interim.append(text)
             if stream:
+                emit({"mode": "stage", "stage": "sources"})
                 emit({"mode": "interim", "text": text})
 
-        favor = body.get("favor") if isinstance(body.get("favor"), dict) else {}
-        partner = Partner(pack, llm, depth=body.get("depth") or "daf",
-                          language=body.get("language") or "en",
-                          index=index_for(pack.data.get("masechta", "")),
-                          favor=favor, voices=body.get("voices"),
-                          sites=body.get("sites") if isinstance(body.get("sites"), list) else None,
-                          sites_halacha=body.get("sites_halacha", True))
+        partner = self.partner_for(body, pack, llm)
         # "Can you read it for me?" -- the page's words may be spoken in full.
         read_out = bool(READ_TO_ME.search(said)) or \
             offer_choice(state.get("memory", {}).get("offered"), said) == "read"
@@ -744,14 +833,22 @@ class Handler(BaseHTTPRequestHandler):
         if route.get("cut_in") and stream:
             emit({"mode": "cut_in", "kind": route["cut_in"]})
         started = time.time()
+        if stream:
+            emit({"mode": "stage", "stage": "writing"})
         try:
-            text, verdict, history, trace = partner.ask(
-                line, state["history"], said, heard=heard, route=route,
-                recent=recent, spoke=state.get("spoke"), announce=announce,
-                # Each sentence as it is written, to be spoken while the rest is.
-                on_part=(lambda text: emit({"mode": "part", "text": text})) if stream else None,
-                memory=state.setdefault("memory", {}),
-                cut=dict(body["cut_in"], kind=route["cut_in"]) if route.get("cut_in") else None)
+            if head:
+                # The router agreed with the guess: the answer already under
+                # way is this answer.
+                text, verdict, history, trace = head.relay(lambda text: emit({"mode": "part", "text": text}))
+                state["memory"] = head.memory
+            else:
+                text, verdict, history, trace = partner.ask(
+                    line, state["history"], said, heard=heard, route=route,
+                    recent=recent, spoke=state.get("spoke"), announce=announce,
+                    # Each sentence as it is written, to be spoken while the rest is.
+                    on_part=(lambda text: emit({"mode": "part", "text": text})) if stream else None,
+                    memory=state.setdefault("memory", {}),
+                    cut=dict(body["cut_in"], kind=route["cut_in"]) if route.get("cut_in") else None)
             # Taken back while it was being answered: the conversation goes on
             # as if it had not been said.
             if said not in state.setdefault("discarded", set()):
@@ -770,6 +867,8 @@ class Handler(BaseHTTPRequestHandler):
                 pass
             return
         trace["seconds"] = round(time.time() - started, 1)
+        trace["router_ms"] = router_ms
+        trace["head_start"] = bool(head)
         if route.get("cut_in"):
             trace["cut_in"] = route["cut_in"]      # what their words were to the answer they cut into
         trace["interim"] = interim[0] if interim else None
@@ -786,6 +885,15 @@ class Handler(BaseHTTPRequestHandler):
                 pass
             return
         return self.send_json(payload)
+
+    def partner_for(self, body, pack, llm):
+        favor = body.get("favor") if isinstance(body.get("favor"), dict) else {}
+        return Partner(pack, llm, depth=body.get("depth") or "daf",
+                       language=body.get("language") or "en",
+                       index=index_for(pack.data.get("masechta", "")),
+                       favor=favor, voices=body.get("voices"),
+                       sites=body.get("sites") if isinstance(body.get("sites"), list) else None,
+                       sites_halacha=body.get("sites_halacha", True))
 
     def forget(self):
         """ "Never mind" / ✕: what they said is taken back -- out of the

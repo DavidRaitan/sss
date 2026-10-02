@@ -196,6 +196,72 @@ def classify(llm, said, cut=None):
     }
 
 
+# -- a head start ----------------------------------------------------------------
+# The router takes a second or two. For a plain question about the page --
+# no other book to fetch, no page to turn, no setting -- the answer can start
+# on a guess of its kind while the router decides; the server uses the head
+# start only if the router agrees (see server.say), so a wrong guess costs
+# tokens, never time.
+SPECIAL = re.compile(
+    r"\b(daf|page|amud|go to|turn to|faster|slower|louder|from now on|turn (off|on)|settings?|in (hebrew|english)|"
+    r"remind|last time|yesterday|review|recap|refresh|summar|quiz|test me|did we (learn|see|study)|where did i|"
+    r"who was|who were|when did|which century|lived|halacha|halakha|halachic|practice|practically|ruling|rule[sd]?|"
+    r"codified|posek|poskim|tur|shulchan|rambam|mishnah berurah|rema|rama|zmanim|sunset|sunrise|"
+    r"wikisource|halacha yomit|outline|desk|side|screen|note|save this|progress|streak|read (it|that|this)|"
+    r"never ?mind|later|repeat|again|what did you say|hear me|can you hear|are you there|hello|thanks|thank you)\b|"
+    r"דף|עמוד|תעבור|מהר|לאט|מעכשיו|הגדר|בעברית|באנגלית|תזכיר|חזרה|סיכום|תבחן|שאלות חזרה|למדנו|ראיתי|"
+    r"מי היה|מתי חי|הלכה|הלכתא|למעשה|פסק|טור|שולחן ערוך|רמב\"?ם|משנה ברורה|רמ\"?א|זמנים|שקיעה|"
+    r"הערה|תשמור|תקרא|שוב|לא משנה|עזוב|אחר כך|שומע|תודה", re.I)
+GUESS_KINDS = [
+    ("conflict", re.compile(r"\b(contradict\w*|but (earlier|before|above|on the other)|elsewhere|doesn'?t (fit|square|match)|"
+                            r"inconsisten\w*|how does (this|that) (fit|square))\b|סתירה|סותר|והא|אבל (קודם|למעלה)", re.I)),
+    ("logic", re.compile(r"\b(why|how come|what'?s the reason|reasoning|what (is|was) the machlok\w*|what are they arguing|"
+                         r"what'?s the difference)\b|למה|מדוע|מה הטעם|מאי טעמא|במה נחלקו|מה ההבדל", re.I)),
+    ("structure", re.compile(r"\b(why is this here|how did we get|where are we|what is the gemara doing|where does this "
+                             r"(start|end)|structure|flow)\b|איך הגענו|מה הגמרא עושה|איפה אנחנו", re.I)),
+    ("meaning", re.compile(r"\b(what does .{1,40} mean|meaning of|what is (a|an|the) \w+|what'?s (a|an|the) \w+|translate|"
+                           r"define|definition)\b|מה (פירוש|זה|הכוונה|המשמעות)|פירוש המילה|מה זאת אומרת|תרגום", re.I)),
+]
+
+
+def guess(said, pack, line, cut=None):
+    """A route for a plain question about the page, or None: a guess of what
+    the router will say, good enough to start on."""
+    words = (said or "").split()
+    if len(words) < 4 or SPECIAL.search(said) or library.place_in(said):
+        return None
+    present = set(pack.commentators())
+    names = []
+    for w in re.findall(r"[\w'\"״׳]+", said):
+        target = ALIASES.get(_key(w))
+        if target and target not in names:
+            names.append(target)
+    if any(n not in ("Rashi", "Tosafot") for n in names):
+        return None                        # another book: the router decides what to open
+    kind = next((k for k, pattern in GUESS_KINDS if pattern.search(said)), None)
+    if names and kind in (None, "meaning"):
+        kind = "on_commentary"
+    kind = kind or "other"
+    hebrew = len(re.findall(r"[א-ת]", said)) > len(re.findall(r"[A-Za-z]", said))
+    route = {"kind": kind, "claim": False, "names": names, "navigate": None, "settings": [],
+             "language": "he" if hebrew else "en", "reply": None, "cut_in": None}
+    if cut:
+        if LATER.search(said):
+            return None
+        route["cut_in"] = "merge" if MERGE.search(said) else ("aside" if len(words) <= 12 else "new")
+    if plan(pack, line, dict(route, said=said)):
+        return None                        # something to fetch: wait for the router
+    return route
+
+
+def agrees(real, guessed, auto_language=False):
+    """Whether the router's route is the guess -- the head start stands."""
+    return (real.get("kind") == guessed["kind"] and set(real.get("names") or []) == set(guessed["names"])
+            and not real.get("navigate") and not real.get("settings")
+            and real.get("cut_in") == guessed.get("cut_in")
+            and (not auto_language or real.get("language") == guessed["language"]))
+
+
 def _near(pack, n, name, reach):
     """A commentator's comments within `reach` lines of n, nearest first."""
     found = []

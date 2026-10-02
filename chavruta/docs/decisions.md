@@ -693,3 +693,23 @@ to the mishna the gemara is on, brings its text, and recaps the pages since.
   in the printed Koren Steinsaltz: the daf's words in the book face (Frank
   Ruhl), bold; his own words in a clean modern Hebrew sans (Assistant); his
   translations of the Aramaic in that sans, smaller and softer.
+
+**66. Faster from the end of a sentence to the first word.**
+- Where the time went (Rosh Hashanah 9a): ~1 s waiting for silence, 1.5-3.7 s
+  transcribing, 1-2.5 s sorting the question, 2-6 s writing, ~0.5 s voicing.
+  The network itself is a few tenths of a second; Wi-Fi does not change it.
+- Heard while spoken: at each breath in the middle of a sentence (a pause of a
+  third of a second, after more than a second of speech), the piece so far
+  goes to be transcribed while the speaker goes on -- so when they stop, only
+  the last piece is left. A piece with no speech in it is never sent (silence
+  is where transcription invents words).
+- A head start: for a plain question about the page (nothing to fetch, no
+  page to turn, no setting), the answer begins on a guess of its kind while
+  the router decides, on its own partner and its own copy of the sitting's
+  memory, holding every sentence. If the router agrees, those sentences are
+  the answer; if not, they are dropped unheard and the real answer starts at
+  once -- a wrong guess costs tokens, never time.
+- What it is doing, shown while it does it: "מבין את השאלה…", "מביא מקורות…",
+  "כותב תשובה…". The export gives each answer a timing line: sorted in, the
+  head start used or not, sources, first sentence, first word heard, and from
+  the end of their sentence to the first word.

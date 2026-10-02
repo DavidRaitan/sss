@@ -1151,6 +1151,59 @@ class CuttingIn(unittest.TestCase):
         self.assertIn("did not hear: «and the Beit Yosef»", seen[-1])
 
 
+class HeadStart(unittest.TestCase):
+    """The answer begins on a guess while the router decides; used only if the router agrees."""
+    pack = Pack(PACK)
+
+    def test_a_plain_question_about_the_page_gets_a_guess(self):
+        g = retrieve.guess("why does the mishna start with the evening?", self.pack, 1)
+        self.assertEqual(g["kind"], "logic")
+        self.assertEqual(retrieve.guess("what does chatzot mean here?", self.pack, 1)["kind"], "meaning")
+        self.assertEqual(retrieve.guess("so what is Rashi saying about the priests?", self.pack, 1)["names"], ["Rashi"])
+        self.assertEqual(retrieve.guess("מה פירוש עד סוף האשמורה הראשונה", self.pack, 1)["language"], "he")
+
+    def test_anything_that_needs_more_waits_for_the_router(self):
+        for said in ("and was this codified in the Tur?", "go to daf 5", "what does the Rashba say here?",
+                     "remind me what we learned yesterday", "talk a bit faster please", "can you hear me now?",
+                     "I think the gemara contradicts what we saw above"):
+            self.assertIsNone(retrieve.guess(said, self.pack, 1), said)
+
+    def test_used_only_when_the_router_agrees(self):
+        g = retrieve.guess("what does chatzot mean here?", self.pack, 1)
+        self.assertTrue(retrieve.agrees({"kind": "meaning", "names": [], "cut_in": None}, g))
+        self.assertFalse(retrieve.agrees({"kind": "logic", "names": [], "cut_in": None}, g))
+        self.assertFalse(retrieve.agrees({"kind": "meaning", "names": ["Meiri"], "cut_in": None}, g))
+        self.assertFalse(retrieve.agrees({"kind": "meaning", "names": [], "cut_in": None, "language": "he"}, g,
+                                         auto_language=True))
+
+    def test_it_holds_its_words_until_told_and_a_dropped_one_is_never_heard(self):
+        import threading as th
+        from chavruta import server
+        go = th.Event()
+
+        class Writer:
+            def ask(self, on_part=None, **k):
+                go.wait(2)
+                on_part("First sentence.")
+                on_part("Second sentence.")
+                return "First sentence. Second sentence.", None, [], {}
+
+        state = {"history": [], "memory": {"place": "Jerusalem"}}
+        head = server.HeadStart(Writer(), 1, state, "q", None, [], {"kind": "meaning", "cut_in": None}, None).start()
+        heard = []
+        go.set()
+        self.assertEqual(head.relay(heard.append)[0], "First sentence. Second sentence.")
+        self.assertEqual(heard, ["First sentence.", "Second sentence."])
+        self.assertIsNot(head.memory, state["memory"])                     # its own copy until used
+        go.clear()
+        dropped = server.HeadStart(Writer(), 1, state, "q", None, [], {"kind": "meaning", "cut_in": None}, None).start()
+        dropped.cancel()
+        go.set()
+        import time as _t
+        _t.sleep(0.2)
+        self.assertTrue(dropped.out.empty())                               # nothing it wrote got out
+
+
 class TakingItBack(unittest.TestCase):
     def test_forgotten_by_the_partner(self):
         import json as _json

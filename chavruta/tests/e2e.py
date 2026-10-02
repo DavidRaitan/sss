@@ -266,9 +266,15 @@ def main():
                 open(os.path.join(args.shots, "session.md"), "w").write(report)
             recorded = os.listdir(os.environ["CHAVRUTA_SESSIONS"])
             check("each turn is recorded on disk", bool(recorded), str(recorded))
+            page.evaluate("""(() => { window.MICLOG = []; for (const f of ['startListening', 'muteMic', 'stopListening']) {
+              const o = window[f]; window[f] = (...a) => { MICLOG.push(f + '@' + Math.round(performance.now())); return o(...a); }; }
+              for (const ev of ['pointerdown', 'pointerup', 'pointerleave', 'click'])
+                document.querySelector('#mic').addEventListener(ev, () => MICLOG.push(ev + '@' + Math.round(performance.now()))); })()""")
             page.click("#mic", delay=900)              # held down: everything stops
+            print("MICLOG", page.evaluate("JSON.stringify(MICLOG)"))
             page.wait_for_function("!saying && !speakingDone", timeout=15000)
-            check("a long press on the mic stops everything", page.evaluate("!S.listening && !speechQ.length"))
+            check("a long press on the mic stops everything", page.evaluate("!S.listening && !speechQ.length"),
+                  page.evaluate("JSON.stringify([S.listening, speechQ.length, document.querySelector('#mic').dataset.state, S.turns.slice(-3).map(t => [t.asked.slice(0, 30), t.status])])"))
             # Citations sit in the sentence and open what they cite.
             page.evaluate("showReply(S.log.find((t) => /can't be right/.test(t.text)).text)")
             check("a citation sits inside the sentence", page.locator("#reply .chip.inline").count() >= 1)
@@ -515,6 +521,12 @@ def main():
                   page.evaluate("S.turns.some(t => /Rif on this/.test(t.asked) && t.discarded && t.status === 'skipped')"))
             latency(0)
             page.wait_for_function("!saying && !speechQ.length", timeout=30000)
+            # The fast path: a plain question started before the router answered, and the export says where time went.
+            heads = [json.loads(l) for f in os.listdir(os.environ["CHAVRUTA_SESSIONS"]) if f.endswith(".jsonl")
+                     for l in open(os.path.join(os.environ["CHAVRUTA_SESSIONS"], f)) if '"head_start": true' in l]
+            check("a plain question begins before the router has answered", bool(heads),
+                  heads[0]["said"] if heads else "")
+            check("the export shows where the time went", "[timing:" in page.evaluate("sessionReport()"))
             # "I'm still waiting" while it gathers: a word back at once, and the work goes on.
             latency(2.5)
             page.fill("#panel input", "why does the mishna mention the priests at all?")
