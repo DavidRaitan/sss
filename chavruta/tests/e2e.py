@@ -266,12 +266,7 @@ def main():
                 open(os.path.join(args.shots, "session.md"), "w").write(report)
             recorded = os.listdir(os.environ["CHAVRUTA_SESSIONS"])
             check("each turn is recorded on disk", bool(recorded), str(recorded))
-            page.evaluate("""(() => { window.MICLOG = []; for (const f of ['startListening', 'muteMic', 'stopListening']) {
-              const o = window[f]; window[f] = (...a) => { MICLOG.push(f + '@' + Math.round(performance.now())); return o(...a); }; }
-              for (const ev of ['pointerdown', 'pointerup', 'pointerleave', 'click'])
-                document.querySelector('#mic').addEventListener(ev, () => MICLOG.push(ev + '@' + Math.round(performance.now()))); })()""")
             page.click("#mic", delay=900)              # held down: everything stops
-            print("MICLOG", page.evaluate("JSON.stringify(MICLOG)"))
             page.wait_for_function("!saying && !speakingDone", timeout=15000)
             check("a long press on the mic stops everything", page.evaluate("!S.listening && !speechQ.length"),
                   page.evaluate("JSON.stringify([S.listening, speechQ.length, document.querySelector('#mic').dataset.state, S.turns.slice(-3).map(t => [t.asked.slice(0, 30), t.status])])"))

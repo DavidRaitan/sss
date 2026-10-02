@@ -2018,11 +2018,14 @@ async function pump() {
 // talking over it stop that). Held down, it stops everything. In use a tap
 // meant to mute, so as to talk to someone in the room, cut the answer off.
 let micHeld = null, micLong = false;
-$("mic").addEventListener("pointerdown", () => {
+$("mic").addEventListener("pointerdown", (e) => {
   micLong = false;
+  // Held by the mic until let go: the bar can grow while an answer is written,
+  // and the button move from under a still finger -- that must not let go.
+  try { $("mic").setPointerCapture(e.pointerId); } catch (x) {}
   micHeld = setTimeout(() => { micLong = true; stopListening(); if (navigator.vibrate) navigator.vibrate(12); }, 650);
 });
-for (const ev of ["pointerup", "pointerleave", "pointercancel"]) $("mic").addEventListener(ev, () => clearTimeout(micHeld));
+for (const ev of ["pointerup", "pointercancel"]) $("mic").addEventListener(ev, () => clearTimeout(micHeld));
 $("mic").onclick = () => {
   if (micLong) { micLong = false; return; }
   if (S.listening) muteMic(); else startListening();
