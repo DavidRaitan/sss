@@ -797,3 +797,11 @@ to the mishna the gemara is on, brings its text, and recaps the pages since.
   Double-tap to look closer, again to fit; the letter size sets its scale.
 - It is a picture: the line you are on and the words you read aloud are
   followed in the other three views, not on the scan.
+
+**72. A brisker voice, and two of them.**
+- "Way too slow": the voice's own direction said "unhurried", and the speed
+  was 1.0. Now the direction asks for a brisk, lively pace and the default
+  speed is 1.15 (settings saved before are moved to it once).
+- Two voices, each where it is best: Cedar (warm, calm) says the answers;
+  Verse (lively) the quick things -- "Yes, I hear you", "Let me pull up the
+  Tur", nudges. The default; settings can keep one voice throughout.

@@ -43,7 +43,7 @@ export const DEFAULTS = {
 // One person, one voice: in use, asking for an Israeli accent on the Hebrew and
 // plain English made each switch of language sound like a different speaker.
 export const VOICE_DIRECTION = ("A warm, sharp study partner in a beit midrash. Natural and " +
-                                "conversational, unhurried, never theatrical. Keep exactly the same " +
+                                "conversational, at a brisk, lively pace -- never slow or drawn out, never theatrical. Keep exactly the same " +
                                 "voice, pitch, pace and warmth throughout -- one person who moves " +
                                 "between English and Hebrew mid-sentence, never two speakers.");
 

@@ -43,7 +43,7 @@ function el(tag, cls, text) {
 
 const DEFAULTS = { view: "daf", depth: "daf", language: "en", voice: "natural",
   hearing: "api", speak: true, pause: "normal", nudges: true, checks: true, translate: false, stops: false,
-  speakers: false, rate: 1, favor: {}, voices: 3, open: "last", mine: [], explain: "stz", script: "plain", voice_name: "cedar", scale: 1,
+  speakers: false, rate: 1.15, favor: {}, voices: 3, open: "last", mine: [], explain: "stz", script: "plain", voice_name: "mix", scale: 1,
   sites: ["halachayomit.co.il", "he.wikisource.org", "dafyomi.co.il"], sites_halacha: true };
 const PAUSES = { short: 1000, normal: 1500, long: 2400 };
 function loadSettings() {
@@ -52,7 +52,14 @@ function loadSettings() {
   catch (e) { s = Object.assign({}, DEFAULTS); }
   // Sites added to the defaults after a list was saved join it once.
   if (!s.sites_seen) { s.sites = [...new Set([...s.sites, ...DEFAULTS.sites])]; s.sites_seen = 1; }
-  if (!["cedar", "verse"].includes(s.voice_name)) s.voice_name = "cedar";   // the voices on offer
+  // Once: the new defaults reach settings saved before them -- a brisker voice
+  // (the old 1.0 was heard as slow), and the two voices mixed.
+  if (!s.voice_seen) {
+    if (+s.rate === 1) s.rate = 1.15;
+    if (s.voice_name === "cedar") s.voice_name = "mix";
+    s.voice_seen = 1;
+  }
+  if (!["mix", "cedar", "verse"].includes(s.voice_name)) s.voice_name = "mix";   // the voices on offer
   return s;
 }
 function saveSettings() {
@@ -1046,6 +1053,16 @@ function syncPlayer() {
 $("p-play").onclick = () => pauseSpeaking();
 $("p-skip").onclick = () => skipCurrent();
 
+// Two voices, each where it is best: Cedar, warm and calm, says the answers
+// themselves; Verse, lively, the quick things -- "Yes, I hear you", "Let me
+// pull up the Tur", a nudge. Or one of them throughout, from settings.
+function voiceFor(item) {
+  const v = S.settings.voice_name;
+  if (v !== "mix") return v;
+  const t = item.turn;
+  return t && !t.quickly && item.text !== t.interim ? "cedar" : "verse";
+}
+
 // Ask the server to make an item's voice, and start fetching the audio, before
 // it is its turn -- so it is ready the moment the one before it ends.
 function prepare(item) {
@@ -1053,7 +1070,7 @@ function prepare(item) {
   item.ready = (async () => {
     const r = await api("/api/voice", { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text: item.text, ref: S.pack && S.pack.ref, whole: !!(item.turn && item.turn.whole),
-        voice_name: S.settings.voice_name }) });
+        voice_name: voiceFor(item) }) });
     if (!r.ok) throw new Error("voice_" + r.status);
     const { id, url } = await r.json();
     const audio = new Audio(url || "/api/voice/" + id);     // the Worker's address, or the Python server's
@@ -3273,10 +3290,11 @@ function openSettings() {
       choice("checks", "לשאול על מילה שיצאה אחרת", [[true, "כן"], [false, "לא"]],
         "כשאמרת מילה אחרת מהכתוב (מעשר במקום תרומה) — לא על מבטא או הגייה."),
       choice("speak", "שיענה בקול", [[true, "כן"], [false, "לא"]]),
-      choice("rate", "מהירות הדיבור", [[0.85, "לאט"], [1, "רגיל"], [1.15, "קצת מהר"], [1.3, "מהר"], [1.5, "מהר מאוד"]],
+      choice("rate", "מהירות הדיבור", [[1, "לאט"], [1.15, "רגיל"], [1.3, "מהר"], [1.5, "מהר מאוד"]],
         "אפשר גם להגיד לו: ״תדבר יותר מהר״ / ״a bit slower״."),
       choice("voice", "קול", [["natural", "טבעי (OpenAI) — תמיד אותו קול"], ["browser", "הדפדפן (חינם, רובוטי)"]]),
-      choice("voice_name", "איזה קול", [["cedar", "Cedar · חם, רגוע"], ["verse", "Verse · חי, ער"]],
+      choice("voice_name", "איזה קול", [["mix", "שניהם · Cedar מסביר, Verse עונה קצר"], ["cedar", "Cedar · חם, רגוע"],
+        ["verse", "Verse · חי, ער"]],
         "לחיצה משמיעה דוגמה."),
       choice("speakers", "שמע", [[false, "אוזניות"], [true, "רמקול"]],
         "ברמקול, בזמן שאני מדבר אני לא מקשיב (אחרת אני שומע את עצמי). לעצור: כפתור העצירה או רווח."),
