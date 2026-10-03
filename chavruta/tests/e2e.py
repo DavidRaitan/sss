@@ -129,12 +129,20 @@ def phone(browser, app, check, shots, sef):
     head = box("header")
     check("phone: the bar is one line", head["height"] < 64, str(head))
     check("phone: it names the page", "ברכות" in page.inner_text("#m-title"), page.inner_text("#m-title"))
-    mic, tabs = box("#mic"), [box(t) for t in ("#open-sources", "#open-desk", "#open-log", "#open-view")]
+    mic, tabs = box("#mic"), [box(t) for t in ("#open-sources", "#open-log", "#open-view", "#open-settings-tab")]
     row = lambda b: b["y"] + b["height"] / 2
     check("phone: the mic in a toolbar at the bottom, between the tabs",
           all(abs(row(t) - row(mic)) < 8 for t in tabs) and mic["y"] + mic["height"] > 844 - 90
           and tabs[1]["x"] > mic["x"] > tabs[2]["x"], str([mic] + tabs))
-    check("phone: every control a fingertip wide", all(t["height"] >= 44 for t in tabs + [box("#m-title"), box("#open-settings")]))
+    check("phone: every control a fingertip wide", all(t["height"] >= 44 for t in tabs + [box("#m-title")]))
+    check("phone: no desk -- that is the computer's", not page.is_visible("#open-desk"))
+    # צורת הדף is the page as printed: Rashi and Tosafot in their columns around the gemara.
+    cols = [box(c) for c in ("#col-inner", "#col-gemara", "#col-outer")]
+    check("phone: צורת הדף has its three columns", all(c and c["width"] > 80 for c in cols) and
+          cols[0]["x"] > cols[1]["x"] > cols[2]["x"], str(cols))
+    page.evaluate("selectLine(3)")
+    page.wait_for_timeout(500)
+    check("phone: …and the commentaries follow the line", page.locator("#col-inner .c.on").count() >= 1)
     # Turning to a page: the title opens a sheet; the last choice closes it.
     page.tap("#m-title")
     page.wait_for_timeout(350)
@@ -186,14 +194,24 @@ def phone(browser, app, check, shots, sef):
     page.mouse.up()
     page.wait_for_timeout(500)
     check("phone: flicked down, it goes away", page.locator("#over.open").count() == 0)
-    # One thing at a time: the desk and a sheet do not stack.
-    page.tap("#open-sources"); page.wait_for_selector("#over.open")
-    page.tap("#open-desk")
-    check("phone: opening the desk lowers the sheet", page.locator("#over.open").count() == 0 and
-          page.locator("#desk:not([hidden])").count() == 1)
-    page.tap("#open-sources"); page.wait_for_selector("#over.open")
-    check("phone: …and a sheet puts the desk away", page.evaluate("!DESK.open"))
+    # "Let's read it together": with no desk, it opens in the commentaries sheet.
+    page.evaluate("deskAdd({ name: 'Rashi' }, S.pack.segments[0].commentaries.Rashi[0].ref)")
+    page.wait_for_selector("#over.open .src", timeout=5000)
+    check("phone: what would go on the desk opens in the commentaries", page.locator("#desk:not([hidden])").count() == 0)
     page.tap("#close-panel")
+    page.wait_for_timeout(300)
+    # While it speaks: a player strip, ⏸ and ⏭ as big as a thumb, and the mic stays the mic.
+    page.evaluate("""(() => { const t = newTurn("What does Rashi say?", "answering");
+      saying = { turn: t }; speakingDone = () => {}; speechQ.push({ text: "x", turn: t }); syncPlayer(); })()""")
+    check("phone: while it speaks, its own controls", page.is_visible("#p-play") and page.is_visible("#p-skip")
+          and box("#p-play")["height"] >= 44 and "What does Rashi say?" in page.inner_text("#player"))
+    page.tap("#p-play")
+    check("phone: ⏸ pauses it", page.evaluate("paused") is True and "בהשהיה" in page.inner_text("#player"))
+    page.tap("#p-play")
+    check("phone: ▶ goes on", page.evaluate("paused") is False)
+    page.evaluate("speakingDone = null; speechQ.length = 0; saying = null; syncPlayer()")
+    page.wait_for_timeout(900)
+    check("phone: …and the strip goes when it is done", not page.is_visible("#player"))
     # The transcript: no keyboard jumping up unasked.
     page.tap("#open-log"); page.wait_for_selector("#over.open #turns")
     page.wait_for_timeout(100)

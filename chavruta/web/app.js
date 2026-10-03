@@ -914,12 +914,35 @@ function pauseSpeaking() {
 }
 
 function showHold() {
+  syncPlayer();
   const b = $("hold");
   b.hidden = !speakingDone;
   b.replaceChildren(icon(paused ? "play" : "pause", paused ? "solid" : ""));
   b.title = paused ? "להמשיך (רווח)" : "לעצור (רווח)";
   b.setAttribute("aria-label", paused ? "להמשיך" : "לעצור");
 }
+
+// The phone's player strip: up for the whole answer (each sentence is said on
+// its own, so it waits a moment before going, rather than blinking between
+// them), with ⏸/▶, ⏭, and what it is answering.
+let playerHide = null;
+function syncPlayer() {
+  const strip = $("player");
+  const live = !!speakingDone || speechQ.length > 0 || !!(saying && saying.turn);
+  if (live) {
+    clearTimeout(playerHide); playerHide = null;
+    strip.hidden = false;
+    $("p-play").replaceChildren(icon(paused ? "play" : "pause", paused ? "solid" : ""));
+    $("p-play").setAttribute("aria-label", paused ? "להמשיך" : "לעצור");
+    $("p-state").textContent = paused ? "בהשהיה" : "מדבר";
+    const t = saying && saying.turn;
+    $("p-asked").textContent = t && t.asked ? t.asked : "";
+  } else if (!strip.hidden && !playerHide) {
+    playerHide = setTimeout(() => { playerHide = null; if (!speakingDone && !speechQ.length) strip.hidden = true; }, 700);
+  }
+}
+$("p-play").onclick = () => pauseSpeaking();
+$("p-skip").onclick = () => skipCurrent();
 
 // Ask the server to make an item's voice, and start fetching the audio, before
 // it is its turn -- so it is ready the moment the one before it ends.
@@ -1609,6 +1632,7 @@ function shownTurn() {
 }
 
 function renderBar() {
+  syncPlayer();
   const t = shownTurn();
   const asked = $("asked");
   asked.hidden = !(t && t.asked);
@@ -2126,6 +2150,7 @@ function syncTabs() {
   $("open-sources").setAttribute("aria-pressed", String(S.panel === "sources"));
   $("open-log").setAttribute("aria-pressed", String(S.panel === "log"));
   $("open-view").setAttribute("aria-pressed", String(S.panel === "view"));
+  $("open-settings-tab").setAttribute("aria-pressed", String(S.panel === "settings"));
 }
 
 // The conversation area: drag its top edge for more or less of it. Kept.
@@ -2286,7 +2311,7 @@ function openSources(n, focus) {
         const more = el("button", "more", "הכל");
         more.onclick = () => { box.classList.toggle("open"); more.textContent = box.classList.contains("open") ? "פחות" : "הכל"; };
         const link = el("a", "lnk", e.ref); link.href = sefariaUrl(e.ref); link.target = "_blank"; link.rel = "noopener";
-        const pin = ibtn("more", "desk", "לשולחן", "לפתוח את " + heName(name) + " לצד הדף");
+        const pin = ibtn("more pin", "desk", "לשולחן", "לפתוח את " + heName(name) + " לצד הדף");
         pin.onclick = () => deskAdd({ name }, e.ref);
         meta.append(more, pin, link); box.append(meta);
         if (e.ref === focus) { target = box; box.classList.add("open", "flash"); more.textContent = "פחות"; }
@@ -2360,7 +2385,7 @@ function openText(ref) {
   openPanel((panel) => {
     panel.append(el("h2", null, chipFor(ref).label || ref), el("div", "sub", ref));
     const link = textLink(ref);
-    const pin = ibtn("btn", "desk", "לשולחן");
+    const pin = ibtn("btn pin", "desk", "לשולחן");
     pin.onclick = () => { deskAdd({ ref }); closePanel(); };
     panel.append(link, pin);
     link.querySelector(".tref").click();
@@ -2377,6 +2402,7 @@ const DESK = { open: false, place: "side", swap: false, size: 16, cards: [], foc
 
 const deskKey = (c) => (c.name ? "n:" + c.name : "r:" + c.ref);
 function deskAdd(card, focus) {
+  if (PHONE.matches) return S.pack && openSources(S.line, focus || null);   // the desk is a computer's
   if (!DESK.cards.some((x) => deskKey(x) === deskKey(card))) DESK.cards.push(card);
   if (focus) { DESK.focus = focus; DESK.toFocus = true; }
   DESK.open = true;
@@ -3144,6 +3170,7 @@ $("open-sources").onclick = () => (S.panel === "sources" ? closePanel() : openSo
 $("open-log").onclick = () => (S.panel === "log" ? closePanel() : openLog());
 $("open-settings").onclick = () => (S.panel === "settings" ? closePanel() : openSettings());
 $("open-view").onclick = () => (S.panel === "view" ? closePanel() : openView());
+$("open-settings-tab").onclick = () => (S.panel === "settings" ? closePanel() : openSettings());
 $("v-daf").onclick = () => { S.settings.view = "daf"; saveSettings(); if (S.pack) { render(); selectLine(S.line); } };
 $("v-lin").onclick = () => { S.settings.view = "lin"; saveSettings(); if (S.pack) { render(); selectLine(S.line); } };
 

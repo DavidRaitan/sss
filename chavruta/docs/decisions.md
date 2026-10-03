@@ -770,3 +770,17 @@ to the mishna the gemara is on, brings its text, and recaps the pages since.
 - The icon: ח in a speech bubble, cream on the page's terracotta -- learning
   by talking it through. Drawn as shapes (no font), so it is the same
   everywhere; a maskable copy for Android keeps clear of its circle.
+
+**70. The phone, mobile first.**
+- צורת הדף on the phone is the page as printed: Rashi and Tosafot in their
+  columns around the gemara (it had shown the gemara alone). Each column
+  scrolls to the line you are on; set to the right edge, not justified, since
+  a narrow justified column opens holes between words.
+- No desk on the phone -- arranging cards side by side is a computer's thing.
+  "Let's read it together" opens the comment in the commentaries sheet; the
+  toolbar is מפרשים, תמליל, the mic, תצוגה, הגדרות.
+- Pause and skip were two small buttons clinging to the mic. While it speaks
+  there is now a player strip above the conversation, as in a music app: a
+  big ⏸/▶ under the right thumb, ⏭, and the question being answered. It stays
+  up for the whole answer (each sentence is voiced separately; it does not
+  blink between them). The mic is only the mic.

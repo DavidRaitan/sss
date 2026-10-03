@@ -125,6 +125,12 @@
       <button id="skipnow" class="hold skipnow" hidden title="לדלג על התשובה הזאת" aria-label="לדלג על התשובה הזאת"><svg class="ic"><use href="#i-skip"/></svg></button>
     </div>
     <div class="talkcol">
+      <!-- On the phone, while it speaks: the answer's own controls, like a player's. -->
+      <div class="player" id="player" hidden>
+        <button class="p-btn" id="p-play" aria-label="לעצור"><svg class="ic"><use href="#i-pause"/></svg></button>
+        <div class="p-what"><span class="p-state" id="p-state">מדבר</span><span class="p-asked" id="p-asked" dir="auto"></span></div>
+        <button class="p-btn" id="p-skip" aria-label="לדלג על התשובה"><svg class="ic"><use href="#i-skip"/></svg></button>
+      </div>
       <div class="talk-top">
         <div class="state" id="state">לחץ על המיקרופון — וקרא, או תגיד מה אתה חושב שכתוב.</div>
         <nav class="tabs" aria-label="חלוניות">
@@ -132,6 +138,7 @@
           <button class="tab" id="open-desk" aria-pressed="false" title="מפרשים לצד הדף, לקריאה"><svg class="ic"><use href="#i-desk"/></svg><span>שולחן</span></button>
           <button class="tab" id="open-log"><svg class="ic"><use href="#i-chat"/></svg><span>תמליל</span></button>
           <button class="tab" id="open-view" title="תצוגה וגודל אותיות"><svg class="ic"><use href="#i-type"/></svg><span>תצוגה</span></button>
+          <button class="tab" id="open-settings-tab" title="הגדרות"><svg class="ic"><use href="#i-settings"/></svg><span>הגדרות</span></button>
         </nav>
       </div>
       <div class="talk" id="talk" aria-live="polite">

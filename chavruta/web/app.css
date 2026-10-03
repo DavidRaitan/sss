@@ -750,3 +750,56 @@ button.m-title, .m-amud, .pick-head, #open-view, .scrim, button.skipnow { displa
   box-shadow: 0 1px 3px rgba(40,25,5,.22); }
 /* A citation inside an English sentence, in the sentence's own letters. */
 .chip.inline { font-family: var(--ui); font-size: 11.5px; }
+
+/* ==== the phone, mobile first (2) ==========================================
+   צורת הדף as printed: Rashi and Tosafot in their columns around the gemara,
+   each column scrolling to the line you are on. No desk (a computer's thing):
+   the toolbar is commentaries, transcript, mic, view, settings. And while it
+   speaks, a player strip -- ⏸/▶ and ⏭ as big as a thumb, and what it is
+   answering -- so the mic is only ever the mic. */
+
+.player, #open-settings-tab { display: none; }
+
+@media (max-width: 760px), (max-height: 500px) and (pointer: coarse) {
+  /* -- the page, as printed -- */
+  .daf { grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.5fr) minmax(0, 0.95fr); }
+  .daf.aleph { grid-template-areas: "inner gemara outer" !important; }
+  .daf.bet { grid-template-areas: "outer gemara inner" !important; }
+  .col.inner, .col.outer { display: block; padding: 8px 6px 48px; }
+  .col.gemara { border-inline: .5px solid var(--rule); padding: 10px 9px 48px; }
+  .gtext { font-size: calc(17px * var(--scale)); line-height: 1.8; text-align: justify; text-align-last: right; }
+  .c { font-size: calc(12px * var(--scale)); line-height: 1.55; padding: 2px 3px; margin-bottom: 6px; border-radius: 3px; }
+  .c .who { font-size: 9px; }
+  .colname { font-size: 11px; margin-bottom: 6px; letter-spacing: .04em; }
+  .unit { font-size: 9px; padding: 0 3px; }
+  .seg.on { box-shadow: 0 0 0 2px var(--glow); }
+
+  /* -- no desk; settings in the toolbar -- */
+  #open-desk, #open-settings, .desk, .desk-bar, .src .meta .pin, .pin { display: none !important; }
+  .bar { grid-template-areas: "player player player player player" "state state state state state"
+                              "talk talk talk talk talk" "queue queue queue queue queue" "src log mic view set"; }
+  .bar::before { grid-row: 5; }
+  #open-settings-tab { display: flex; grid-area: set; }
+  /* -- the player strip -- */
+  .hold, button.skipnow { display: none !important; }
+  .player:not([hidden]) { display: flex; grid-area: player; align-items: center; gap: 10px; margin: 8px 12px 0;
+    padding: 6px 8px; border-radius: 16px; background: var(--desk); }
+  .p-btn { flex: none; width: 44px; height: 44px; border-radius: 50%; border: 0; display: grid; place-items: center;
+    background: var(--paper); color: var(--ink); box-shadow: 0 1px 3px rgba(40, 25, 5, .2); cursor: pointer; }
+  #p-play { width: 48px; height: 48px; background: var(--ink); color: var(--paper); }
+  .p-btn .ic { width: 22px; height: 22px; stroke-width: 2; }
+  .p-btn:active { transform: scale(.92); }
+  .p-what { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.25; }
+  .p-state { font-size: 12px; font-weight: 600; color: var(--mark); }
+  .p-asked { font-size: 13.5px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    unicode-bidi: plaintext; text-align: start; }
+  .p-asked:empty { display: none; }
+}
+@media (max-height: 500px) and (pointer: coarse) {
+  #open-settings-tab span { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .p-btn:active { transform: none; } }
+@media (max-width: 760px), (max-height: 500px) and (pointer: coarse) {
+  /* Justified, a narrow column opens holes between words: set it to the right edge instead. */
+  .gtext, .c { text-align: right; text-align-last: right; }
+}
