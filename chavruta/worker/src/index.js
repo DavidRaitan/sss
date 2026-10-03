@@ -118,7 +118,8 @@ function page(request, ctx, url) {
   let parsed;
   try { parsed = new URL(target); } catch (e) { return json({ error: "bad_url" }, 400); }
   if (!/^https?:$/.test(parsed.protocol)) return json({ error: "bad_url" }, 400);
-  return cached(request, ctx, parsed.toString(), 3600);
+  // A scanned page of the Shas never changes: kept a month. Anything else, an hour.
+  return cached(request, ctx, parsed.toString(), /(^|\.)hebrewbooks\.org$/.test(parsed.hostname) ? 2592000 : 3600);
 }
 
 function base(value, fallback) { return (value || fallback).replace(/\/+$/, ""); }

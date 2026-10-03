@@ -784,3 +784,16 @@ to the mishna the gemara is on, brings its text, and recaps the pages since.
   big ⏸/▶ under the right thumb, ⏭, and the question being answered. It stays
   up for the whole answer (each sentence is voiced separately; it does not
   blink between them). The mic is only the mic.
+
+**71. The page as printed, as a fourth way to see it.**
+- תצוגה now offers four: מצולם (the Vilna Shas, scanned), צורת הדף (the
+  page's shape in text, with Rashi and Tosafot), שטיינזלץ, and מנוקד.
+- The scan is HebrewBooks' PDF of the amud (`shas.aspx?mesechta=N&daf=23b
+  &format=pdf`, their tractate numbers 1-40), fetched through the Worker and
+  kept at the edge for a month, drawn with pdf.js (shipped with the app, not
+  loaded from elsewhere), and recoloured pixel by pixel: black to the app's
+  ink, white to its paper -- so it sits in the app instead of on top of it,
+  in dark mode too. The neighbouring amudim are fetched while one is read.
+  Double-tap to look closer, again to fit; the letter size sets its scale.
+- It is a picture: the line you are on and the words you read aloud are
+  followed in the other three views, not on the scan.

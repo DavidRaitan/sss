@@ -89,7 +89,8 @@ def page_config(sef):
     site = sef[:-4]
     return "window.CHAVRUTA_CONFIG = %s;" % json.dumps({
         "zmanim": site + "/zmanim", "wikisource": site + "/w/api.php",
-        "web_rewrite": {"https://halachayomit.co.il": site + "/hy", "https://www.dafyomi.co.il": site + "/daf"}})
+        "web_rewrite": {"https://halachayomit.co.il": site + "/hy", "https://www.dafyomi.co.il": site + "/daf",
+                        "https://hebrewbooks.org/shas.aspx": site + "/hb/shas.aspx"}})
 
 
 def start_stack():
@@ -169,6 +170,24 @@ def phone(browser, app, check, shots, sef):
     check("phone: the view sheet as tall as what it holds", box("#over")["height"] < 520, str(box("#over")))
     page.tap("#panel .sizer .btn >> nth=0")
     page.tap("#panel .view-set .btn:has-text('צורת הדף')")
+    # The page as printed: the Vilna Shas scan (HebrewBooks, through the Worker), in the app's ink and paper.
+    if not page.locator("#over.open .view-set").count():
+        page.tap("#open-view")
+    page.wait_for_selector("#over.open .view-set")
+    check("phone: four ways to see the page", page.locator("#panel .view-set .btn[data-look]").all_inner_texts()
+          == ["מצולם", "צורת הדף", "שטיינזלץ", "מנוקד"], str(page.locator("#panel .view-set .btn[data-look]").all_inner_texts()))
+    page.tap("#panel .view-set .btn[data-look='img']")
+    page.tap("#close-panel")
+    page.wait_for_function("document.querySelector('#scan-note').hidden", timeout=20000)
+    asked = json.loads(urllib.request.urlopen(sef[:-4] + "/hb/log").read())["scans"]
+    check("phone: the scan of this amud, from HebrewBooks", {"mesechta": "1", "daf": "3b", "format": "pdf"} in asked, str(asked))
+    corner = page.evaluate("Array.from(document.querySelector('#scan-canvas').getContext('2d').getImageData(2, 2, 1, 1).data.slice(0, 3))")
+    check("phone: …in the app's paper, not white", corner == [251, 247, 238], str(corner))
+    page.tap("#open-view")
+    page.wait_for_selector("#over.open .view-set")
+    page.tap("#panel .view-set .btn[data-look='daf']")
+    page.tap("#close-panel")
+    page.wait_for_selector("#col-inner .c", timeout=10000)
     # The commentaries: a sheet that rises from the toolbar, the page still above it.
     page.tap("#open-sources")
     page.wait_for_selector("#over.open .src")

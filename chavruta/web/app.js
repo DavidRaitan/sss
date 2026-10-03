@@ -281,7 +281,7 @@ async function turnTo(ref, line) {
   const token = ++opening;
   showRefInPicker(ref);
   $("loading").hidden = false; $("loading").textContent = "פותח את הדף…";
-  $("page").hidden = true; $("linear").hidden = true;
+  $("page").hidden = true; $("linear").hidden = true; $("scan").hidden = true;
   $("runner").textContent = runnerText(ref);
   try {
     const r = await api("/api/daf?ref=" + encodeURIComponent(ref));
@@ -318,11 +318,17 @@ function render() {
   const view = S.settings.view;
   $("v-daf").setAttribute("aria-pressed", String(view === "daf"));
   $("v-lin").setAttribute("aria-pressed", String(view === "lin"));
+  $("v-img").setAttribute("aria-pressed", String(view === "img"));
   $("loading").hidden = true;
   $("runner").textContent = runnerText(S.pack.ref);
   // Only one view exists at a time. A hidden copy of the page would still take
   // reading marks and quote highlights, and scroll to words nobody can see.
-  if (view === "daf") {
+  $("scan").hidden = view !== "img";
+  if (view === "img") {
+    $("linear").replaceChildren(); $("linear").hidden = true;
+    $("gtext").replaceChildren(); $("col-inner").replaceChildren(); $("col-outer").replaceChildren();
+    $("page").hidden = true; renderScan();
+  } else if (view === "daf") {
     $("linear").replaceChildren(); $("linear").hidden = true; renderDaf();
   } else {
     $("gtext").replaceChildren(); $("col-inner").replaceChildren(); $("col-outer").replaceChildren();
@@ -341,6 +347,102 @@ function render() {
   }
   renderDesk();
 }
+
+// -- the page as printed ------------------------------------------------------------
+// The amud as the Vilna Shas printed it, scanned (HebrewBooks, one PDF an amud,
+// kept by the Worker), drawn with pdf.js and recoloured into the app's own ink
+// and paper -- dark mode included. Double-tap to look closer, again to fit.
+// It is a picture: the line you are on and the words you read are followed in
+// the other views, not on it.
+let PDFJS = null, scanToken = 0, scanZoom = 1;
+const SCANS = new Map();            // ref -> the PDF, loading or loaded
+async function pdfjs() {
+  if (!PDFJS) {
+    PDFJS = await import("./vendor/pdfjs/pdf.min.mjs");
+    PDFJS.GlobalWorkerOptions.workerSrc = "vendor/pdfjs/pdf.worker.min.mjs";
+  }
+  return PDFJS;
+}
+const hexRGB = (v) => {
+  const h = v.trim().replace("#", "");
+  const f = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
+  return [0, 2, 4].map((i) => parseInt(f.slice(i, i + 2), 16));
+};
+// Black becomes the app's ink, white its paper, and every grey between them.
+function tintScan(canvas) {
+  const cs = getComputedStyle(document.documentElement);
+  const ink = hexRGB(cs.getPropertyValue("--ink")), paper = hexRGB(cs.getPropertyValue("--paper"));
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  const img = ctx.getImageData(0, 0, canvas.width, canvas.height), d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const l = (d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114) / 255;
+    d[i] = ink[0] + (paper[0] - ink[0]) * l;
+    d[i + 1] = ink[1] + (paper[1] - ink[1]) * l;
+    d[i + 2] = ink[2] + (paper[2] - ink[2]) * l;
+  }
+  ctx.putImageData(img, 0, 0);
+}
+async function renderScan() {
+  const box = $("scan"), canvas = $("scan-canvas"), note = $("scan-note"), ref = S.pack.ref;
+  const token = ++scanToken;
+  note.textContent = "פותח את הדף המצולם…"; note.hidden = false;
+  try {
+    const url = window.API && window.API.scan_url && window.API.scan_url(ref);
+    if (!url) throw new Error("no_scan");
+    const lib = await pdfjs();
+    if (!SCANS.has(ref)) SCANS.set(ref, lib.getDocument({ url }).promise);
+    let doc;
+    try { doc = await SCANS.get(ref); } catch (e) { SCANS.delete(ref); throw e; }
+    if (token !== scanToken) return;
+    const page = await doc.getPage(1);
+    const fit = Math.max(200, box.clientWidth - 16) * scanZoom * (S.settings.scale || 1);
+    const ratio = Math.min(window.devicePixelRatio || 1, 3);
+    const viewport = page.getViewport({ scale: (fit / page.getViewport({ scale: 1 }).width) * ratio });
+    const off = document.createElement("canvas");
+    off.width = Math.floor(viewport.width); off.height = Math.floor(viewport.height);
+    await page.render({ canvasContext: off.getContext("2d"), viewport }).promise;
+    if (token !== scanToken) return;
+    tintScan(off);
+    canvas.width = off.width; canvas.height = off.height;
+    canvas.getContext("2d").drawImage(off, 0, 0);
+    canvas.style.width = Math.round(off.width / ratio) + "px";
+    note.hidden = true;
+    // Its neighbours, while this one is read.
+    for (const n of [S.pack.next, S.pack.prev]) {
+      const u = n && window.API.scan_url(n);
+      if (u && !SCANS.has(n)) { const p = lib.getDocument({ url: u }).promise; p.catch(() => SCANS.delete(n)); SCANS.set(n, p); }
+    }
+  } catch (e) {
+    if (token !== scanToken) return;
+    note.replaceChildren(el("div", null, "לא הצלחתי להביא את הדף המצולם."));
+    const again = el("button", "btn", "נסה שוב");
+    again.onclick = () => { SCANS.delete(ref); renderScan(); };
+    const other = el("button", "btn", "צורת הדף");
+    other.onclick = () => { S.settings.view = "daf"; saveSettings(); render(); selectLine(S.line); };
+    const row = el("div", "scan-acts"); row.append(again, other);
+    note.append(row);
+  }
+}
+// Double-tap: closer, at the place tapped; again: the whole page.
+(function zoomScan() {
+  let last = 0;
+  $("scan").addEventListener("pointerup", (e) => {
+    const now = e.timeStamp;
+    if (now - last > 320) { last = now; return; }
+    last = 0;
+    const box = $("scan"), r = box.getBoundingClientRect();
+    const fx = (e.clientX - r.left + box.scrollLeft) / box.scrollWidth, fy = (e.clientY - r.top + box.scrollTop) / box.scrollHeight;
+    scanZoom = scanZoom > 1 ? 1 : 2.2;
+    renderScan().then(() => {
+      box.scrollLeft = fx * box.scrollWidth - (e.clientX - r.left);
+      box.scrollTop = fy * box.scrollHeight - (e.clientY - r.top);
+    });
+  });
+})();
+// A change of light or dark repaints it in the new colours.
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+  if (S.pack && S.settings.view === "img") renderScan();
+});
 
 // Your notes: a note mark on the line each belongs to; tap to read it.
 async function drawNotes(fresh) {
@@ -3079,8 +3181,27 @@ function openView() {
       box.append(row);
       return box;
     };
-    panel.append(seg("view", [["daf", "צורת הדף"], ["lin", "שטיינזלץ"]],
-      () => { if (S.pack) { render(); selectLine(S.line); } }));
+    // The four ways to see the page, as one choice: the scan, the page's shape
+    // in text, Steinsaltz, and the pointed gemara alone.
+    const looks = [["img", "מצולם"], ["daf", "צורת הדף"], ["stz", "שטיינזלץ"], ["nikud", "מנוקד"]];
+    const look = () => (S.settings.view === "img" ? "img" : S.settings.view === "daf" ? "daf"
+      : S.settings.explain === "off" ? "nikud" : "stz");
+    const lookBox = el("div", "set view-set"), lookRow = el("div", "opts");
+    for (const [value, text] of looks) {
+      const b = el("button", "btn", text);
+      b.dataset.look = value;
+      b.setAttribute("aria-pressed", String(look() === value));
+      b.onclick = () => {
+        if (value === "img" || value === "daf") S.settings.view = value;
+        else { S.settings.view = "lin"; S.settings.explain = value === "nikud" ? "off" : "stz"; }
+        saveSettings();
+        for (const x of lookRow.children) x.setAttribute("aria-pressed", String(x === b));
+        if (S.pack) { render(); selectLine(S.line); }
+      };
+      lookRow.append(b);
+    }
+    lookBox.append(lookRow);
+    panel.append(lookBox);
     const size = el("div", "set"); size.append(el("div", "lbl", "גודל האותיות"));
     const row = el("div", "sizer");
     const less = el("button", "btn", "א"), more = el("button", "btn", "א");
@@ -3095,7 +3216,10 @@ function openView() {
     panel.append(size, script);
   }, "view");
 }
-function applyScale() { document.documentElement.style.setProperty("--scale", S.settings.scale || 1); }
+function applyScale() {
+  document.documentElement.style.setProperty("--scale", S.settings.scale || 1);
+  if (S.pack && S.settings.view === "img" && !$("scan").hidden) renderScan();     // the picture is drawn to size
+}
 
 function openSettings() {
   const choice = (key, label, options, help) => {
@@ -3138,7 +3262,7 @@ function openSettings() {
         "מוסיף כמה שניות וכמה אגורות לשאלה."),
       choice("language", "שפת התשובה", [["en", "English"], ["he", "עברית"], ["auto", "כמוני"]],
         "באנגלית הוא מצטט את הגמרא בעברית, בתוך המשפט — כמו שמדברים בבית המדרש."),
-      choice("view", "תצוגת הדף", [["daf", "צורת הדף"], ["lin", "שטיינזלץ, מנוקד"]]),
+      choice("view", "תצוגת הדף", [["img", "מצולם — ש״ס וילנא"], ["daf", "צורת הדף"], ["lin", "שטיינזלץ, מנוקד"]]),
       choice("script", "כתב רש״י", [["plain", "בלי — הכול באותיות רגילות"], ["page", "רש״י ותוספות שעל הדף"],
         ["all", "כל המפרשים"]], "האותיות שבהן נדפסו המפרשים. רגילות קלות יותר לקריאה."),
       choice("translate", "תרגום (בתצוגת שטיינזלץ)", [[false, "בלי"], [true, "עם תרגום"]]),
@@ -3173,6 +3297,7 @@ $("open-view").onclick = () => (S.panel === "view" ? closePanel() : openView());
 $("open-settings-tab").onclick = () => (S.panel === "settings" ? closePanel() : openSettings());
 $("v-daf").onclick = () => { S.settings.view = "daf"; saveSettings(); if (S.pack) { render(); selectLine(S.line); } };
 $("v-lin").onclick = () => { S.settings.view = "lin"; saveSettings(); if (S.pack) { render(); selectLine(S.line); } };
+$("v-img").onclick = () => { S.settings.view = "img"; saveSettings(); if (S.pack) { render(); selectLine(S.line); } };
 
 /* ----------------------------------------------------------- keys & touch */
 

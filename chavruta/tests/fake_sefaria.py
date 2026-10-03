@@ -19,6 +19,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 HERE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "recorded")
 LANGS = {"hebrew", "english", "source", "translation"}
+SCANS = []   # what was asked of the HebrewBooks stand-in
 
 
 def _load(name):
@@ -134,6 +135,18 @@ class Handler(BaseHTTPRequestHandler):
             body = page.encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            return self.wfile.write(body)
+        if url.path == "/hb/log":
+            return self.reply({"scans": SCANS})
+        if url.path == "/hb/shas.aspx":
+            # Stands in for HebrewBooks: an amud of the Vilna Shas as a PDF (one stand-in page for every amud).
+            SCANS.append({k: v[0] for k, v in q.items()})
+            with open(os.path.join(HERE, "scan_sample.pdf"), "rb") as handle:
+                body = handle.read()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/pdf")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             return self.wfile.write(body)

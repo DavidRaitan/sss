@@ -803,3 +803,16 @@ button.m-title, .m-amud, .pick-head, #open-view, .scrim, button.skipnow { displa
   /* Justified, a narrow column opens holes between words: set it to the right edge instead. */
   .gtext, .c { text-align: right; text-align-last: right; }
 }
+
+/* The page as printed: the scan, in the app's own ink and paper. */
+.scan { flex: 1; min-height: 0; overflow: auto; padding: 8px; background: var(--paper);
+  overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+.scan canvas { display: block; margin: 0 auto; max-width: none; border-radius: 2px; }
+.scan-note { padding: 48px 16px; color: var(--faint); font-size: 14px; text-align: center; }
+.scan-note:empty { display: none; }
+.scan-acts { display: flex; gap: 8px; justify-content: center; margin-top: 14px; }
+.scan-acts .btn { min-height: 40px; padding-inline: 16px; }
+@media (max-width: 760px), (max-height: 500px) and (pointer: coarse) {
+  .scan { padding: 4px 2px 40px; }
+  .view-set .opts .btn { font-size: 13.5px; padding-inline: 4px; }
+}

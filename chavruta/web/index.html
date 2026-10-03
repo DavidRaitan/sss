@@ -73,6 +73,7 @@
   <span class="seg2 hide-narrow" role="group" aria-label="תצוגה">
     <button class="btn" id="v-daf" aria-pressed="true" title="כמו בגמרא: רש״י ותוספות מסביב">צורת הדף</button>
     <button class="btn" id="v-lin" aria-pressed="false" title="מנוקד ומפוסק, עם תרגום">שטיינזלץ</button>
+    <button class="btn" id="v-img" aria-pressed="false" title="הדף כפי שנדפס (ש״ס וילנא)">מצולם</button>
   </span>
   <span class="status" id="status" title=""><span class="dot" id="dot"></span><span id="statustext"></span></span>
   <button class="btn icon" id="open-settings" title="הגדרות" aria-label="הגדרות"><svg class="ic"><use href="#i-settings"/></svg></button>
@@ -89,6 +90,8 @@
       <section class="col outer" id="col-outer" aria-label="תוספות"></section>
     </div>
     <div id="linear" class="linear" hidden></div>
+    <!-- The page as printed: the Vilna Shas, scanned (HebrewBooks), in the app's own ink and paper. -->
+    <div id="scan" class="scan" hidden><canvas id="scan-canvas" aria-label="הדף המצולם"></canvas><div class="scan-note" id="scan-note"></div></div>
     <div id="loading" class="loading">פותח את הדף…</div>
   </div>
   <section class="desk" id="desk" hidden aria-label="שולחן: מפרשים לקרוא לצד הדף">

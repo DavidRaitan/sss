@@ -18,7 +18,7 @@
 // Worker's database, every device).
 
 import { re, search, sub, split, findall, pysplit, rsplit, strip, truthy, deepcopy, now, fmt } from "./py.js";
-import { config } from "./net.js";
+import { config, route } from "./net.js";
 import * as store from "./store.js";
 import * as align from "./align.js";
 import * as commentators from "./commentators.js";
@@ -934,4 +934,22 @@ export async function morning() {
     prefetch(...refs);
     seen = today;
   }
+}
+
+// -- the page as printed ----------------------------------------------------------
+// The Vilna Shas, scanned, from HebrewBooks: one PDF per amud. Its own number
+// for each tractate (Berakhot 1 ... Niddah 40); amud ב is "23b", amud א plain "23".
+export const HEBREWBOOKS = { "Berakhot": 1, "Shabbat": 2, "Eruvin": 3, "Pesachim": 4, "Shekalim": 5, "Yoma": 6,
+  "Sukkah": 7, "Beitzah": 8, "Rosh Hashanah": 9, "Taanit": 10, "Megillah": 11, "Moed Katan": 12, "Chagigah": 13,
+  "Yevamot": 14, "Ketubot": 15, "Nedarim": 16, "Nazir": 17, "Sotah": 18, "Gittin": 19, "Kiddushin": 20,
+  "Bava Kamma": 21, "Bava Metzia": 22, "Bava Batra": 23, "Sanhedrin": 24, "Makkot": 25, "Shevuot": 26,
+  "Avodah Zarah": 27, "Horayot": 28, "Zevachim": 29, "Menachot": 30, "Chullin": 31, "Bekhorot": 32,
+  "Arakhin": 33, "Temurah": 34, "Keritot": 35, "Meilah": 36, "Kinnim": 37, "Tamid": 38, "Middot": 39, "Niddah": 40 };
+
+/** Where this amud's scan is fetched from (through the Worker, which keeps it). */
+export function scan_url(ref) {
+  const m = /^(.*) (\d+)([ab])$/.exec(ref || "");
+  if (!m || !(m[1] in HEBREWBOOKS)) return null;
+  return route("https://hebrewbooks.org/shas.aspx?mesechta=" + HEBREWBOOKS[m[1]] + "&daf=" + m[2] +
+    (m[3] === "b" ? "b" : "") + "&format=pdf");
 }
