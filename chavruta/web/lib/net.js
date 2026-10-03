@@ -32,10 +32,10 @@ export class HttpError extends Error {
 }
 
 /** The address to actually ask: a stand-in if one is configured, through the Worker if it is elsewhere. */
-export function route(url) {
+export function route(url, { proxy = true } = {}) {
   for (const [from, to] of Object.entries(config.web_rewrite || {}))
     if (url.startsWith(from)) { url = to + url.slice(from.length); break; }
-  if (config.proxy && /^https?:\/\//i.test(url)) return config.proxy + encodeURIComponent(url);
+  if (proxy && config.proxy && /^https?:\/\//i.test(url)) return config.proxy + encodeURIComponent(url);
   return url;
 }
 

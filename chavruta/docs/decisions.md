@@ -805,3 +805,16 @@ to the mishna the gemara is on, brings its text, and recaps the pages since.
 - Two voices, each where it is best: Cedar (warm, calm) says the answers;
   Verse (lively) the quick things -- "Yes, I hear you", "Let me pull up the
   Tur", nudges. The default; settings can keep one voice throughout.
+
+**73. The scan, opened by the learner's own browser.**
+- HebrewBooks turns away requests from servers (the Worker got a 403; its
+  bot protection), so fetching the PDF through the Worker failed on the
+  phone. Getting past that by pretending to be a browser would be going
+  around their protection; instead the page is what HebrewBooks expects --
+  the learner's own browser opening it -- in a frame inside the app,
+  blended into the app's paper (multiply; light-on-dark in dark mode), drawn
+  as wide as the letter size says, with "open it there" beneath in case it
+  will not show in a frame. pdf.js is no longer needed.
+- HebrewBooks' tractate numbers, checked against live links: Vilna order
+  1-37, Shekalim 5, Kinnim/Tamid/Middot under Meilah (36), Niddah 37 (they
+  were 37-40 before, wrongly).

@@ -356,100 +356,23 @@ function render() {
 }
 
 // -- the page as printed ------------------------------------------------------------
-// The amud as the Vilna Shas printed it, scanned (HebrewBooks, one PDF an amud,
-// kept by the Worker), drawn with pdf.js and recoloured into the app's own ink
-// and paper -- dark mode included. Double-tap to look closer, again to fit.
-// It is a picture: the line you are on and the words you read are followed in
-// the other views, not on it.
-let PDFJS = null, scanToken = 0, scanZoom = 1;
-const SCANS = new Map();            // ref -> the PDF, loading or loaded
-async function pdfjs() {
-  if (!PDFJS) {
-    PDFJS = await import("./vendor/pdfjs/pdf.min.mjs");
-    PDFJS.GlobalWorkerOptions.workerSrc = "vendor/pdfjs/pdf.worker.min.mjs";
-  }
-  return PDFJS;
+// The amud as the Vilna Shas printed it, scanned, at HebrewBooks. HebrewBooks
+// turns away servers, so it is not fetched for the page: the learner's own
+// browser opens it, in a frame, and the frame is blended into the app's paper
+// (white becomes the paper; in dark mode the page is turned light-on-dark).
+// The letter size sets how wide it is drawn. If it does not show, it opens at
+// HebrewBooks itself. It is a picture: the line you are on and the words you
+// read aloud are followed in the other three views, not on it.
+function renderScan() {
+  const ref = S.pack.ref, api = window.API || {};
+  const url = api.scan_url && api.scan_url(ref);
+  const frame = $("scan-frame"), open = $("scan-open");
+  if (!url) { frame.removeAttribute("src"); open.removeAttribute("href"); return; }
+  const want = url + "#toolbar=0&navpanes=0&view=FitH";
+  if (frame.getAttribute("src") !== want) frame.setAttribute("src", want);
+  open.href = (api.scan_page && api.scan_page(ref)) || url;
+  $("scan-sheet").style.setProperty("--scan-w", Math.round(100 * (S.settings.scale || 1)) + "%");
 }
-const hexRGB = (v) => {
-  const h = v.trim().replace("#", "");
-  const f = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
-  return [0, 2, 4].map((i) => parseInt(f.slice(i, i + 2), 16));
-};
-// Black becomes the app's ink, white its paper, and every grey between them.
-function tintScan(canvas) {
-  const cs = getComputedStyle(document.documentElement);
-  const ink = hexRGB(cs.getPropertyValue("--ink")), paper = hexRGB(cs.getPropertyValue("--paper"));
-  const ctx = canvas.getContext("2d", { willReadFrequently: true });
-  const img = ctx.getImageData(0, 0, canvas.width, canvas.height), d = img.data;
-  for (let i = 0; i < d.length; i += 4) {
-    const l = (d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114) / 255;
-    d[i] = ink[0] + (paper[0] - ink[0]) * l;
-    d[i + 1] = ink[1] + (paper[1] - ink[1]) * l;
-    d[i + 2] = ink[2] + (paper[2] - ink[2]) * l;
-  }
-  ctx.putImageData(img, 0, 0);
-}
-async function renderScan() {
-  const box = $("scan"), canvas = $("scan-canvas"), note = $("scan-note"), ref = S.pack.ref;
-  const token = ++scanToken;
-  note.textContent = "פותח את הדף המצולם…"; note.hidden = false;
-  try {
-    const url = window.API && window.API.scan_url && window.API.scan_url(ref);
-    if (!url) throw new Error("no_scan");
-    const lib = await pdfjs();
-    if (!SCANS.has(ref)) SCANS.set(ref, lib.getDocument({ url }).promise);
-    let doc;
-    try { doc = await SCANS.get(ref); } catch (e) { SCANS.delete(ref); throw e; }
-    if (token !== scanToken) return;
-    const page = await doc.getPage(1);
-    const fit = Math.max(200, box.clientWidth - 16) * scanZoom * (S.settings.scale || 1);
-    const ratio = Math.min(window.devicePixelRatio || 1, 3);
-    const viewport = page.getViewport({ scale: (fit / page.getViewport({ scale: 1 }).width) * ratio });
-    const off = document.createElement("canvas");
-    off.width = Math.floor(viewport.width); off.height = Math.floor(viewport.height);
-    await page.render({ canvasContext: off.getContext("2d"), viewport }).promise;
-    if (token !== scanToken) return;
-    tintScan(off);
-    canvas.width = off.width; canvas.height = off.height;
-    canvas.getContext("2d").drawImage(off, 0, 0);
-    canvas.style.width = Math.round(off.width / ratio) + "px";
-    note.hidden = true;
-    // Its neighbours, while this one is read.
-    for (const n of [S.pack.next, S.pack.prev]) {
-      const u = n && window.API.scan_url(n);
-      if (u && !SCANS.has(n)) { const p = lib.getDocument({ url: u }).promise; p.catch(() => SCANS.delete(n)); SCANS.set(n, p); }
-    }
-  } catch (e) {
-    if (token !== scanToken) return;
-    note.replaceChildren(el("div", null, "לא הצלחתי להביא את הדף המצולם."));
-    const again = el("button", "btn", "נסה שוב");
-    again.onclick = () => { SCANS.delete(ref); renderScan(); };
-    const other = el("button", "btn", "צורת הדף");
-    other.onclick = () => { S.settings.view = "daf"; saveSettings(); render(); selectLine(S.line); };
-    const row = el("div", "scan-acts"); row.append(again, other);
-    note.append(row);
-  }
-}
-// Double-tap: closer, at the place tapped; again: the whole page.
-(function zoomScan() {
-  let last = 0;
-  $("scan").addEventListener("pointerup", (e) => {
-    const now = e.timeStamp;
-    if (now - last > 320) { last = now; return; }
-    last = 0;
-    const box = $("scan"), r = box.getBoundingClientRect();
-    const fx = (e.clientX - r.left + box.scrollLeft) / box.scrollWidth, fy = (e.clientY - r.top + box.scrollTop) / box.scrollHeight;
-    scanZoom = scanZoom > 1 ? 1 : 2.2;
-    renderScan().then(() => {
-      box.scrollLeft = fx * box.scrollWidth - (e.clientX - r.left);
-      box.scrollTop = fy * box.scrollHeight - (e.clientY - r.top);
-    });
-  });
-})();
-// A change of light or dark repaints it in the new colours.
-window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
-  if (S.pack && S.settings.view === "img") renderScan();
-});
 
 // Your notes: a note mark on the line each belongs to; tap to read it.
 async function drawNotes(fresh) {

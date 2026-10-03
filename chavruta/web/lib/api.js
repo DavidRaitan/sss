@@ -937,19 +937,28 @@ export async function morning() {
 }
 
 // -- the page as printed ----------------------------------------------------------
-// The Vilna Shas, scanned, from HebrewBooks: one PDF per amud. Its own number
-// for each tractate (Berakhot 1 ... Niddah 40); amud ב is "23b", amud א plain "23".
+// The Vilna Shas, scanned, at HebrewBooks: one PDF per amud. HebrewBooks turns
+// away requests from servers (the Worker got a 403), so the page is not
+// fetched here: the learner's own browser opens it, from this address.
+// HebrewBooks' tractate numbers follow the Vilna order, 1-37: Shekalim is 5;
+// Kinnim, Tamid and Middot are printed with Meilah and are under its number,
+// 36, with their own daf numbers; Niddah is 37. Amud ב is "23b", amud א "23".
 export const HEBREWBOOKS = { "Berakhot": 1, "Shabbat": 2, "Eruvin": 3, "Pesachim": 4, "Shekalim": 5, "Yoma": 6,
   "Sukkah": 7, "Beitzah": 8, "Rosh Hashanah": 9, "Taanit": 10, "Megillah": 11, "Moed Katan": 12, "Chagigah": 13,
   "Yevamot": 14, "Ketubot": 15, "Nedarim": 16, "Nazir": 17, "Sotah": 18, "Gittin": 19, "Kiddushin": 20,
   "Bava Kamma": 21, "Bava Metzia": 22, "Bava Batra": 23, "Sanhedrin": 24, "Makkot": 25, "Shevuot": 26,
   "Avodah Zarah": 27, "Horayot": 28, "Zevachim": 29, "Menachot": 30, "Chullin": 31, "Bekhorot": 32,
-  "Arakhin": 33, "Temurah": 34, "Keritot": 35, "Meilah": 36, "Kinnim": 37, "Tamid": 38, "Middot": 39, "Niddah": 40 };
+  "Arakhin": 33, "Temurah": 34, "Keritot": 35, "Meilah": 36, "Kinnim": 36, "Tamid": 36, "Middot": 36, "Niddah": 37 };
 
-/** Where this amud's scan is fetched from (through the Worker, which keeps it). */
+/** HebrewBooks' address for this amud's scan (the PDF), for the browser itself to open. */
 export function scan_url(ref) {
   const m = /^(.*) (\d+)([ab])$/.exec(ref || "");
   if (!m || !(m[1] in HEBREWBOOKS)) return null;
   return route("https://hebrewbooks.org/shas.aspx?mesechta=" + HEBREWBOOKS[m[1]] + "&daf=" + m[2] +
-    (m[3] === "b" ? "b" : "") + "&format=pdf");
+    (m[3] === "b" ? "b" : "") + "&format=pdf", { proxy: false });
+}
+/** The same amud's page on HebrewBooks itself, to open in a new tab. */
+export function scan_page(ref) {
+  const u = scan_url(ref);
+  return u && u.replace("&format=pdf", "");
 }

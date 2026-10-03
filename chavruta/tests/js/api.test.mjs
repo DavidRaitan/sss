@@ -176,3 +176,17 @@ describe("the routes, as the page asks them", () => {
     assert.ok(notes.notes.some((n) => /the fence/.test(n.text)));
   });
 });
+
+describe("the page as printed", () => {
+  test("HebrewBooks' numbers: Vilna order, Shekalim 5, Tamid under Meilah, Niddah 37", () => {
+    const q = (ref) => new URL(server.scan_url(ref), "http://x").searchParams;
+    assert.deepEqual([q("Berakhot 2a").get("mesechta"), q("Berakhot 2a").get("daf")], ["1", "2"]);
+    assert.equal(q("Gittin 59b").get("mesechta") + " " + q("Gittin 59b").get("daf"), "19 59b");
+    assert.equal(q("Ketubot 3a").get("mesechta"), "15");
+    assert.equal(q("Bava Kamma 2a").get("mesechta"), "21");
+    assert.equal(q("Tamid 27b").get("mesechta") + " " + q("Tamid 27b").get("daf"), "36 27b");
+    assert.equal(q("Niddah 51b").get("mesechta"), "37");
+    assert.equal(q("Niddah 51b").get("format"), "pdf");
+    assert.ok(!server.scan_page("Niddah 51b").includes("format=pdf"));
+  });
+});

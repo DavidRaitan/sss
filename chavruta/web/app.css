@@ -804,15 +804,21 @@ button.m-title, .m-amud, .pick-head, #open-view, .scrim, button.skipnow { displa
   .gtext, .c { text-align: right; text-align-last: right; }
 }
 
-/* The page as printed: the scan, in the app's own ink and paper. */
-.scan { flex: 1; min-height: 0; overflow: auto; padding: 8px; background: var(--paper);
+/* The page as printed: the scan from HebrewBooks, blended into the app's paper. */
+.scan { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; background: var(--paper);
   overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
-.scan canvas { display: block; margin: 0 auto; max-width: none; border-radius: 2px; }
-.scan-note { padding: 48px 16px; color: var(--faint); font-size: 14px; text-align: center; }
-.scan-note:empty { display: none; }
-.scan-acts { display: flex; gap: 8px; justify-content: center; margin-top: 14px; }
-.scan-acts .btn { min-height: 40px; padding-inline: 16px; }
+.scan-sheet { flex: none; width: var(--scan-w, 100%); min-width: 100%; margin: 0 auto; background: var(--paper);
+  isolation: isolate; }
+/* A daf is about two parts wide to three tall. */
+.scan-sheet iframe { display: block; width: 100%; aspect-ratio: 2 / 3; height: auto; border: 0;
+  mix-blend-mode: multiply; filter: sepia(.18) contrast(1.05); }
+@media (prefers-color-scheme: dark) {
+  .scan-sheet iframe { mix-blend-mode: screen; filter: invert(1) sepia(.25) brightness(.92); }
+}
+.scan-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 14px 48px;
+  font-size: 12px; color: var(--faint); }
+.scan-foot a { color: var(--dim); text-decoration: none; }
+.view-set .opts .btn { white-space: nowrap; }
 @media (max-width: 760px), (max-height: 500px) and (pointer: coarse) {
-  .scan { padding: 4px 2px 40px; }
   .view-set .opts .btn { font-size: 13.5px; padding-inline: 4px; }
 }

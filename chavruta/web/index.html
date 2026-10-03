@@ -90,8 +90,11 @@
       <section class="col outer" id="col-outer" aria-label="תוספות"></section>
     </div>
     <div id="linear" class="linear" hidden></div>
-    <!-- The page as printed: the Vilna Shas, scanned (HebrewBooks), in the app's own ink and paper. -->
-    <div id="scan" class="scan" hidden><canvas id="scan-canvas" aria-label="הדף המצולם"></canvas><div class="scan-note" id="scan-note"></div></div>
+    <!-- The page as printed: the Vilna Shas, scanned, opened by the browser itself from HebrewBooks, in the app's own colours. -->
+    <div id="scan" class="scan" hidden>
+      <div class="scan-sheet" id="scan-sheet"><iframe id="scan-frame" title="הדף המצולם" referrerpolicy="no-referrer"></iframe></div>
+      <div class="scan-foot"><span>ש״ס וילנא · HebrewBooks</span><a id="scan-open" target="_blank" rel="noopener">לא מופיע? לפתוח שם ↗</a></div>
+    </div>
     <div id="loading" class="loading">פותח את הדף…</div>
   </div>
   <section class="desk" id="desk" hidden aria-label="שולחן: מפרשים לקרוא לצד הדף">
