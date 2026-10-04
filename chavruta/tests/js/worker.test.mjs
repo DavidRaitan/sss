@@ -30,6 +30,12 @@ test("no passcode: the app's own page is answered at once", async () => {
   assert.equal(viaOrigin.status, 200);
 });
 
+test("which deployment this is, so the page can say it was updated", async () => {
+  const v = await (await go("/x/version")).json();
+  assert.equal(typeof v.id, "string");
+  assert.ok(v.id.length > 0);
+});
+
 test("but not another website, nor a request from nowhere", async () => {
   assert.equal((await fetch(w.url + "/x/openai/v1/models")).status, 403);
   assert.equal((await fetch(w.url + "/x/openai/v1/models", { headers: { "Sec-Fetch-Site": "cross-site" } })).status, 403);

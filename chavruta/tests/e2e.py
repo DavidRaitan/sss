@@ -175,35 +175,72 @@ def phone(browser, app, check, shots, sef):
     if not page.locator("#over.open .view-set").count():
         page.tap("#open-view")
     page.wait_for_selector("#over.open .view-set")
-    check("phone: four ways to see the page", page.locator("#panel .view-set .btn[data-look]").all_inner_texts()
-          == ["וילנא", "צורת הדף", "שטיינזלץ", "מנוקד"], str(page.locator("#panel .view-set .btn[data-look]").all_inner_texts()))
+    check("phone: five ways to see the page", page.locator("#panel .view-set .btn[data-look]").all_inner_texts()
+          == ["וילנא", "וילנא חי", "צורת הדף", "שטיינזלץ", "מנוקד"], str(page.locator("#panel .view-set .btn[data-look]").all_inner_texts()))
+    check("phone: …all in one row on the screen", page.evaluate("""(() => { const b = [...document.querySelectorAll('#panel .view-set .btn[data-look]')];
+          return b.every((x) => x.getBoundingClientRect().top === b[0].getBoundingClientRect().top && x.getBoundingClientRect().left >= 0
+            && x.getBoundingClientRect().right <= 390 && x.scrollWidth <= x.clientWidth + 1); })()"""))
     page.tap("#panel .view-set .btn[data-look='vilna']")
     page.tap("#close-panel")
     # וילנא: the page itself -- the Vilna Shas scan, in the app's paper and ink.
-    page.wait_for_selector("#vilna img.scan.in", timeout=15000)
-    check("phone: וילנא is the scanned page of this amud",
-          page.get_attribute("#vilna img.scan", "src").endswith("/ms/vilna-romm/Berakhot_3b.jpg")
-          and page.evaluate("document.querySelector('#vilna img.scan').naturalWidth") > 0,
-          page.get_attribute("#vilna img.scan", "src"))
-    check("phone: …tinted to the app's paper", "multiply" == page.evaluate(
-          "getComputedStyle(document.querySelector('#vilna img.scan')).mixBlendMode"))
-    sw = box("#vilna img.scan")["width"]
+    page.wait_for_selector("#vilna canvas.scan.in", timeout=15000)
+    check("phone: וילנא is the scanned page of this amud", "vilna-romm%2FBerakhot_3b.jpg" in
+          (page.get_attribute("#vilna .scan", "data-src") or "").replace("/", "%2F")
+          and page.evaluate("document.querySelector('#vilna .scan').width") > 0,
+          page.get_attribute("#vilna .scan", "data-src"))
+    paper, corner = page.evaluate("""(() => { const c = document.querySelector('#vilna .scan');
+        const p = c.getContext('2d').getImageData(4, 4, 1, 1).data;
+        const v = getComputedStyle(document.documentElement).getPropertyValue('--paper').trim();
+        return [[1, 3, 5].map((i) => parseInt(v.slice(i, i + 2), 16)), [p[0], p[1], p[2]]]; })()""")
+    check("phone: …painted in the app's own paper and ink", all(abs(a - b) <= 3 for a, b in zip(paper, corner)),
+          str([paper, corner]))
+    sw = box("#vilna .scan")["width"]
     check("phone: …the whole page across the screen", 330 < sw <= 390 and
           page.evaluate("document.documentElement.scrollWidth") <= 390, str(sw))
     shot("p2-vilna-scan")
-    page.dblclick("#vilna img.scan", position={"x": 300, "y": 160})
-    page.wait_for_timeout(300)
-    check("phone: double-tap brings it closer", box("#vilna img.scan")["width"] > 2 * sw
-          and -500 < box("#vilna img.scan")["x"] < -150, str(box("#vilna img.scan")))   # at the place tapped, not an edge
+    page.dblclick("#vilna .scan", position={"x": 300, "y": 160})
+    page.wait_for_timeout(600)
+    check("phone: double-tap brings it closer", box("#vilna .scan")["width"] > 2 * sw
+          and -500 < box("#vilna .scan")["x"] < -150, str(box("#vilna .scan")))   # at the place tapped, not an edge
     shot("p2-vilna-close")
-    page.dblclick("#vilna img.scan", position={"x": 300, "y": 160})
+    page.dblclick("#vilna .scan", position={"x": 300, "y": 160})
+    page.wait_for_timeout(600)
+    check("phone: …and again, the whole page", abs(box("#vilna .scan")["width"] - sw) < 2)
+    # Two fingers: while they move, the page is only scaled (nothing laid out again); laid out once when they lift.
+    cdp = page.context.new_cdp_session(page)
+    touch = lambda kind, pts: cdp.send("Input.dispatchTouchEvent", {"type": kind,
+        "touchPoints": [{"x": x, "y": y, "id": i} for i, (x, y) in enumerate(pts)]})
+    touch("touchStart", [(150, 400), (230, 400)])
+    for k in range(1, 9):
+        touch("touchMove", [(150 - 5 * k, 400), (230 + 5 * k, 400)])
+    mid = page.evaluate("(() => { const c = document.querySelector('#vilna .scan'); return [c.style.width, c.style.transform]; })()")
+    check("phone: pinching only scales the picture while the fingers move", mid[0] == "%dpx" % round(sw)
+          and "scale(2)" in mid[1], str(mid))
+    touch("touchEnd", [])
     page.wait_for_timeout(300)
-    check("phone: …and again, the whole page", abs(box("#vilna img.scan")["width"] - sw) < 2)
+    after = page.evaluate("(() => { const c = document.querySelector('#vilna .scan'); return [c.getBoundingClientRect().width, c.style.transform]; })()")
+    check("phone: …and is laid out at that size once they lift", abs(after[0] - 2 * sw) < 3 and not after[1], str(after))
+    page.dblclick("#vilna .scan", position={"x": 300, "y": 160})
+    page.wait_for_timeout(600)
+    check("phone: …double-tap, and the whole page again", abs(box("#vilna .scan")["width"] - sw) < 2)
     check("phone: …and a link to the full scan", "vilna-romm/Berakhot_3b.jpg" in (page.get_attribute("#scan-open", "href") or ""))
     # Without the scan (offline, or an amud it lacks): the same page laid out from its text.
     page.route(lambda u: "vilna-romm" in u, lambda r: r.abort())
     page.evaluate("vilnaText = null; $('vilna-page').replaceChildren(); renderVilna()")
     page.wait_for_selector("#vilna .vseg", timeout=15000)
+    check("phone: no scan, and וילנא is laid out from the text instead", not page.locator("#vilna .scan").count()
+          and page.evaluate("S.settings.view") == "vilna")
+    page.unroute_all()
+    # וילנא חי: the same page rebuilt from its text, by choice -- alive: lit, followed, tappable.
+    page.evaluate("vilnaText = null; render()")
+    page.wait_for_selector("#vilna .scan.in", timeout=15000)
+    page.tap("#open-view")
+    page.wait_for_selector("#over.open .view-set")
+    page.tap("#panel .view-set .btn[data-look='live']")
+    page.tap("#close-panel")
+    page.wait_for_selector("#vilna .vseg", timeout=15000)
+    check("phone: וילנא חי is the page from its text, not the scan", page.evaluate("S.settings.view") == "live"
+          and not page.locator("#vilna .scan").count())
     page.wait_for_timeout(400)
     lines, comments = page.evaluate("[document.querySelectorAll('#vilna .vseg').length, document.querySelectorAll('#vilna .vc').length]")
     check("phone: וילנא lays out the whole amud, gemara and commentaries", lines == page.evaluate("S.pack.segments.length")
@@ -217,7 +254,7 @@ def phone(browser, app, check, shots, sef):
     check("phone: a tap on its line selects it", page.evaluate("S.line") == 5 and
           page.locator("#vilna .vseg.on").count() == 1)
     check("phone: …and the scan is a link to HebrewBooks", "mesechta=1&daf=3b" in (page.get_attribute("#scan-open", "href") or ""))
-    page.unroute_all()
+    shot("p2-vilna-live")
     page.evaluate("selectLine(1)")                 # back to a line that has commentaries on this page
     page.tap("#open-view")
     page.wait_for_selector("#over.open .view-set")
@@ -279,6 +316,23 @@ def phone(browser, app, check, shots, sef):
     check("phone on its side: the commentaries beside the page", box("#over")["width"] < 844 * 0.6 and
           box("main")["width"] > 400, str([box("#over"), box("main")]))
     shot("p3-landscape")
+    # A new version: said once, with what is new; and, if one comes while it is open, an offer to refresh.
+    page.set_viewport_size({"width": 390, "height": 844})
+    page.route("**/x/version", lambda r: r.fulfill(json={"id": "v2", "at": "2026-10-04T08:00:00Z"}))
+    page.evaluate("localStorage.setItem('chavruta.version', 'v1'); VERSION.id = null; checkVersion()")
+    page.wait_for_selector("#news:not([hidden])", timeout=5000)
+    check("phone: it says it was updated, and what is new", page.inner_text("#news-text").startswith("עודכן לגרסה החדשה · וילנא")
+          and page.locator("#news-act").is_hidden(), page.inner_text("#news-text"))
+    shot("p3-updated")
+    page.tap("#news-x")
+    page.unroute("**/x/version")
+    page.route("**/x/version", lambda r: r.fulfill(json={"id": "v3", "at": "2026-10-04T09:00:00Z"}))
+    page.evaluate("checkVersion()")
+    page.wait_for_selector("#news:not([hidden])", timeout=5000)
+    check("phone: …and a newer one while open is offered with a refresh", page.inner_text("#news-text") == "יש גרסה חדשה"
+          and page.locator("#news-act").is_visible())
+    page.tap("#news-x")
+    page.unroute("**/x/version")
     check("phone: no JavaScript errors", not errors, "; ".join(errors[:3]))
     ctx.close()
 

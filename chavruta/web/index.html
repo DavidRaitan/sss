@@ -73,7 +73,8 @@
   <span class="seg2 hide-narrow" role="group" aria-label="תצוגה">
     <button class="btn" id="v-daf" aria-pressed="true" title="כמו בגמרא: רש״י ותוספות מסביב">צורת הדף</button>
     <button class="btn" id="v-lin" aria-pressed="false" title="מנוקד ומפוסק, עם תרגום">שטיינזלץ</button>
-    <button class="btn" id="v-img" aria-pressed="false" title="הדף כצורתו בש״ס וילנא">וילנא</button>
+    <button class="btn" id="v-img" aria-pressed="false" title="הדף הסרוק, כפי שנדפס בש״ס וילנא">וילנא</button>
+    <button class="btn" id="v-live" aria-pressed="false" title="אותו דף, בנוי מחדש מהטקסט: השורה שלך מוארת, והקריאה שלך נעקבת">וילנא חי</button>
   </span>
   <span class="status" id="status" title=""><span class="dot" id="dot"></span><span id="statustext"></span></span>
   <button class="btn icon" id="open-settings" title="הגדרות" aria-label="הגדרות"><svg class="ic"><use href="#i-settings"/></svg></button>
@@ -165,5 +166,6 @@
 </aside>
 
 <script type="module" src="boot.js"></script>
+<div id="news" class="news" role="status" hidden><span id="news-text"></span><button id="news-act" class="news-act" hidden>לרענן</button><button id="news-x" class="news-x" aria-label="סגור">✕</button></div>
 </body>
 </html>

@@ -322,18 +322,21 @@ function runnerText(ref) {
   return p ? (m ? m.he : p.masechta) + " · דף " + geresh(hebNum(p.daf)) + " · עמוד " + amudHe(p.amud) : ref;
 }
 
+// Both Vilna views live in #vilna: the scan (vilna), and the page rebuilt from its text (live).
+const onVilna = (view = S.settings.view) => view === "vilna" || view === "live";
 function render() {
   const view = S.settings.view;
   $("v-daf").setAttribute("aria-pressed", String(view === "daf"));
   $("v-lin").setAttribute("aria-pressed", String(view === "lin"));
   $("v-img").setAttribute("aria-pressed", String(view === "vilna"));
+  $("v-live").setAttribute("aria-pressed", String(view === "live"));
   $("loading").hidden = true;
   $("runner").textContent = runnerText(S.pack.ref);
   // Only one view exists at a time. A hidden copy of the page would still take
   // reading marks and quote highlights, and scroll to words nobody can see.
-  $("vilna").hidden = view !== "vilna";
-  if (view !== "vilna") $("vilna-page").replaceChildren();
-  if (view === "vilna") {
+  $("vilna").hidden = !onVilna(view);
+  if (!onVilna(view)) $("vilna-page").replaceChildren();
+  if (onVilna(view)) {
     $("linear").replaceChildren(); $("linear").hidden = true;
     $("gtext").replaceChildren(); $("col-inner").replaceChildren(); $("col-outer").replaceChildren();
     $("page").hidden = true; renderVilna();
@@ -362,9 +365,11 @@ function render() {
 // in the app's paper and ink: its yellowed paper becomes the page's own and
 // its ink the app's (in the dark, the other way round). Double-tap: closer,
 // at the place tapped; again: the whole page. Two fingers: as close as you like.
-// If the scan cannot be had (offline, or an amud it lacks), the same page is
-// laid out from its text instead -- the gemara in the middle, Rashi toward the
-// binding and Tosafot outside, by daf-renderer -- where a line can be tapped.
+// וילנא חי is the same page rebuilt from its text -- the gemara in the middle,
+// Rashi toward the binding and Tosafot outside, by daf-renderer -- in the
+// app's own letters, where the line you are on is lit, your reading is
+// followed and a tap opens a line or a comment. It is also what וילנא shows
+// when the scan cannot be had (offline, or an amud it lacks).
 let DAFR = null, vilnaZoom = 1, vilnaToken = 0;
 const vilnaComments = (names) => {
   const out = [];
@@ -391,25 +396,19 @@ const scanFor = (ref) => {
   return url && { direct: url, proxied: null };
 };
 let vilnaText = null;                                   // the ref whose scan could not be had
+let vilnaSource = null;                                 // {ref, img}: the scan as loaded, to repaint when the theme turns
 function renderVilna() {
-  const pack = S.pack, scan = vilnaText === pack.ref ? null : scanFor(pack.ref);
+  const pack = S.pack, scan = S.settings.view === "live" || vilnaText === pack.ref ? null : scanFor(pack.ref);
   if (!scan) return renderVilnaText();
-  const token = ++vilnaToken, box = $("vilna-page");
-  let img = box.querySelector("img.scan");
+  ++vilnaToken;
+  const box = $("vilna-page");
+  let shown = box.querySelector(".scan");
   $("vilna").classList.add("is-scan");
-  if (!img || img.dataset.ref !== pack.ref) {
-    img = el("img", "scan"); img.alt = runnerText(pack.ref); img.dataset.ref = pack.ref;
-    img.decoding = "async"; img.draggable = false;
-    const tries = [scan.direct, scan.proxied].filter(Boolean);
-    img.addEventListener("error", () => {
-      if (!img.isConnected) return;                       // a page already turned
-      if (tries.length) { img.src = tries.shift(); return; }
-      vilnaText = pack.ref;                              // no scan: the page from its text
-      if (S.pack === pack && S.settings.view === "vilna") renderVilna();
-    });
-    img.addEventListener("load", () => { img.classList.add("in"); });
-    img.src = tries.shift();
-    box.replaceChildren(img);
+  if (!shown || shown.dataset.ref !== pack.ref) {
+    shown = el("canvas", "scan"); shown.dataset.ref = pack.ref;
+    shown.setAttribute("role", "img"); shown.setAttribute("aria-label", runnerText(pack.ref));
+    box.replaceChildren(shown);
+    loadScan(pack, scan, shown);
   }
   sizeScan();
   const open = $("scan-open");
@@ -417,11 +416,73 @@ function renderVilna() {
   $("scan-credit").textContent = "דפוס וילנא, האלמנה והאחים ראם · הספרייה הלאומית, דרך ספריא";
   return Promise.resolve();
 }
+// The scan is painted once, in the app's own ink and paper, onto a canvas:
+// zooming then only scales a finished picture, and dark mode is the app's
+// dark, not black and white. Painting needs the picture's pixels, so it is
+// asked for openly (Sefaria directly, if it allows it; else through the
+// Worker, as the app's own); failing both, it is shown as it is, under a filter.
+function loadScan(pack, scan, shown) {
+  const tries = [[scan.direct, "anonymous"], [scan.proxied, null], [scan.direct, "plain"]].filter((t) => t[0]);
+  const next = () => {
+    if (!shown.isConnected) return;                        // a page already turned
+    if (!tries.length) {
+      vilnaText = pack.ref;                                // no scan: the page from its text
+      if (S.pack === pack && S.settings.view === "vilna") renderVilna();
+      return;
+    }
+    const [src, how] = tries.shift(), img = new Image();
+    if (how === "anonymous") img.crossOrigin = "anonymous";
+    img.onerror = next;
+    img.onload = () => {
+      if (!shown.isConnected) return;
+      if (how === "plain") {                               // its pixels are not ours: the picture, filtered
+        img.className = "scan in filtered"; img.dataset.ref = pack.ref; img.dataset.src = src;
+        img.alt = shown.getAttribute("aria-label"); img.draggable = false;
+        shown.replaceWith(img); sizeScan();
+        return;
+      }
+      try { paintScan(img, shown); } catch (e) { next(); return; }   // pixels refused: the next way
+      vilnaSource = { ref: pack.ref, img };
+      shown.dataset.src = src; shown.classList.add("in");
+    };
+    img.src = src;
+  };
+  next();
+}
+const hexRGB = (v) => { const h = v.trim().replace("#", ""); return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16)); };
+function paintScan(img, canvas) {
+  const w = img.naturalWidth, h = img.naturalHeight, x = canvas.getContext("2d", { willReadFrequently: true });
+  canvas.width = w; canvas.height = h; canvas.style.aspectRatio = w + " / " + h;
+  x.drawImage(img, 0, 0);
+  const d = x.getImageData(0, 0, w, h), p = d.data;   // throws if the picture is not ours to read
+  // Its levels: the darkest ink and the paper (most of the page), from a sample.
+  const hist = new Uint32Array(256);
+  for (let i = 0; i < p.length; i += 4 * 7) hist[(p[i] * 77 + p[i + 1] * 150 + p[i + 2] * 29) >> 8]++;
+  const at = (q) => { let n = 0, all = hist.reduce((a, b) => a + b, 0); for (let v = 0; v < 256; v++) if ((n += hist[v]) >= q * all) return v; return 255; };
+  const lo = at(0.02), hi = Math.max(lo + 40, at(0.7));
+  // Each grey to a colour between the app's ink and its paper, softly.
+  const cs = getComputedStyle(document.documentElement), ink = hexRGB(cs.getPropertyValue("--ink")), paper = hexRGB(cs.getPropertyValue("--paper"));
+  const lut = new Uint8ClampedArray(256 * 3);
+  for (let v = 0; v < 256; v++) {
+    let t = Math.min(1, Math.max(0, (v - lo) / (hi - lo))); t = t * t * (3 - 2 * t);
+    for (let c = 0; c < 3; c++) lut[v * 3 + c] = ink[c] + (paper[c] - ink[c]) * t;
+  }
+  for (let i = 0; i < p.length; i += 4) {
+    const v = ((p[i] * 77 + p[i + 1] * 150 + p[i + 2] * 29) >> 8) * 3;
+    p[i] = lut[v]; p[i + 1] = lut[v + 1]; p[i + 2] = lut[v + 2];
+  }
+  x.putImageData(d, 0, 0);
+}
+// Light to dark (or back): the same scan, repainted in the new ink and paper.
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+  const shown = $("vilna-page").querySelector("canvas.scan");
+  if (shown && vilnaSource && vilnaSource.ref === shown.dataset.ref) paintScan(vilnaSource.img, shown);
+});
 function sizeScan() {
-  const img = $("vilna-page").querySelector("img.scan");
-  if (!img) return;
+  const shown = $("vilna-page").querySelector(".scan");
+  if (!shown) return;
   const fit = Math.max(280, Math.min($("vilna").clientWidth - 10, 900));
-  img.style.width = Math.round(fit * vilnaZoom) + "px";
+  shown.style.width = Math.round(fit * vilnaZoom) + "px";
 }
 async function renderVilnaText() {
   const token = ++vilnaToken, pack = S.pack, p = parseRef(pack.ref);
@@ -472,18 +533,40 @@ function vilnaAct(target) {
   const g = target.closest && target.closest(".vseg");
   if (g) selectLine(+g.dataset.n, { scroll: "side" });
 }
-// Scrolled from the left edge, whichever way the page runs (in Hebrew, scrollLeft counts from the right).
-const fromLeft = (box) => getComputedStyle(box).direction === "rtl" ? box.scrollWidth - box.clientWidth : 0;
-const leftOf = (box) => box.scrollLeft + fromLeft(box);
-const scrollToLeft = (box, x) => { box.scrollLeft = x - fromLeft(box); };
+// Zooming, smoothly: while it moves, the page is only scaled as a picture
+// (by the graphics chip, with nothing laid out again); when it stops, it is
+// laid out at its new size once, and the place you zoomed at put back under
+// your fingers.
+const ZOOM_MIN = 1, ZOOM_MAX = 4;
+function zoomBegin(mx, my) {
+  const t = $("vilna-page").firstElementChild;
+  if (!t) return null;
+  const r = t.getBoundingClientRect();
+  t.style.transformOrigin = "0 0"; t.style.willChange = "transform";
+  return { t, r, z0: vilnaZoom, ex: mx - r.left, ey: my - r.top, k: 1, mx, my };
+}
+function zoomMove(g, k, mx, my) {
+  g.k = Math.min(ZOOM_MAX / g.z0, Math.max(ZOOM_MIN / g.z0, k)); g.mx = mx; g.my = my;
+  g.t.style.transform = "translate(" + (mx - g.r.left - g.k * g.ex) + "px, " + (my - g.r.top - g.k * g.ey) + "px) scale(" + g.k + ")";
+}
+async function zoomEnd(g) {
+  const box = $("vilna");
+  vilnaZoom = g.z0 * g.k;
+  await renderVilna();                                   // the scan: a new width; the text: laid out again
+  const t = $("vilna-page").firstElementChild;
+  if (!t) return;
+  for (const n of [t, g.t]) { n.style.transform = ""; n.style.transition = ""; n.style.willChange = ""; }
+  const r = t.getBoundingClientRect();
+  box.scrollLeft += r.left + g.k * g.ex - g.mx;           // (by the difference: right-to-left or not)
+  box.scrollTop += r.top + g.k * g.ey - g.my;
+}
 function vilnaZoomAt(e) {
-  const box = $("vilna"), r = box.getBoundingClientRect();
-  const fx = (e.clientX - r.left + leftOf(box)) / box.scrollWidth, fy = (e.clientY - r.top + box.scrollTop) / box.scrollHeight;
-  vilnaZoom = vilnaZoom > 1 ? 1 : box.classList.contains("is-scan") ? 2.2 : 1.8;
-  renderVilna().then(() => {
-    scrollToLeft(box, fx * box.scrollWidth - (e.clientX - r.left));
-    box.scrollTop = fy * box.scrollHeight - (e.clientY - r.top);
-  });
+  const g = zoomBegin(e.clientX, e.clientY);
+  if (!g) return;
+  const to = vilnaZoom > 1 ? 1 : $("vilna").classList.contains("is-scan") ? 2.2 : 1.8;
+  g.t.style.transition = "transform 220ms cubic-bezier(.2, .7, .3, 1)";
+  zoomMove(g, to / g.z0, e.clientX, e.clientY);
+  setTimeout(() => zoomEnd(g), 230);
 }
 $("vilna").addEventListener("click", (e) => {
   if (e.target.closest("a")) return;                               // the link to the scan
@@ -492,32 +575,40 @@ $("vilna").addEventListener("click", (e) => {
   vilnaTap = setTimeout(() => { vilnaTap = null; vilnaAct(target); }, 280);
 });
 
-// Two fingers on the scan: as close as they spread, about the point between them.
+// Two fingers: as close as they spread, about the point between them, following them as they move.
 let pinch = null;
 const spread = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+const mid = (t) => [(t[0].clientX + t[1].clientX) / 2, (t[0].clientY + t[1].clientY) / 2];
 $("vilna").addEventListener("touchstart", (e) => {
-  if (e.touches.length !== 2 || !$("vilna").classList.contains("is-scan")) return;
-  const box = $("vilna"), r = box.getBoundingClientRect();
-  const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2 - r.left, cy = (e.touches[0].clientY + e.touches[1].clientY) / 2 - r.top;
-  pinch = { d: spread(e.touches), zoom: vilnaZoom, cx, cy,
-    fx: (cx + leftOf(box)) / box.scrollWidth, fy: (cy + box.scrollTop) / box.scrollHeight };
+  if (e.touches.length !== 2 || pinch) return;
+  const g = zoomBegin(...mid(e.touches));
+  if (g) pinch = { g, d: spread(e.touches) };
 }, { passive: true });
 $("vilna").addEventListener("touchmove", (e) => {
   if (!pinch || e.touches.length !== 2) return;
   e.preventDefault();
-  const box = $("vilna");
-  vilnaZoom = Math.min(4, Math.max(1, pinch.zoom * spread(e.touches) / pinch.d));
-  sizeScan();
-  scrollToLeft(box, pinch.fx * box.scrollWidth - pinch.cx);
-  box.scrollTop = pinch.fy * box.scrollHeight - pinch.cy;
+  zoomMove(pinch.g, spread(e.touches) / pinch.d, ...mid(e.touches));
 }, { passive: false });
-$("vilna").addEventListener("touchend", (e) => { if (e.touches.length < 2) pinch = null; });
+const pinchDone = (e) => { if (pinch && e.touches.length < 2) { const g = pinch.g; pinch = null; zoomEnd(g); } };
+$("vilna").addEventListener("touchend", pinchDone);
+$("vilna").addEventListener("touchcancel", pinchDone);
+// A trackpad's pinch (ctrl+wheel), on the computer.
+let wheelZoom = null, wheelDone = 0;
+$("vilna").addEventListener("wheel", (e) => {
+  if (!e.ctrlKey) return;
+  e.preventDefault();
+  if (!wheelZoom) wheelZoom = zoomBegin(e.clientX, e.clientY);
+  if (!wheelZoom) return;
+  zoomMove(wheelZoom, wheelZoom.k * Math.exp(-e.deltaY / 120), wheelZoom.mx, wheelZoom.my);
+  clearTimeout(wheelDone);
+  wheelDone = setTimeout(() => { const g = wheelZoom; wheelZoom = null; zoomEnd(g); }, 180);
+}, { passive: false });
 
 // Laid out to the width it has: again when that changes (a phone turned on its side).
 let vilnaWidth = 0;
 new ResizeObserver(() => {
   const w = $("vilna").clientWidth;
-  if (S.pack && S.settings.view === "vilna" && !$("vilna").hidden && Math.abs(w - vilnaWidth) > 4) { vilnaWidth = w; renderVilna(); }
+  if (S.pack && onVilna() && !$("vilna").hidden && Math.abs(w - vilnaWidth) > 4) { vilnaWidth = w; renderVilna(); }
 }).observe($("vilna"));
 
 // Your notes: a note mark on the line each belongs to; tap to read it.
@@ -755,7 +846,7 @@ function selectLine(n, opts) {
   $("where").textContent = "שורה " + S.line + " מתוך " + max +
     (sec && sec.label ? " · " + sec.label + " (" + sec.from + "–" + sec.to + ")" : "");
 
-  const main = S.settings.view === "daf" ? $("col-gemara") : S.settings.view === "vilna" ? $("vilna") : $("linear");
+  const main = S.settings.view === "daf" ? $("col-gemara") : onVilna() ? $("vilna") : $("linear");
   const node = main.querySelector('[data-n="' + S.line + '"]');
   if (S.settings.view === "lin" && node && opts.scroll !== "top")
     // Its explanation opens below it: once it has, keep both in view.
@@ -3267,10 +3358,11 @@ function openView() {
       box.append(row);
       return box;
     };
-    // The four ways to see the page, as one choice: the scan, the page's shape
-    // in text, Steinsaltz, and the pointed gemara alone.
-    const looks = [["vilna", "וילנא"], ["daf", "צורת הדף"], ["stz", "שטיינזלץ"], ["nikud", "מנוקד"]];
-    const look = () => (S.settings.view === "vilna" ? "vilna" : S.settings.view === "daf" ? "daf"
+    // The five ways to see the page, as one choice: the Vilna scan, the same
+    // page rebuilt from its text (alive: lit, followed, tappable), the page's
+    // shape in columns, Steinsaltz, and the pointed gemara alone.
+    const looks = [["vilna", "וילנא"], ["live", "וילנא חי"], ["daf", "צורת הדף"], ["stz", "שטיינזלץ"], ["nikud", "מנוקד"]];
+    const look = () => (["vilna", "live", "daf"].includes(S.settings.view) ? S.settings.view
       : S.settings.explain === "off" ? "nikud" : "stz");
     const lookBox = el("div", "set view-set"), lookRow = el("div", "opts");
     for (const [value, text] of looks) {
@@ -3278,7 +3370,7 @@ function openView() {
       b.dataset.look = value;
       b.setAttribute("aria-pressed", String(look() === value));
       b.onclick = () => {
-        if (value === "vilna" || value === "daf") S.settings.view = value;
+        if (["vilna", "live", "daf"].includes(value)) S.settings.view = value;
         else { S.settings.view = "lin"; S.settings.explain = value === "nikud" ? "off" : "stz"; }
         saveSettings();
         for (const x of lookRow.children) x.setAttribute("aria-pressed", String(x === b));
@@ -3304,7 +3396,7 @@ function openView() {
 }
 function applyScale() {
   document.documentElement.style.setProperty("--scale", S.settings.scale || 1);
-  if (S.pack && S.settings.view === "vilna" && !$("vilna").hidden) renderVilna();   // laid out to the letter size
+  if (S.pack && onVilna() && !$("vilna").hidden && !$("vilna").classList.contains("is-scan")) renderVilna();   // laid out to the letter size
 }
 
 function openSettings() {
@@ -3348,7 +3440,7 @@ function openSettings() {
         "מוסיף כמה שניות וכמה אגורות לשאלה."),
       choice("language", "שפת התשובה", [["en", "English"], ["he", "עברית"], ["auto", "כמוני"]],
         "באנגלית הוא מצטט את הגמרא בעברית, בתוך המשפט — כמו שמדברים בבית המדרש."),
-      choice("view", "תצוגת הדף", [["vilna", "וילנא"], ["daf", "צורת הדף"], ["lin", "שטיינזלץ, מנוקד"]]),
+      choice("view", "תצוגת הדף", [["vilna", "וילנא"], ["live", "וילנא חי"], ["daf", "צורת הדף"], ["lin", "שטיינזלץ, מנוקד"]]),
       choice("script", "כתב רש״י", [["plain", "בלי — הכול באותיות רגילות"], ["page", "רש״י ותוספות שעל הדף"],
         ["all", "כל המפרשים"]], "האותיות שבהן נדפסו המפרשים. רגילות קלות יותר לקריאה."),
       choice("translate", "תרגום (בתצוגת שטיינזלץ)", [[false, "בלי"], [true, "עם תרגום"]]),
@@ -3374,6 +3466,7 @@ function openSettings() {
     keys.innerHTML = "<kbd>רווח</kbd> מיקרופון · <kbd>←</kbd> <kbd>→</kbd> עמוד הבא / הקודם · " +
       "<kbd>↑</kbd> <kbd>↓</kbd> שורה · <kbd>Esc</kbd> סגור";
     k.append(keys); panel.append(k);
+    if (versionText()) panel.append(el("div", "sub", versionText()));
   }, "settings");
 }
 
@@ -3385,6 +3478,7 @@ $("open-settings-tab").onclick = () => (S.panel === "settings" ? closePanel() : 
 $("v-daf").onclick = () => { S.settings.view = "daf"; saveSettings(); if (S.pack) { render(); selectLine(S.line); } };
 $("v-lin").onclick = () => { S.settings.view = "lin"; saveSettings(); if (S.pack) { render(); selectLine(S.line); } };
 $("v-img").onclick = () => { S.settings.view = "vilna"; saveSettings(); if (S.pack) { render(); selectLine(S.line); } };
+$("v-live").onclick = () => { S.settings.view = "live"; saveSettings(); if (S.pack) { render(); selectLine(S.line); } };
 
 /* ----------------------------------------------------------- keys & touch */
 
@@ -3410,6 +3504,38 @@ document.addEventListener("touchend", (e) => {
   if (Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 1.8) flip(dx < 0 ? 1 : -1);
 });
 
+// -- "updated": once, when a new version first opens -- with what is new --
+// and, if one is published while the app is open, an offer to refresh.
+const VERSION = { id: null, at: null };
+function news(text, act) {
+  $("news-text").textContent = text;
+  $("news-act").hidden = !act;
+  if (act) $("news-act").onclick = act;
+  $("news").hidden = false;
+  clearTimeout(news.timer);
+  if (!act) news.timer = setTimeout(() => { $("news").hidden = true; }, 9000);
+}
+$("news-x").onclick = () => { $("news").hidden = true; };
+async function checkVersion() {
+  let v;
+  try { v = await (await fetch("/x/version", { cache: "no-store" })).json(); } catch (e) { return; }   // the Python server: none
+  if (!v || !v.id || v.id === "dev") return;
+  if (!VERSION.id) {                                         // this page: which version it is
+    Object.assign(VERSION, v);
+    let seen = null;
+    try { seen = localStorage.getItem("chavruta.version"); localStorage.setItem("chavruta.version", v.id); } catch (e) {}
+    if (seen && seen !== v.id) {
+      let what = "";
+      try { what = (await (await fetch("whatsnew.json", { cache: "no-store" })).json()).he || ""; } catch (e) {}
+      news("עודכן לגרסה החדשה" + (what ? " · " + what : ""));
+    }
+  } else if (v.id !== VERSION.id) {
+    news("יש גרסה חדשה", () => location.reload());
+  }
+}
+const versionText = () => VERSION.at ? "גרסה מ-" + new Date(VERSION.at).toLocaleString("he-IL",
+  { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
+
 /* ------------------------------------------------------------------ start */
 
 (async function start() {
@@ -3417,6 +3543,9 @@ document.addEventListener("touchend", (e) => {
   applyScale();
   syncMic();
   checkHealth();          // not awaited: a slow Sefaria must not hold up a cached page
+  checkVersion();
+  setInterval(checkVersion, 15 * 60 * 1000);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) checkVersion(); });
   await buildPickers();
   setInterval(checkHealth, 60000);
   const last = recall("ref");

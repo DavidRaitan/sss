@@ -12,6 +12,8 @@
   "d1_databases": [
     { "binding": "DB", "database_name": "chavruta", "database_id": "1cf82c3d-ae01-4d6e-8591-380a9d894122" }
   ],
+  // Which deployment this is: the page says so when it changes ("updated").
+  "version_metadata": { "binding": "VERSION" },
   "vars": {
     "OPENAI_BASE": "https://api.openai.com",
     "SEFARIA_BASE": "https://www.sefaria.org/api"

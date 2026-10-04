@@ -850,3 +850,22 @@ to the mishna the gemara is on, brings its text, and recaps the pages since.
   page too (scrollLeft counts from the right there; it did not, before).
 - If the scan cannot be had (offline, an amud it lacks), the page is laid out
   from its text by daf-renderer, as in 74, where a line can be tapped.
+
+**76. Two Vilnas, a smooth zoom, and "updated".**
+- וילנא is the scan; וילנא חי ("living Vilna") is the page rebuilt from its
+  text (74), kept as its own view: there the line you are on is lit, your
+  reading is followed and a tap opens a comment. Five looks now.
+- The scan is painted once onto a canvas in the app's own ink and paper
+  (each grey mapped between --ink and --paper, levels taken from the page), so
+  dark mode is warm cream on the dark page, not black and white. Its pixels
+  must be readable, so it is asked for openly from Sefaria, else through the
+  Worker as the app's own; failing both, it is shown under a CSS filter.
+- Zoom was choppy: every finger movement resized a 1530x2450 picture under a
+  filter and blend. Now, while the fingers (or a double-tap's animation, or a
+  trackpad's pinch) move, the page is only scaled by a transform, on the
+  graphics chip; when they stop it is laid out once at its new size and the
+  place zoomed at is put back under the fingers.
+- "Updated": the Worker says which deployment it is (/x/version, Cloudflare's
+  version metadata). The first time a new one opens, a note says so, with
+  web/whatsnew.json's line of what is new; if one is published while the app
+  is open, it offers a refresh. Settings shows the version's date.

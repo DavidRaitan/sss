@@ -7,6 +7,7 @@
 //   /x/fetch?url=      any other page the partner reads (Wikisource, Hebcal, the study sites)
 //   /x/events          the record of every sitting and the learner's notes (D1)
 //   /x/who             whether the key is set
+//   /x/version         which deployment this is, so the page can say it was updated
 //
 // Everything that thinks runs in the page. The Worker only passes things
 // through, so each request costs it almost no CPU -- which is what keeps it
@@ -21,6 +22,10 @@ export default {
     try {
       if (!fromThePage(request, env, url)) return json({ error: "not_from_the_app" }, 403);
       if (url.pathname === "/x/who") return json({ ok: true, key: !!env.OPENAI_API_KEY });
+      if (url.pathname === "/x/version") {
+        const v = env.VERSION || {};
+        return json({ id: v.id || "dev", at: v.timestamp || null });
+      }
       if (url.pathname.startsWith("/x/openai/v1/")) return openai(request, env, url);
       if (url.pathname === "/x/voice") return voice(request, env, ctx, url);
       if (url.pathname.startsWith("/x/sefaria/")) return sefaria(request, env, ctx, url);
