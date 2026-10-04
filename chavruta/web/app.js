@@ -60,6 +60,7 @@ function loadSettings() {
     s.voice_seen = 1;
   }
   if (!["mix", "cedar", "verse"].includes(s.voice_name)) s.voice_name = "mix";   // the voices on offer
+  if (s.view === "img") s.view = "vilna";        // the scan view became the Vilna page
   return s;
 }
 function saveSettings() {
@@ -288,7 +289,7 @@ async function turnTo(ref, line) {
   const token = ++opening;
   showRefInPicker(ref);
   $("loading").hidden = false; $("loading").textContent = "פותח את הדף…";
-  $("page").hidden = true; $("linear").hidden = true; $("scan").hidden = true;
+  $("page").hidden = true; $("linear").hidden = true; $("vilna").hidden = true;
   $("runner").textContent = runnerText(ref);
   try {
     const r = await api("/api/daf?ref=" + encodeURIComponent(ref));
@@ -325,16 +326,17 @@ function render() {
   const view = S.settings.view;
   $("v-daf").setAttribute("aria-pressed", String(view === "daf"));
   $("v-lin").setAttribute("aria-pressed", String(view === "lin"));
-  $("v-img").setAttribute("aria-pressed", String(view === "img"));
+  $("v-img").setAttribute("aria-pressed", String(view === "vilna"));
   $("loading").hidden = true;
   $("runner").textContent = runnerText(S.pack.ref);
   // Only one view exists at a time. A hidden copy of the page would still take
   // reading marks and quote highlights, and scroll to words nobody can see.
-  $("scan").hidden = view !== "img";
-  if (view === "img") {
+  $("vilna").hidden = view !== "vilna";
+  if (view !== "vilna") $("vilna-page").replaceChildren();
+  if (view === "vilna") {
     $("linear").replaceChildren(); $("linear").hidden = true;
     $("gtext").replaceChildren(); $("col-inner").replaceChildren(); $("col-outer").replaceChildren();
-    $("page").hidden = true; renderScan();
+    $("page").hidden = true; renderVilna();
   } else if (view === "daf") {
     $("linear").replaceChildren(); $("linear").hidden = true; renderDaf();
   } else {
@@ -355,24 +357,101 @@ function render() {
   renderDesk();
 }
 
-// -- the page as printed ------------------------------------------------------------
-// The amud as the Vilna Shas printed it, scanned, at HebrewBooks. HebrewBooks
-// turns away servers, so it is not fetched for the page: the learner's own
-// browser opens it, in a frame, and the frame is blended into the app's paper
-// (white becomes the paper; in dark mode the page is turned light-on-dark).
-// The letter size sets how wide it is drawn. If it does not show, it opens at
-// HebrewBooks itself. It is a picture: the line you are on and the words you
-// read aloud are followed in the other three views, not on it.
-function renderScan() {
-  const ref = S.pack.ref, api = window.API || {};
-  const url = api.scan_url && api.scan_url(ref);
-  const frame = $("scan-frame"), open = $("scan-open");
-  if (!url) { frame.removeAttribute("src"); open.removeAttribute("href"); return; }
-  const want = url + "#toolbar=0&navpanes=0&view=FitH";
-  if (frame.getAttribute("src") !== want) frame.setAttribute("src", want);
-  open.href = (api.scan_page && api.scan_page(ref)) || url;
-  $("scan-sheet").style.setProperty("--scan-w", Math.round(100 * (S.settings.scale || 1)) + "%");
+// -- וילנא: the page as the Vilna Shas lays it out ------------------------------------
+// The gemara in the middle, Rashi toward the binding and Tosafot outside,
+// wrapping around it as on the printed daf -- laid out by daf-renderer from
+// the page's own text (Sefaria), so it is in the app's ink and paper, the line
+// you are on is lit, and the words you read are followed, as everywhere else.
+// (HebrewBooks' scan cannot be shown inside the app -- it refuses to be framed
+// and refuses servers -- so the scan is a link, to open there.)
+// Double-tap: closer, at the place tapped; again: the whole page.
+let DAFR = null, vilnaZoom = 1, vilnaToken = 0;
+const vilnaComments = (names) => {
+  const out = [];
+  for (const seg of S.pack.segments)
+    for (const name of names)
+      for (const e of seg.commentaries[name] || []) {
+        const c = el("span", "vc"); c.dataset.n = seg.n; c.dataset.ref = e.ref;
+        const body = e.he || "";
+        let rest = body;
+        if (e.dibur) {
+          const at = body.indexOf(e.dibur);
+          if (at >= 0 && at < 12) rest = body.slice(at + e.dibur.length).replace(/^[\s.:–—-]+/, "");
+          c.append(el("b", "vdib", e.dibur), document.createTextNode(" "));
+        }
+        c.append(document.createTextNode(rest.replace(/[\s:]+$/, "") + ": "));
+        out.push(c.outerHTML);
+      }
+  return out.join(" ");
+};
+async function renderVilna() {
+  const token = ++vilnaToken, pack = S.pack, p = parseRef(pack.ref);
+  const box = $("vilna-page");
+  if (!DAFR) DAFR = (await import("./vendor/daf-renderer/daf-renderer.esm.js")).default;
+  if (document.fonts && document.fonts.ready) await document.fonts.ready;   // it measures the text: fonts first
+  if (token !== vilnaToken || S.pack !== pack) return;
+  // The gemara, its lines as spans (and its words, so reading is followed on it too).
+  const main = el("div");
+  for (const seg of pack.segments) {
+    const s = el("span", "vseg"); s.dataset.n = seg.n;
+    s.append(words(seg.he, seg.n, false));
+    main.append(s, document.createTextNode(" "));
+  }
+  const { inner, outer } = sides();
+  // As wide as the screen allows, up to a book's page; then closer, if double-tapped.
+  const width = Math.max(300, Math.min($("vilna").clientWidth - 10, 640)) * vilnaZoom;
+  const k = (width / 360) * (S.settings.scale || 1);
+  const px = (v) => (v * k).toFixed(2) + "px";
+  const cs = getComputedStyle(document.documentElement);
+  const host = el("div", "vilna-host");
+  box.replaceChildren(host);
+  const r = DAFR(host, {
+    contentWidth: width + "px", mainWidth: "46%",
+    padding: { vertical: px(7), horizontal: px(10) },
+    fontFamily: { main: cs.getPropertyValue("--square").trim(), inner: cs.getPropertyValue("--cfont").trim() || "serif",
+      outer: cs.getPropertyValue("--cfont").trim() || "serif" },
+    fontSize: { main: px(13), side: px(8.6) }, lineHeight: { main: px(18.5), side: px(12.4) },
+  });
+  r.render(main.innerHTML, vilnaComments(inner), vilnaComments(outer), p && p.amud === "b" ? "b" : "a");
+  const api = window.API || {};
+  const open = $("scan-open");
+  const page = api.scan_page && api.scan_page(pack.ref);
+  if (page) open.href = page; else open.removeAttribute("href");
+  for (const node of box.querySelectorAll(".vseg, .vc")) node.classList.toggle("on", +node.dataset.n === S.line);
+  markRead(null);
 }
+// A tap on a line of the gemara: that line; on a comment: that line, and the
+// comment opened. Two taps: closer, at the place tapped; again: the whole page.
+// (A tap waits a moment for a second, so a double-tap only zooms.)
+let vilnaTap = null;
+function vilnaAct(target) {
+  const c = target.closest && target.closest(".vc");
+  if (c) { selectLine(+c.dataset.n, { scroll: "side" }); openSources(+c.dataset.n, c.dataset.ref); return; }
+  const g = target.closest && target.closest(".vseg");
+  if (g) selectLine(+g.dataset.n, { scroll: "side" });
+}
+function vilnaZoomAt(e) {
+  const box = $("vilna"), r = box.getBoundingClientRect();
+  const fx = (e.clientX - r.left + box.scrollLeft) / box.scrollWidth, fy = (e.clientY - r.top + box.scrollTop) / box.scrollHeight;
+  vilnaZoom = vilnaZoom > 1 ? 1 : 1.8;
+  renderVilna().then(() => {
+    box.scrollLeft = fx * box.scrollWidth - (e.clientX - r.left);
+    box.scrollTop = fy * box.scrollHeight - (e.clientY - r.top);
+  });
+}
+$("vilna").addEventListener("click", (e) => {
+  if (e.target.closest("a")) return;                               // the link to HebrewBooks
+  if (vilnaTap) { clearTimeout(vilnaTap); vilnaTap = null; vilnaZoomAt(e); return; }
+  const target = e.target;
+  vilnaTap = setTimeout(() => { vilnaTap = null; vilnaAct(target); }, 280);
+});
+
+// Laid out to the width it has: again when that changes (a phone turned on its side).
+let vilnaWidth = 0;
+new ResizeObserver(() => {
+  const w = $("vilna").clientWidth;
+  if (S.pack && S.settings.view === "vilna" && !$("vilna").hidden && Math.abs(w - vilnaWidth) > 4) { vilnaWidth = w; renderVilna(); }
+}).observe($("vilna"));
 
 // Your notes: a note mark on the line each belongs to; tap to read it.
 async function drawNotes(fresh) {
@@ -603,13 +682,13 @@ function selectLine(n, opts) {
   const max = S.pack.segments.length;
   S.line = Math.min(Math.max(1, n), max);
   remember("line." + S.pack.ref, S.line);        // to pick up at this line next time
-  for (const node of document.querySelectorAll(".seg, .line, .c"))
+  for (const node of document.querySelectorAll(".seg, .line, .c, .vseg, .vc"))
     node.classList.toggle("on", +node.dataset.n === S.line);
   const sec = sectionOf(S.line);
   $("where").textContent = "שורה " + S.line + " מתוך " + max +
     (sec && sec.label ? " · " + sec.label + " (" + sec.from + "–" + sec.to + ")" : "");
 
-  const main = S.settings.view === "daf" ? $("col-gemara") : $("linear");
+  const main = S.settings.view === "daf" ? $("col-gemara") : S.settings.view === "vilna" ? $("vilna") : $("linear");
   const node = main.querySelector('[data-n="' + S.line + '"]');
   if (S.settings.view === "lin" && node && opts.scroll !== "top")
     // Its explanation opens below it: once it has, keep both in view.
@@ -3123,8 +3202,8 @@ function openView() {
     };
     // The four ways to see the page, as one choice: the scan, the page's shape
     // in text, Steinsaltz, and the pointed gemara alone.
-    const looks = [["img", "מצולם"], ["daf", "צורת הדף"], ["stz", "שטיינזלץ"], ["nikud", "מנוקד"]];
-    const look = () => (S.settings.view === "img" ? "img" : S.settings.view === "daf" ? "daf"
+    const looks = [["vilna", "וילנא"], ["daf", "צורת הדף"], ["stz", "שטיינזלץ"], ["nikud", "מנוקד"]];
+    const look = () => (S.settings.view === "vilna" ? "vilna" : S.settings.view === "daf" ? "daf"
       : S.settings.explain === "off" ? "nikud" : "stz");
     const lookBox = el("div", "set view-set"), lookRow = el("div", "opts");
     for (const [value, text] of looks) {
@@ -3132,7 +3211,7 @@ function openView() {
       b.dataset.look = value;
       b.setAttribute("aria-pressed", String(look() === value));
       b.onclick = () => {
-        if (value === "img" || value === "daf") S.settings.view = value;
+        if (value === "vilna" || value === "daf") S.settings.view = value;
         else { S.settings.view = "lin"; S.settings.explain = value === "nikud" ? "off" : "stz"; }
         saveSettings();
         for (const x of lookRow.children) x.setAttribute("aria-pressed", String(x === b));
@@ -3158,7 +3237,7 @@ function openView() {
 }
 function applyScale() {
   document.documentElement.style.setProperty("--scale", S.settings.scale || 1);
-  if (S.pack && S.settings.view === "img" && !$("scan").hidden) renderScan();     // the picture is drawn to size
+  if (S.pack && S.settings.view === "vilna" && !$("vilna").hidden) renderVilna();   // laid out to the letter size
 }
 
 function openSettings() {
@@ -3202,7 +3281,7 @@ function openSettings() {
         "מוסיף כמה שניות וכמה אגורות לשאלה."),
       choice("language", "שפת התשובה", [["en", "English"], ["he", "עברית"], ["auto", "כמוני"]],
         "באנגלית הוא מצטט את הגמרא בעברית, בתוך המשפט — כמו שמדברים בבית המדרש."),
-      choice("view", "תצוגת הדף", [["img", "מצולם — ש״ס וילנא"], ["daf", "צורת הדף"], ["lin", "שטיינזלץ, מנוקד"]]),
+      choice("view", "תצוגת הדף", [["vilna", "וילנא"], ["daf", "צורת הדף"], ["lin", "שטיינזלץ, מנוקד"]]),
       choice("script", "כתב רש״י", [["plain", "בלי — הכול באותיות רגילות"], ["page", "רש״י ותוספות שעל הדף"],
         ["all", "כל המפרשים"]], "האותיות שבהן נדפסו המפרשים. רגילות קלות יותר לקריאה."),
       choice("translate", "תרגום (בתצוגת שטיינזלץ)", [[false, "בלי"], [true, "עם תרגום"]]),
@@ -3238,7 +3317,7 @@ $("open-view").onclick = () => (S.panel === "view" ? closePanel() : openView());
 $("open-settings-tab").onclick = () => (S.panel === "settings" ? closePanel() : openSettings());
 $("v-daf").onclick = () => { S.settings.view = "daf"; saveSettings(); if (S.pack) { render(); selectLine(S.line); } };
 $("v-lin").onclick = () => { S.settings.view = "lin"; saveSettings(); if (S.pack) { render(); selectLine(S.line); } };
-$("v-img").onclick = () => { S.settings.view = "img"; saveSettings(); if (S.pack) { render(); selectLine(S.line); } };
+$("v-img").onclick = () => { S.settings.view = "vilna"; saveSettings(); if (S.pack) { render(); selectLine(S.line); } };
 
 /* ----------------------------------------------------------- keys & touch */
 

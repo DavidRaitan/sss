@@ -818,3 +818,19 @@ to the mishna the gemara is on, brings its text, and recaps the pages since.
 - HebrewBooks' tractate numbers, checked against live links: Vilna order
   1-37, Shekalim 5, Kinnim/Tamid/Middot under Meilah (36), Niddah 37 (they
   were 37-40 before, wrongly).
+
+**74. וילנא: the page laid out as printed, from its own text.**
+- The scan from HebrewBooks stayed blank on the phone: HebrewBooks refuses
+  servers, and will not be shown inside another site. So the fourth view is
+  no longer a picture: it is the page laid out as the Vilna Shas lays it out
+  -- the gemara in the middle, Rashi toward the binding, Tosafot outside,
+  wrapping around it, sides swapping between amud א and ב -- by daf-renderer
+  (MIT, shipped with the app), from Sefaria's text. Called וילנא.
+- Being text, it is in the app's ink and paper (dark mode too), the line you
+  are on is lit, the words you read are followed, a tap selects a line or
+  opens a comment, and two taps zoom in where tapped (a tap waits a moment,
+  so a double-tap only zooms). It is as wide as the screen, up to a book's
+  page; the letter size scales it. The scan itself is a link, to open at
+  HebrewBooks.
+- daf-renderer read every stylesheet on the page and stopped at Google
+  Fonts', which a page may not read; patched to skip those.

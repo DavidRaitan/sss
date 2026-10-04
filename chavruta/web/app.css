@@ -804,17 +804,17 @@ button.m-title, .m-amud, .pick-head, #open-view, .scrim, button.skipnow { displa
   .gtext, .c { text-align: right; text-align-last: right; }
 }
 
-/* The page as printed: the scan from HebrewBooks, blended into the app's paper. */
-.scan { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; background: var(--paper);
-  overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
-.scan-sheet { flex: none; width: var(--scan-w, 100%); min-width: 100%; margin: 0 auto; background: var(--paper);
-  isolation: isolate; }
-/* A daf is about two parts wide to three tall. */
-.scan-sheet iframe { display: block; width: 100%; aspect-ratio: 2 / 3; height: auto; border: 0;
-  mix-blend-mode: multiply; filter: sepia(.18) contrast(1.05); }
-@media (prefers-color-scheme: dark) {
-  .scan-sheet iframe { mix-blend-mode: screen; filter: invert(1) sepia(.25) brightness(.92); }
-}
+/* וילנא: the page as the Vilna Shas lays it out. */
+.vilna { position: relative; flex: 1; min-height: 0; min-width: 0; width: 100%; overflow: auto; touch-action: manipulation; background: var(--paper); overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch; padding: 10px 5px 0; }
+.vilna-page { width: max-content; min-width: 100%; margin: 0 auto; color: var(--ink); }
+.vilna-host { margin: 0 auto; position: relative; }   /* its three texts are placed absolutely: inside this, not the page */
+.vilna .vseg { border-radius: 3px; transition: background-color 200ms; }
+.vilna .vseg.on { background: var(--glow); box-shadow: 0 0 0 2px var(--glow); }
+.vilna .vc { border-radius: 2px; }
+.vilna .vc.on { background: color-mix(in srgb, var(--glow) 70%, transparent); }
+.vilna .vdib { font-weight: 700; font-family: var(--square); }
+.vilna .w.head { font-size: 1.5em; line-height: 1; }
 .scan-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 14px 48px;
   font-size: 12px; color: var(--faint); }
 .scan-foot a { color: var(--dim); text-decoration: none; }

@@ -73,7 +73,7 @@
   <span class="seg2 hide-narrow" role="group" aria-label="תצוגה">
     <button class="btn" id="v-daf" aria-pressed="true" title="כמו בגמרא: רש״י ותוספות מסביב">צורת הדף</button>
     <button class="btn" id="v-lin" aria-pressed="false" title="מנוקד ומפוסק, עם תרגום">שטיינזלץ</button>
-    <button class="btn" id="v-img" aria-pressed="false" title="הדף כפי שנדפס (ש״ס וילנא)">מצולם</button>
+    <button class="btn" id="v-img" aria-pressed="false" title="הדף כצורתו בש״ס וילנא">וילנא</button>
   </span>
   <span class="status" id="status" title=""><span class="dot" id="dot"></span><span id="statustext"></span></span>
   <button class="btn icon" id="open-settings" title="הגדרות" aria-label="הגדרות"><svg class="ic"><use href="#i-settings"/></svg></button>
@@ -90,10 +90,10 @@
       <section class="col outer" id="col-outer" aria-label="תוספות"></section>
     </div>
     <div id="linear" class="linear" hidden></div>
-    <!-- The page as printed: the Vilna Shas, scanned, opened by the browser itself from HebrewBooks, in the app's own colours. -->
-    <div id="scan" class="scan" hidden>
-      <div class="scan-sheet" id="scan-sheet"><iframe id="scan-frame" title="הדף המצולם" referrerpolicy="no-referrer"></iframe></div>
-      <div class="scan-foot"><span>ש״ס וילנא · HebrewBooks</span><a id="scan-open" target="_blank" rel="noopener">לא מופיע? לפתוח שם ↗</a></div>
+    <!-- וילנא: the page laid out as the Vilna Shas prints it -- gemara in the middle, Rashi and Tosafot around it. -->
+    <div id="vilna" class="vilna" hidden>
+      <div class="vilna-page" id="vilna-page"></div>
+      <div class="scan-foot"><span>כצורת ש״ס וילנא</span><a id="scan-open" target="_blank" rel="noopener">הדף הסרוק ב-HebrewBooks ↗</a></div>
     </div>
     <div id="loading" class="loading">פותח את הדף…</div>
   </div>
