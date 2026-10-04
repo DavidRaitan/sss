@@ -357,14 +357,14 @@ function render() {
   renderDesk();
 }
 
-// -- וילנא: the page as the Vilna Shas lays it out ------------------------------------
-// The gemara in the middle, Rashi toward the binding and Tosafot outside,
-// wrapping around it as on the printed daf -- laid out by daf-renderer from
-// the page's own text (Sefaria), so it is in the app's ink and paper, the line
-// you are on is lit, and the words you read are followed, as everywhere else.
-// (HebrewBooks' scan cannot be shown inside the app -- it refuses to be framed
-// and refuses servers -- so the scan is a link, to open there.)
-// Double-tap: closer, at the place tapped; again: the whole page.
+// -- וילנא: the page itself, as the Vilna Shas printed it -----------------------------
+// The scan of the Romm printing (1880-86), which Sefaria keeps for every amud,
+// in the app's paper and ink: its yellowed paper becomes the page's own and
+// its ink the app's (in the dark, the other way round). Double-tap: closer,
+// at the place tapped; again: the whole page. Two fingers: as close as you like.
+// If the scan cannot be had (offline, or an amud it lacks), the same page is
+// laid out from its text instead -- the gemara in the middle, Rashi toward the
+// binding and Tosafot outside, by daf-renderer -- where a line can be tapped.
 let DAFR = null, vilnaZoom = 1, vilnaToken = 0;
 const vilnaComments = (names) => {
   const out = [];
@@ -384,9 +384,49 @@ const vilnaComments = (names) => {
       }
   return out.join(" ");
 };
-async function renderVilna() {
+const scanFor = (ref) => {
+  if (window.API && window.API.scan_image) return window.API.scan_image(ref);
+  const m = /^(.*) (\d+[ab])$/.exec(ref || "");       // the Python server: straight from Sefaria
+  const url = m && "https://manuscripts.sefaria.org/vilna-romm/" + m[1].replace(/ /g, "_") + "_" + m[2] + ".jpg";
+  return url && { direct: url, proxied: null };
+};
+let vilnaText = null;                                   // the ref whose scan could not be had
+function renderVilna() {
+  const pack = S.pack, scan = vilnaText === pack.ref ? null : scanFor(pack.ref);
+  if (!scan) return renderVilnaText();
+  const token = ++vilnaToken, box = $("vilna-page");
+  let img = box.querySelector("img.scan");
+  $("vilna").classList.add("is-scan");
+  if (!img || img.dataset.ref !== pack.ref) {
+    img = el("img", "scan"); img.alt = runnerText(pack.ref); img.dataset.ref = pack.ref;
+    img.decoding = "async"; img.draggable = false;
+    const tries = [scan.direct, scan.proxied].filter(Boolean);
+    img.addEventListener("error", () => {
+      if (!img.isConnected) return;                       // a page already turned
+      if (tries.length) { img.src = tries.shift(); return; }
+      vilnaText = pack.ref;                              // no scan: the page from its text
+      if (S.pack === pack && S.settings.view === "vilna") renderVilna();
+    });
+    img.addEventListener("load", () => { img.classList.add("in"); });
+    img.src = tries.shift();
+    box.replaceChildren(img);
+  }
+  sizeScan();
+  const open = $("scan-open");
+  open.textContent = "הדף בגודל מלא ↗"; open.href = scan.direct;
+  $("scan-credit").textContent = "דפוס וילנא, האלמנה והאחים ראם · הספרייה הלאומית, דרך ספריא";
+  return Promise.resolve();
+}
+function sizeScan() {
+  const img = $("vilna-page").querySelector("img.scan");
+  if (!img) return;
+  const fit = Math.max(280, Math.min($("vilna").clientWidth - 10, 900));
+  img.style.width = Math.round(fit * vilnaZoom) + "px";
+}
+async function renderVilnaText() {
   const token = ++vilnaToken, pack = S.pack, p = parseRef(pack.ref);
   const box = $("vilna-page");
+  $("vilna").classList.remove("is-scan");
   if (!DAFR) DAFR = (await import("./vendor/daf-renderer/daf-renderer.esm.js")).default;
   if (document.fonts && document.fonts.ready) await document.fonts.ready;   // it measures the text: fonts first
   if (token !== vilnaToken || S.pack !== pack) return;
@@ -416,7 +456,9 @@ async function renderVilna() {
   const api = window.API || {};
   const open = $("scan-open");
   const page = api.scan_page && api.scan_page(pack.ref);
+  open.textContent = "הדף הסרוק ב-HebrewBooks ↗";
   if (page) open.href = page; else open.removeAttribute("href");
+  $("scan-credit").textContent = "כצורת ש״ס וילנא";
   for (const node of box.querySelectorAll(".vseg, .vc")) node.classList.toggle("on", +node.dataset.n === S.line);
   markRead(null);
 }
@@ -430,21 +472,46 @@ function vilnaAct(target) {
   const g = target.closest && target.closest(".vseg");
   if (g) selectLine(+g.dataset.n, { scroll: "side" });
 }
+// Scrolled from the left edge, whichever way the page runs (in Hebrew, scrollLeft counts from the right).
+const fromLeft = (box) => getComputedStyle(box).direction === "rtl" ? box.scrollWidth - box.clientWidth : 0;
+const leftOf = (box) => box.scrollLeft + fromLeft(box);
+const scrollToLeft = (box, x) => { box.scrollLeft = x - fromLeft(box); };
 function vilnaZoomAt(e) {
   const box = $("vilna"), r = box.getBoundingClientRect();
-  const fx = (e.clientX - r.left + box.scrollLeft) / box.scrollWidth, fy = (e.clientY - r.top + box.scrollTop) / box.scrollHeight;
-  vilnaZoom = vilnaZoom > 1 ? 1 : 1.8;
+  const fx = (e.clientX - r.left + leftOf(box)) / box.scrollWidth, fy = (e.clientY - r.top + box.scrollTop) / box.scrollHeight;
+  vilnaZoom = vilnaZoom > 1 ? 1 : box.classList.contains("is-scan") ? 2.2 : 1.8;
   renderVilna().then(() => {
-    box.scrollLeft = fx * box.scrollWidth - (e.clientX - r.left);
+    scrollToLeft(box, fx * box.scrollWidth - (e.clientX - r.left));
     box.scrollTop = fy * box.scrollHeight - (e.clientY - r.top);
   });
 }
 $("vilna").addEventListener("click", (e) => {
-  if (e.target.closest("a")) return;                               // the link to HebrewBooks
+  if (e.target.closest("a")) return;                               // the link to the scan
   if (vilnaTap) { clearTimeout(vilnaTap); vilnaTap = null; vilnaZoomAt(e); return; }
   const target = e.target;
   vilnaTap = setTimeout(() => { vilnaTap = null; vilnaAct(target); }, 280);
 });
+
+// Two fingers on the scan: as close as they spread, about the point between them.
+let pinch = null;
+const spread = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+$("vilna").addEventListener("touchstart", (e) => {
+  if (e.touches.length !== 2 || !$("vilna").classList.contains("is-scan")) return;
+  const box = $("vilna"), r = box.getBoundingClientRect();
+  const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2 - r.left, cy = (e.touches[0].clientY + e.touches[1].clientY) / 2 - r.top;
+  pinch = { d: spread(e.touches), zoom: vilnaZoom, cx, cy,
+    fx: (cx + leftOf(box)) / box.scrollWidth, fy: (cy + box.scrollTop) / box.scrollHeight };
+}, { passive: true });
+$("vilna").addEventListener("touchmove", (e) => {
+  if (!pinch || e.touches.length !== 2) return;
+  e.preventDefault();
+  const box = $("vilna");
+  vilnaZoom = Math.min(4, Math.max(1, pinch.zoom * spread(e.touches) / pinch.d));
+  sizeScan();
+  scrollToLeft(box, pinch.fx * box.scrollWidth - pinch.cx);
+  box.scrollTop = pinch.fy * box.scrollHeight - pinch.cy;
+}, { passive: false });
+$("vilna").addEventListener("touchend", (e) => { if (e.touches.length < 2) pinch = null; });
 
 // Laid out to the width it has: again when that changes (a phone turned on its side).
 let vilnaWidth = 0;

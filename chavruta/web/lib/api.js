@@ -957,6 +957,16 @@ export function scan_url(ref) {
   return route("https://hebrewbooks.org/shas.aspx?mesechta=" + HEBREWBOOKS[m[1]] + "&daf=" + m[2] +
     (m[3] === "b" ? "b" : "") + "&format=pdf", { proxy: false });
 }
+/** The Vilna Shas itself, scanned (the Romm printing, 1880-86, from the National
+ *  Library's copy), as Sefaria keeps it: one picture per amud, at an address
+ *  made from the ref. Sefaria lets anyone show it, so the browser loads it
+ *  straight from there; and, if that fails, through the Worker. */
+export function scan_image(ref) {
+  const m = /^(.*) (\d+[ab])$/.exec(ref || "");
+  if (!m) return null;
+  const url = "https://manuscripts.sefaria.org/vilna-romm/" + m[1].replace(/ /g, "_") + "_" + m[2] + ".jpg";
+  return { direct: route(url, { proxy: false }), proxied: route(url) };
+}
 /** The same amud's page on HebrewBooks itself, to open in a new tab. */
 export function scan_page(ref) {
   const u = scan_url(ref);

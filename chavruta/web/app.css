@@ -809,6 +809,16 @@ button.m-title, .m-amud, .pick-head, #open-view, .scrim, button.skipnow { displa
   -webkit-overflow-scrolling: touch; padding: 10px 5px 0; }
 .vilna-page { width: max-content; min-width: 100%; margin: 0 auto; color: var(--ink); }
 .vilna-host { margin: 0 auto; position: relative; }   /* its three texts are placed absolutely: inside this, not the page */
+/* The scan: its paper made the app's, its ink the app's ink; in the dark, light on dark. */
+.vilna.is-scan { touch-action: pan-x pan-y; }
+.vilna img.scan { display: block; margin: 0 auto; max-width: none; aspect-ratio: 1530 / 2450; height: auto;
+  background: color-mix(in srgb, var(--ink) 4%, var(--paper)); opacity: 0; transition: opacity 260ms;
+  filter: grayscale(1) sepia(.22) contrast(1.55) brightness(1.1); mix-blend-mode: multiply;
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.vilna img.scan.in { opacity: 1; background: none; }
+@media (prefers-color-scheme: dark) {
+  .vilna img.scan { filter: grayscale(1) contrast(1.6) brightness(1.1) invert(1) sepia(.4) brightness(.92); mix-blend-mode: screen; }
+}
 .vilna .vseg { border-radius: 3px; transition: background-color 200ms; }
 .vilna .vseg.on { background: var(--glow); box-shadow: 0 0 0 2px var(--glow); }
 .vilna .vc { border-radius: 2px; }

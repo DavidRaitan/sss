@@ -90,7 +90,8 @@ def page_config(sef):
     return "window.CHAVRUTA_CONFIG = %s;" % json.dumps({
         "zmanim": site + "/zmanim", "wikisource": site + "/w/api.php",
         "web_rewrite": {"https://halachayomit.co.il": site + "/hy", "https://www.dafyomi.co.il": site + "/daf",
-                        "https://hebrewbooks.org/shas.aspx": site + "/hb/shas.aspx"}})
+                        "https://hebrewbooks.org/shas.aspx": site + "/hb/shas.aspx",
+                        "https://manuscripts.sefaria.org": site + "/ms"}})
 
 
 def start_stack():
@@ -178,7 +179,30 @@ def phone(browser, app, check, shots, sef):
           == ["וילנא", "צורת הדף", "שטיינזלץ", "מנוקד"], str(page.locator("#panel .view-set .btn[data-look]").all_inner_texts()))
     page.tap("#panel .view-set .btn[data-look='vilna']")
     page.tap("#close-panel")
-    # וילנא: the page as the Vilna Shas lays it out -- gemara in the middle, Rashi and Tosafot around it.
+    # וילנא: the page itself -- the Vilna Shas scan, in the app's paper and ink.
+    page.wait_for_selector("#vilna img.scan.in", timeout=15000)
+    check("phone: וילנא is the scanned page of this amud",
+          page.get_attribute("#vilna img.scan", "src").endswith("/ms/vilna-romm/Berakhot_3b.jpg")
+          and page.evaluate("document.querySelector('#vilna img.scan').naturalWidth") > 0,
+          page.get_attribute("#vilna img.scan", "src"))
+    check("phone: …tinted to the app's paper", "multiply" == page.evaluate(
+          "getComputedStyle(document.querySelector('#vilna img.scan')).mixBlendMode"))
+    sw = box("#vilna img.scan")["width"]
+    check("phone: …the whole page across the screen", 330 < sw <= 390 and
+          page.evaluate("document.documentElement.scrollWidth") <= 390, str(sw))
+    shot("p2-vilna-scan")
+    page.dblclick("#vilna img.scan", position={"x": 300, "y": 160})
+    page.wait_for_timeout(300)
+    check("phone: double-tap brings it closer", box("#vilna img.scan")["width"] > 2 * sw
+          and -500 < box("#vilna img.scan")["x"] < -150, str(box("#vilna img.scan")))   # at the place tapped, not an edge
+    shot("p2-vilna-close")
+    page.dblclick("#vilna img.scan", position={"x": 300, "y": 160})
+    page.wait_for_timeout(300)
+    check("phone: …and again, the whole page", abs(box("#vilna img.scan")["width"] - sw) < 2)
+    check("phone: …and a link to the full scan", "vilna-romm/Berakhot_3b.jpg" in (page.get_attribute("#scan-open", "href") or ""))
+    # Without the scan (offline, or an amud it lacks): the same page laid out from its text.
+    page.route(lambda u: "vilna-romm" in u, lambda r: r.abort())
+    page.evaluate("vilnaText = null; $('vilna-page').replaceChildren(); renderVilna()")
     page.wait_for_selector("#vilna .vseg", timeout=15000)
     page.wait_for_timeout(400)
     lines, comments = page.evaluate("[document.querySelectorAll('#vilna .vseg').length, document.querySelectorAll('#vilna .vc').length]")
@@ -193,6 +217,7 @@ def phone(browser, app, check, shots, sef):
     check("phone: a tap on its line selects it", page.evaluate("S.line") == 5 and
           page.locator("#vilna .vseg.on").count() == 1)
     check("phone: …and the scan is a link to HebrewBooks", "mesechta=1&daf=3b" in (page.get_attribute("#scan-open", "href") or ""))
+    page.unroute_all()
     page.evaluate("selectLine(1)")                 # back to a line that has commentaries on this page
     page.tap("#open-view")
     page.wait_for_selector("#over.open .view-set")

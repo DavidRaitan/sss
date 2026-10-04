@@ -834,3 +834,20 @@ to the mishna the gemara is on, brings its text, and recaps the pages since.
   HebrewBooks.
 - daf-renderer read every stylesheet on the page and stopped at Google
   Fonts', which a page may not read; patched to skip those.
+
+## 75. וילנא is the scanned page, from Sefaria
+
+- Sefaria keeps the scan of the Romm Vilna printing (1880-86, the National
+  Library's copy) for every amud, at an address made from the ref
+  (manuscripts.sefaria.org/vilna-romm/Bava_Kamma_83b.jpg), and lets any page
+  show it. So וילנא is now the printed page itself: the browser loads the
+  picture straight from there (through the Worker if that fails), no server
+  and no PDF.
+- Tinted, not edited: grayscale, a little warmth and contrast, multiplied onto
+  the app's paper, so the yellowed paper becomes the page's own; in the dark,
+  inverted and screened, light ink on the dark page.
+- Double-tap zooms in where tapped and back; two fingers zoom as far as they
+  spread. Zooming keeps the tapped place under the finger in a right-to-left
+  page too (scrollLeft counts from the right there; it did not, before).
+- If the scan cannot be had (offline, an amud it lacks), the page is laid out
+  from its text by daf-renderer, as in 74, where a line can be tapped.

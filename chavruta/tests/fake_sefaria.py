@@ -150,6 +150,18 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             return self.wfile.write(body)
+        if url.path.startswith("/ms/vilna-romm/"):
+            # Stands in for Sefaria's scans of the Vilna Shas: one stand-in picture for Berakhot, none for the rest.
+            SCANS.append({"scan": url.path.rsplit("/", 1)[-1]})
+            if not url.path.rsplit("/", 1)[-1].startswith("Berakhot_"):
+                return self.reply({"error": "no such scan"}, 404)
+            with open(os.path.join(HERE, "vilna_sample.jpg"), "rb") as handle:
+                body = handle.read()
+            self.send_response(200)
+            self.send_header("Content-Type", "image/jpeg")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            return self.wfile.write(body)
         if url.path.startswith("/daf/"):
             # Stands in for a D.A.F. point-by-point outline page (English).
             page = ("<html><head><title>POINT BY POINT OUTLINE - %s</title></head><body>"
