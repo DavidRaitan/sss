@@ -835,8 +835,7 @@ to the mishna the gemara is on, brings its text, and recaps the pages since.
 - daf-renderer read every stylesheet on the page and stopped at Google
   Fonts', which a page may not read; patched to skip those.
 
-## 75. וילנא is the scanned page, from Sefaria
-
+**75. וילנא is the scanned page itself, from Sefaria.**
 - Sefaria keeps the scan of the Romm Vilna printing (1880-86, the National
   Library's copy) for every amud, at an address made from the ref
   (manuscripts.sefaria.org/vilna-romm/Bava_Kamma_83b.jpg), and lets any page
