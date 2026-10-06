@@ -2433,57 +2433,67 @@ function syncTabs() {
 }
 
 // The conversation area: drag its top edge for more or less of it. Kept.
-// On a phone it also snaps smaller: pulled down a little, only the answer's
-// own words, a few lines that scroll with the voice (no "last time", no
-// review buttons, no queue); pulled all the way down, nothing -- you speak
-// and listen, and only the toolbar is left. A swipe on the area does the
-// same, a step at a time; pulled (or swiped) up, it comes back.
-const TALK_MODES = ["hidden", "small", "full"];
-function talkMode(mode) {
-  if (!TALK_MODES.includes(mode)) mode = "full";
-  document.body.classList.toggle("talk-small", mode === "small");
-  document.body.classList.toggle("talk-hidden", mode === "hidden");
-  S.talkMode = mode;
+// On a phone it goes all the way: it follows the finger to any height, and
+// when it is low only the answer's own words are left (no "last time",
+// review buttons or the question repeated). It snaps only at the ends: let go
+// near the bottom, or flick it down, and it is gone -- you speak and listen,
+// only the toolbar is left; flick it up (or pull it) and it comes back as it was.
+const TALK_SMALL = 120, TALK_GONE = 36, FLICK = 0.8;                 // px, px, px per ms
+function talkHeight(h) {
+  const max = Math.round(innerHeight * 0.7);
+  h = Math.round(Math.min(Math.max(h, 0), max));
+  const phone = PHONE.matches;
+  document.body.classList.toggle("talk-sized", phone);
+  document.body.classList.toggle("talk-hidden", phone && h < 8);
+  document.body.classList.toggle("talk-small", phone && h >= 8 && h < TALK_SMALL);
+  if (h >= 8) document.documentElement.style.setProperty("--talk-h", (phone ? h : Math.max(h, 70)) + "px");
+  S.talkH = h;
 }
-const talkStep = (by) => { talkMode(TALK_MODES[Math.max(0, Math.min(2, TALK_MODES.indexOf(S.talkMode || "full") + by))]);
-  remember("talkmode", S.talkMode); };
 (function sizeTalk() {
   const grip = $("foot-grip"), root = document.documentElement.style;
-  const apply = (px) => root.setProperty("--talk-h", Math.round(Math.min(Math.max(px, 70), innerHeight * 0.7)) + "px");
-  const saved = +(recall("talk") || 0);
-  if (saved) apply(saved);
-  talkMode(PHONE.matches ? recall("talkmode") : "full");
-  let startY = 0, startH = 0, startMode = "full";
+  const keep = () => { remember("talk", S.talkH || 0); if (S.talkH >= TALK_GONE) remember("talkback", S.talkH); };
+  const back = () => +(recall("talkback") || 0) || Math.round(innerHeight * 0.22);
+  const saved = recall("talk");
+  if (PHONE.matches && saved !== null && saved !== undefined && saved !== "") talkHeight(+saved);
+  else if (+saved) talkHeight(+saved);
+  const settle = (h) => { document.body.classList.add("talk-settling"); talkHeight(h); keep();
+    setTimeout(() => document.body.classList.remove("talk-settling"), 260); };
+  let startY = 0, startH = 0, trail = [];
   grip.addEventListener("pointerdown", (e) => {
-    startY = e.clientY; startMode = S.talkMode || "full";
-    startH = startMode === "full" ? $("talk").getBoundingClientRect().height : startMode === "small" ? 60 : 0;
+    startY = e.clientY; trail = [[e.timeStamp, e.clientY]];
+    startH = document.body.classList.contains("talk-hidden") ? 0 : $("talk").getBoundingClientRect().height;
   });
   onDrag(grip, "resizing-v", (ev) => {
-    const h = startH + (startY - ev.clientY);
-    if (!PHONE.matches) return apply(h);
-    // The phone: snap as it is dragged -- nothing, a few lines, or as tall as pulled.
-    talkMode(h < 28 ? "hidden" : h < 95 ? "small" : "full");
-    if (S.talkMode === "full") apply(Math.max(h, 110));
+    trail.push([ev.timeStamp, ev.clientY]); if (trail.length > 6) trail.shift();
+    talkHeight(startH + (startY - ev.clientY));
   }, () => {
-    remember("talkmode", S.talkMode || "full");
-    remember("talk", parseInt(getComputedStyle(document.documentElement).getPropertyValue("--talk-h"), 10) || "");
+    if (!PHONE.matches) return keep();
+    // How fast it was moving as it was let go (down is positive).
+    const [t0, y0] = trail[0], [t1, y1] = trail[trail.length - 1], v = t1 > t0 ? (y1 - y0) / (t1 - t0) : 0;
+    if (v > FLICK || S.talkH < TALK_GONE) settle(0);
+    else if (v < -FLICK && S.talkH < back()) settle(back());
+    else keep();
   });
-  grip.addEventListener("dblclick", () => { root.removeProperty("--talk-h"); remember("talk", ""); talkMode("full");
-    remember("talkmode", "full"); });
-  // A swipe on the conversation or the toolbar: down a step (when the words are at their top), up a step.
+  grip.addEventListener("dblclick", () => { root.removeProperty("--talk-h"); remember("talk", ""); remember("talkback", "");
+    ["talk-sized", "talk-small", "talk-hidden"].forEach((c) => document.body.classList.remove(c)); S.talkH = null; });
+  // A flick on the conversation or the toolbar: down, it goes (when its words are at their top); up, it comes back.
   let sw = null;
   $("foot").addEventListener("touchstart", (e) => {
     if (!PHONE.matches || e.touches.length !== 1 || e.target.closest("#foot-grip")) return (sw = null);
     const t = e.touches[0], inTalk = e.target.closest("#talk, .queue");
-    sw = { x: t.clientX, y: t.clientY, at: Date.now(), top: !inTalk || inTalk.scrollTop <= 0 };
+    sw = { x: t.clientX, y: t.clientY, at: e.timeStamp, top: !inTalk || inTalk.scrollTop <= 0,
+      lx: t.clientX, ly: t.clientY, lt: e.timeStamp };
+  }, { passive: true });
+  $("foot").addEventListener("touchmove", (e) => {
+    if (sw && e.touches.length === 1) Object.assign(sw, { lx: e.touches[0].clientX, ly: e.touches[0].clientY, lt: e.timeStamp });
   }, { passive: true });
   $("foot").addEventListener("touchend", (e) => {
     if (!sw) return;
-    const t = e.changedTouches[0], dx = t.clientX - sw.x, dy = t.clientY - sw.y, quick = Date.now() - sw.at < 700;
+    const dx = sw.lx - sw.x, dy = sw.ly - sw.y, v = dy / Math.max(1, sw.lt - sw.at);
     const was = sw; sw = null;
-    if (!quick || Math.abs(dy) < 45 || Math.abs(dx) > Math.abs(dy) * 0.6) return;
-    if (dy > 0 && was.top) talkStep(-1);
-    else if (dy < 0 && S.talkMode !== "full") talkStep(1);
+    if (Math.abs(dy) < 50 || Math.abs(dx) > Math.abs(dy) * 0.6 || Math.abs(v) < FLICK) return;
+    if (dy > 0 && was.top && !document.body.classList.contains("talk-hidden")) settle(0);
+    else if (dy < 0 && (document.body.classList.contains("talk-hidden") || (S.talkH || 1e9) < back())) settle(back());
   }, { passive: true });
 })();
 // ✕ sits outside the scrolling panel, so it is always in reach.

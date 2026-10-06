@@ -871,8 +871,11 @@ to the mishna the gemara is on, brings its text, and recaps the pages since.
   is open, it offers a refresh. Settings shows the version's date.
 
 **77. The conversation on a phone, pulled down out of the way.**
-- Its top edge (or a swipe on it) snaps to three sizes: whole (as before);
-  small -- only the answer's own words, three lines scrolling with the voice,
-  no "last time", review buttons, state line or queue; and hidden -- nothing
-  above the toolbar: speak and listen. Swiped or pulled up, a step at a time,
-  it comes back. Kept between visits. The computer keeps its free handle.
+- Its top edge follows the finger to any height, to the pixel -- no steps
+  (snapping to three sizes was tried first: "too sensitive, either up or
+  down"). Low (under ~120 px), only the answer's own words are left: no "last
+  time", review buttons or the question repeated.
+- It snaps only at the ends: let go near the bottom, or flicked down hard,
+  it is gone -- nothing above the toolbar, speak and listen; flicked up (on
+  the toolbar too), it comes back as tall as it was. Kept between visits.
+  The computer keeps its free handle.

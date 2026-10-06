@@ -657,11 +657,12 @@ button.m-title, .m-amud, .pick-head, #open-view, .scrim, button.skipnow { displa
   .foot-grip { top: -10px; height: 20px; }
   .foot-grip::after { top: 8px; }
 
-  /* Pulled down a little: only the answer's words, a few lines, scrolling with the voice. */
-  body.talk-small .state, body.talk-small .queue, body.talk-small #chips, body.talk-small #mine,
-  body.talk-small #asked, body.talk-small .reply.hint { display: none; }
-  body.talk-small .talk { max-height: calc(16.5px * 1.6 * 3 + 16px); padding-top: 8px; }
-  /* Pulled all the way down: nothing above the toolbar -- speak and listen. */
+  /* Sized by hand: as tall as pulled, to the pixel (it follows the finger); low, only the answer's words. */
+  body.talk-sized .talk { height: var(--talk-h); max-height: none; }
+  body.talk-settling .talk { transition: height 240ms cubic-bezier(.2, .8, .3, 1); }
+  body.talk-small #chips, body.talk-small #mine, body.talk-small #asked, body.talk-small .reply.hint { display: none; }
+  body.talk-small .talk { padding-top: 8px; }
+  /* Let go near the bottom, or flicked down: nothing above the toolbar -- speak and listen. */
   body.talk-hidden .state, body.talk-hidden .talk, body.talk-hidden .queue { display: none; }
   body.talk-hidden .foot-grip::after { opacity: 1; }
 

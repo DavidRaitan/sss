@@ -333,41 +333,47 @@ def phone(browser, app, check, shots, sef):
           and page.locator("#news-act").is_visible())
     page.tap("#news-x")
     page.unroute("**/x/version")
-    # The conversation, pulled down: first only the answer's words, then nothing; swiped up, back again.
+    # The conversation, pulled by its edge: it follows the finger to any height (no snapping), low it keeps
+    # only the answer's words; let go near the bottom, or flicked, it is gone; flicked up, it comes back.
     page.evaluate("closePanel(); showReply('הנה שורה ראשונה של תשובה. ועוד אחת. ועוד שלישית. ורביעית, שגוללת.')")
     page.wait_for_timeout(200)
     vis = lambda sel: page.locator(sel).is_visible()
     check("phone: the whole conversation to start with", vis("#reply") and vis("#chips") and vis("#state"))
-    g = box("#foot-grip"); gx, gy = g["x"] + g["width"] / 2, g["y"] + g["height"] / 2
-    touch("touchStart", [(gx, gy)])
-    for k in range(1, 6):
-        touch("touchMove", [(gx, gy + 12 * k)])
-    touch("touchEnd", [])
-    page.wait_for_timeout(200)
-    check("phone: pulled down a little, only the answer's words", page.evaluate("S.talkMode") == "small"
-          and vis("#reply") and not vis("#chips") and not vis("#state") and box("#talk")["height"] < 100,
-          str([page.evaluate("S.talkMode"), box("#talk")]))
+    def drag(dy, steps=10, ms=40):
+        g = box("#foot-grip"); gx, gy = g["x"] + g["width"] / 2, g["y"] + g["height"] / 2
+        touch("touchStart", [(gx, gy)])
+        for k in range(1, steps + 1):
+            page.wait_for_timeout(ms)
+            touch("touchMove", [(gx, gy + dy * k / steps)])
+        touch("touchEnd", [])
+        page.wait_for_timeout(350)
+    h0 = box("#talk")["height"]
+    drag(-60)
+    h1 = box("#talk")["height"]
+    check("phone: pulled up slowly, it grows by just as much", abs(h1 - h0 - 60) < 4, str([h0, h1]))
+    drag(25)
+    check("phone: …and down a little, shrinks by just as much", abs(box("#talk")["height"] - (h1 - 25)) < 4)
+    drag(box("#talk")["height"] - 90)
+    check("phone: low, only the answer's words", abs(box("#talk")["height"] - 90) < 4 and vis("#reply")
+          and not vis("#chips"), str(box("#talk")))
     shot("p4-talk-small")
-    g = box("#foot-grip"); gx, gy = g["x"] + g["width"] / 2, g["y"] + g["height"] / 2
-    touch("touchStart", [(gx, gy)])
-    for k in range(1, 8):
-        touch("touchMove", [(gx, gy + 15 * k)])
-    touch("touchEnd", [])
-    page.wait_for_timeout(200)
-    check("phone: …all the way down, nothing but the toolbar", page.evaluate("S.talkMode") == "hidden"
-          and not vis("#talk") and vis("#mic"))
+    drag(70)
+    check("phone: let go near the bottom, it is gone", not vis("#talk") and vis("#mic"))
     shot("p4-talk-hidden")
     page.reload(wait_until="domcontentloaded")
     page.wait_for_function("typeof S !== 'undefined' && S.pack", timeout=20000)
-    check("phone: …and kept so next time", page.evaluate("S.talkMode") == "hidden")
+    check("phone: …and kept so next time", not vis("#talk"))
     m = box("#open-log"); sx, sy = m["x"] + m["width"] / 2, m["y"] + 5
-    for _ in range(2):
-        touch("touchStart", [(sx, sy)])
-        for k in range(1, 6):
-            touch("touchMove", [(sx, sy - 14 * k)])
-        touch("touchEnd", [])
-        page.wait_for_timeout(250)
-    check("phone: swiped up twice, the whole conversation again", page.evaluate("S.talkMode") == "full" and vis("#talk"))
+    touch("touchStart", [(sx, sy)])                 # a quick, strong flick: one movement
+    touch("touchMove", [(sx, sy - 120)])
+    touch("touchEnd", [])
+    page.wait_for_timeout(400)
+    check("phone: flicked up, back as tall as it was", vis("#talk") and abs(box("#talk")["height"] - 90) < 4,
+          str(box("#talk")))
+    drag(70, steps=1, ms=0)                          # a quick, strong flick down
+    check("phone: …and a hard flick down, gone again", not vis("#talk"))
+    drag(-140)
+    check("phone: …or pulled up by hand", abs(box("#talk")["height"] - 140) < 6, str(box("#talk")))
     check("phone: no JavaScript errors", not errors, "; ".join(errors[:3]))
     # And if something does break on the phone: it is said on the screen, and kept in the record.
     page.evaluate("setTimeout(() => { throw new Error('test-boom') })")
