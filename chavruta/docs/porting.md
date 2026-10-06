@@ -1,8 +1,9 @@
 # Porting the Python server to the browser
 
 The app moves to Cloudflare's free plan: a small Worker (worker/) holds the
-OpenAI key, reaches Sefaria and the study sites, stores the record in D1 and
-checks a passcode. Everything the Python server *decided* -- the partner, the
+OpenAI key, reaches Sefaria and the study sites, and stores the record in D1
+(there was a passcode at first; it was removed -- the Worker answers only its
+own page instead). Everything the Python server *decided* -- the partner, the
 router, the pack builder, alignment, grounding -- runs in the browser as
 JavaScript under `web/lib/`. The Python code stays the reference until the port
 passes every test it passed.

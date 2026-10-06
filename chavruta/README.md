@@ -22,11 +22,20 @@ One address for the phone and the Mac, on Cloudflare's free plan:
     ./run.sh deploy
 
 The first time it opens a browser to log in to Cloudflare, takes your OpenAI key
-from `.env`, and prints the address (`https://chavruta.<you>.workers.dev`). There
-is no passcode: the link is enough. Anyone you give the link to uses your OpenAI
+from `.env`, and prints the address — today **https://chavruta.workpages.workers.dev**.
+There is no passcode: the link is enough. Anyone you give the link to uses your OpenAI
 key, so set a monthly limit at platform.openai.com → Settings → Limits. On the phone: open it in Safari, then
-Share → **Add to Home Screen** — it opens full screen, like an app. Run
-`./run.sh deploy` again after each `git pull` to publish the new version.
+Share → **Add to Home Screen** — it opens full screen, like an app.
+
+**Updates publish themselves.** Cloudflare is connected to GitHub (Workers Builds):
+every push to the `claude/cloudflare-experiment` branch is built and live a minute or
+two later — nothing to run. The app says so: "עודכן ✓" the first time a new version
+opens, and "יש גרסה חדשה · לרענן" if one arrives while it is open; ⚙ shows the
+version's date at the bottom. If something breaks on the phone, it is written at the
+top of the screen ("משהו השתבש — …") — a screenshot of that is the quickest fix.
+
+This is a separate branch on purpose: `claude/understand-idea-l0bw9a` keeps the
+original Python version that runs on the Mac, untouched by the Cloudflare work.
 
 How it is built: the page is static; everything that thinks (the partner, the
 router, following your reading) runs in the browser (`web/lib/`). A small Worker
@@ -60,8 +69,14 @@ conversation, not a chat.
 - **Ask**: "what does the Rashba say here?", "does he really hold that, I learned the
   opposite elsewhere", "what's the halacha", "read it inside or summarise".
 - **Move by voice**: "go to daf 5 amud b" / "תעבור לדף ה עמוד ב".
-- **Interrupt** it by talking; it stops, and hears you. **⏸** (or space) pauses it
-  without talking over it; **🔊** says the last answer again.
+- **Interrupt** it by talking; it stops at once and hears you. A quick side question
+  ("wait, what's chatzot?") gets a sentence, then "as I was saying" and it goes on;
+  "no, I mean…" folds into the question; a new question is answered and the old
+  answer waits ("go back" / "תמשיך במה שאמרת" brings it back). Several things said
+  while it is still thinking are answered together, once. **⏸** (or space) pauses it
+  without talking over it; **🔊** says the last answer again. On the phone's speaker it
+  cannot listen while it talks (it would hear itself) — tap ⏸ or the mic; with
+  earbuds, just talk over it.
 - **Keep reading while it thinks.** It follows your reading at once, answers when you
   pause, and if you've read on it says which question it's answering.
 
@@ -118,9 +133,25 @@ Tur or the Rambam, which open right there.
 is: on the page, Rishonim, Acharonim, then halacha, Tanakh, parallels. **תמליל** is the
 transcript, and has a box for typing when you cannot speak.
 
-**Two ways to see the page**: *צורת הדף* — the gemara in the middle, Rashi toward the
-binding, Tosafot outside, unvocalized like the printed page — or *שטיינזלץ*, vocalized
-and punctuated with the translation under each line.
+**Five ways to see the page** (תצוגה):
+- *וילנא* — the printed page itself: the Vilna Shas scan (Romm, 1880–86, from the
+  National Library's copy, as Sefaria keeps it), painted in the app's paper and ink —
+  warm in dark mode too. Double-tap to zoom in where you tap, and again for the whole
+  page; pinch with two fingers (or the trackpad) for any size.
+- *וילנא חי* — the same page rebuilt from its text, gemara in the middle, Rashi and
+  Tosafot around it, in the app's letters: the line you are on lights up, your reading
+  is followed, and tapping a comment opens it. Shown also when the scan cannot be had.
+- *צורת הדף* — three columns, gemara with Rashi and Tosafot beside it.
+- *שטיינזלץ* — vocalized and punctuated with the explanation woven in; *מנוקד* — the
+  pointed gemara alone.
+
+**On the phone** it is built for one hand: the page fills the screen, the toolbar sits
+at the bottom (מפרשים · תמליל · the mic · תצוגה · הגדרות), and panels rise as sheets
+you can drag. While it speaks, a small strip gives ⏸ and ⏭. The conversation above the
+toolbar has a handle on its top edge: drag it to any height — low, it keeps only the
+answer's words, scrolling with the voice — and let go near the bottom (or flick it
+down) to hide it entirely and just talk; flick up to bring it back. The desk (שולחן,
+commentators side by side) is on the computer only.
 
 **Settings** (⚙): how deep it reaches on its own (the page / + Rishonim / + Acharonim),
 which language it answers in, how long it waits before answering (choose *long* if it
@@ -142,8 +173,10 @@ learn this elsewhere":
 
 ## How it is built
 
-    run.sh                    one command: set up, check, open
+    run.sh                    one command: set up, check, open, deploy
     web/                      the page, the voice loop, the panels
+    web/lib/                  the Python modules below, ported to the browser (Cloudflare version)
+    worker/                   the Cloudflare Worker: OpenAI key, Sefaria and site proxy, voice cache, D1 record
     chavruta/server.py        the local app
     chavruta/sefaria.py       fetching an amud and building its pack
     chavruta/align.py         following the reading: where on the page is the learner
@@ -167,7 +200,10 @@ Three rules are enforced in code rather than asked for in a prompt:
 3. **Silence while you read.** Reading is recognised by lining up what it heard with
    the page, and followed without a word.
 
-Tests: `./run.sh test` (unit), `python3 tests/e2e.py` (browser, needs Playwright).
+Tests: `./run.sh test` (Python unit), `node --test "tests/js/*.test.mjs"` (the browser
+port), `python3 tests/e2e.py` (browser, needs Playwright and Node: it runs the real
+Worker with `wrangler dev` against stand-ins for Sefaria and OpenAI, including an
+iPhone-sized pass with touch gestures).
 
 ## If something is wrong
 
