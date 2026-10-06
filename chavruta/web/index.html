@@ -7,6 +7,8 @@
 <meta name="theme-color" media="(prefers-color-scheme: light)" content="#fbf7ee">
 <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#1c1812">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="description" content="חברותא לגמרא: קוראים בקול, והוא עוקב, עונה ומביא מקורות.">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <title>חברותא</title>
 <link rel="icon" href="icon.svg" type="image/svg+xml">
@@ -165,6 +167,22 @@
   <div class="panel" id="panel" role="complementary"></div>
 </aside>
 
+<!-- Too old a browser (before iOS 16.4 / Safari 16.4, March 2023; or an old Android one)
+     cannot even read the app's code: say so, instead of an empty page. -->
+<script>
+(function () {
+  var ok = true;
+  try { new RegExp("(?<=a)b"); } catch (e) { ok = false; }
+  if (ok && window.CSS && CSS.supports) ok = CSS.supports("color", "color-mix(in srgb, red, blue)");
+  if (ok) return;
+  var d = document.createElement("div");
+  d.setAttribute("style", "position:fixed;top:0;left:0;right:0;bottom:0;z-index:999;display:flex;align-items:center;justify-content:center;" +
+    "padding:32px;background:#fbf7ee;color:#1f1a14;font:17px/1.6 -apple-system,sans-serif;text-align:center");
+  d.innerHTML = "<div><div style='font-size:28px;margin-bottom:12px'>חברותא</div>הדפדפן הזה ישן מדי בשביל האפליקציה." +
+    "<br>באייפון: לעדכן ל-iOS 16.4 ומעלה (הגדרות ← כללי ← עדכון תוכנה).<br>באנדרואיד: לעדכן את Chrome או את Samsung Internet.</div>";
+  document.body.appendChild(d);
+})();
+</script>
 <script type="module" src="boot.js"></script>
 <div id="news" class="news" role="status" hidden><span id="news-text"></span><button id="news-act" class="news-act" hidden>לרענן</button><button id="news-x" class="news-x" aria-label="סגור">✕</button></div>
 </body>

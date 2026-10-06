@@ -25,7 +25,11 @@ The first time it opens a browser to log in to Cloudflare, takes your OpenAI key
 from `.env`, and prints the address — today **https://chavruta.workpages.workers.dev**.
 There is no passcode: the link is enough. Anyone you give the link to uses your OpenAI
 key, so set a monthly limit at platform.openai.com → Settings → Limits. On the phone: open it in Safari, then
-Share → **Add to Home Screen** — it opens full screen, like an app.
+Share → **Add to Home Screen** — it opens full screen, like an app. On Android
+(Samsung, Nothing, any Chrome) and on the computer, ⚙ has an **install** button (or
+the browser menu → Add to Home screen / Install app). Installed, it opens even with no
+signal, on the pages you have already learned. It needs iOS 16.4 or later on an iPhone,
+or a current Chrome / Samsung Internet; an older browser says so.
 
 **Updates publish themselves.** Cloudflare is connected to GitHub (Workers Builds):
 every push to the `claude/cloudflare-experiment` branch is built and live a minute or

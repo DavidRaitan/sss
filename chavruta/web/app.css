@@ -122,7 +122,7 @@ footer { position: relative; background: var(--paper); border-top: 1px solid var
 .foot-grip { position: absolute; inset-inline: 0; top: -7px; height: 14px; cursor: row-resize; touch-action: none; z-index: 2; }
 .foot-grip::after { content: ""; position: absolute; top: 5px; inset-inline: calc(50% - 22px); width: 44px; height: 4px;
   border-radius: 2px; background: var(--edge); opacity: .5; transition: opacity 160ms, width 160ms; }
-body.resizing-v, body.resizing-v * { cursor: row-resize !important; user-select: none; }
+body.resizing-v, body.resizing-v * { cursor: row-resize !important; -webkit-user-select: none; user-select: none; }
 .bar { max-width: 1100px; margin: 0 auto; display: grid; grid-template-columns: auto minmax(0, 1fr);
   gap: 18px; align-items: start; }
 .talkcol { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
@@ -226,7 +226,7 @@ button:has(> .ic) { display: inline-flex; align-items: center; justify-content: 
 /* In from the side it lives on, and back out the same way. */
 .over.open { visibility: visible; transform: none; transition: transform var(--t-in), visibility 0s; }
 body.docked { padding-inline-start: var(--side); }
-body.resizing, body.resizing * { cursor: col-resize !important; user-select: none; }
+body.resizing, body.resizing * { cursor: col-resize !important; -webkit-user-select: none; user-select: none; }
 .panel { position: absolute; inset: 0;
   background: var(--paper); border-inline-end: 1px solid var(--rule); overflow-y: auto;
   padding: 18px 20px 40px; padding-inline-end: 52px; box-shadow: 8px 0 30px -18px rgba(0,0,0,.25); }
@@ -344,7 +344,7 @@ main[data-place="below"] .desk-grip::after { inset-block: 3px auto; inset-inline
 .dc.wide { flex-basis: 100%; }
 .dc-head { display: flex; align-items: center; gap: 6px; padding: 5px 8px; border-bottom: 1px solid var(--rule);
   background: var(--desk); border-radius: 6px 6px 0 0; }
-.dc-grip { cursor: grab; color: var(--faint); letter-spacing: -2px; user-select: none; padding: 0 2px; }
+.dc-grip { cursor: grab; color: var(--faint); letter-spacing: -2px; -webkit-user-select: none; user-select: none; padding: 0 2px; }
 .dc-name { font-family: var(--square); font-size: 15.5px; font-weight: 500; flex: 1; }
 .dc-tools { display: flex; gap: 2px; }
 .dc-btn { border: 0; background: none; cursor: pointer; color: var(--dim); font-size: 13px; padding: 2px 5px;
@@ -473,6 +473,11 @@ body { grid-template-columns: minmax(0, 1fr); }
   .chip { padding: 5px 12px; }
   .chip.inline { padding: 1px 8px; }
   .desk-bar .btn, .btn.icon { min-height: 36px; min-width: 36px; }
+  /* Every button a finger can hit: ~40px, as on a phone's own apps (the review chips, the
+     tractates in ⚙, the choices in each sheet); "all" links keep their look, with room around them. */
+  .chip:not(.inline) { min-height: 36px; padding: 6px 14px; }
+  #panel .btn, header .btn, header select, .tabs .tab { min-height: 38px; }
+  .more { padding: 9px 8px; margin: -9px -8px; }
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -852,3 +857,5 @@ button.m-title, .m-amud, .pick-head, #open-view, .scrim, button.skipnow { displa
 .news-x { background: none; border: 0; color: inherit; opacity: .6; font-size: 14px; padding: 4px 6px; cursor: pointer; }
 @keyframes news-in { from { opacity: 0; transform: translateY(-10px); } }
 @media (prefers-reduced-motion: reduce) { .news { animation: none; } }
+/* (after the Steinsaltz bar's own rules, so a fingertip's size wins) */
+@media (pointer: coarse) { .ex-bar .seg2 .btn { min-height: 36px; padding-inline: 14px; } }

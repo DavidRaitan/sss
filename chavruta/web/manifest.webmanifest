@@ -1,12 +1,20 @@
 {
+  "id": "/",
   "name": "חברותא",
   "short_name": "חברותא",
+  "description": "חברותא לגמרא: קוראים בקול, והוא עוקב, עונה ומביא מקורות.",
   "lang": "he",
   "dir": "rtl",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "any",
   "background_color": "#fbf7ee",
   "theme_color": "#fbf7ee",
+  "categories": [
+    "education",
+    "books"
+  ],
   "icons": [
     {
       "src": "icon-192.png",

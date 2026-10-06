@@ -174,7 +174,29 @@ function picking(on) {
   if (on && !PHONE.matches) return;
   document.body.classList.toggle("picking", !!on);
   $("m-title").setAttribute("aria-expanded", String(!!on));
+  syncLayer();
 }
+// Android's back button (and a swipe back): closes the sheet that is up, as
+// an app does -- not the app. One step in the history while any sheet is up;
+// closed by hand, that step is taken back. (Checked once the opening and
+// closing are done, so going from one sheet straight to another stays one step.)
+let layered = false, layerCheck = false;
+function syncLayer() {
+  if (layerCheck) return;
+  layerCheck = true;
+  queueMicrotask(() => {
+    layerCheck = false;
+    const up = PHONE.matches && (document.body.classList.contains("picking") || !!S.panel);
+    if (up && !layered) { history.pushState({ chavrutaLayer: true }, ""); layered = true; }
+    else if (!up && layered) { layered = false; if (history.state && history.state.chavrutaLayer) history.back(); }
+  });
+}
+addEventListener("popstate", () => {
+  if (!layered) return;
+  layered = false;
+  if (document.body.classList.contains("picking")) picking(false);
+  if (S.panel) closePanel();
+});
 $("m-title").onclick = () => picking(!document.body.classList.contains("picking"));
 $("pick-done").onclick = () => picking(false);
 $("scrim").onclick = () => picking(false);
@@ -1266,7 +1288,7 @@ async function speak(text, item) {
       if (!current()) return done;                           // stopped while it was being made
       player = audio;
       player._syl = syllables(text);
-      player.preservesPitch = true;
+      player.preservesPitch = true; player.webkitPreservesPitch = true;   // faster, not higher (older Safari)
       pace(player);
       // The length is known only once the voice is all here: set the pace then.
       player.ondurationchange = () => pace(audio);
@@ -1517,6 +1539,34 @@ function idleMode(text) {
   setMode(S.listening ? "listening" : "idle", text || (S.listening ? "מקשיב…" : "המיקרופון כבוי — לחץ כדי לדבר."));
 }
 
+// While the mic is open the screen stays on: reading aloud for ten minutes
+// without touching the phone, it would dim and lock, and a locked phone stops
+// the microphone. (Every phone browser can hold it now; one that cannot just
+// sleeps as before.)
+let wake = null;
+async function keepAwake(on) {
+  try {
+    if (on && !wake && navigator.wakeLock && document.visibilityState === "visible") {
+      wake = await navigator.wakeLock.request("screen");
+      wake.addEventListener("release", () => { wake = null; });
+    } else if (!on && wake) { const w = wake; wake = null; await w.release(); }
+  } catch (e) { wake = null; }
+}
+// Back in the app (after the lock screen, a call, another app): phones pause
+// the sound engine and may end the microphone while away. Woken up again --
+// or, if the microphone is gone, opened anew -- so it is not left looking on
+// while hearing nothing.
+async function wakeEars() {
+  if (document.hidden || !S.listening || !ears || S.starting) return;
+  keepAwake(true);
+  const tracks = ears.stream ? ears.stream.getAudioTracks() : [];
+  if (tracks.length && tracks.every((t) => t.readyState === "ended")) return startListening();
+  try { if (ears.ctx && ears.ctx.state !== "running") await ears.ctx.resume(); } catch (e) {}
+  if (ears.ctx && ears.ctx.state !== "running") return startListening();
+}
+document.addEventListener("visibilitychange", wakeEars);
+window.addEventListener("pageshow", wakeEars);
+
 async function startListening() {
   if (S.starting) return;          // a double click must not open two microphones
   S.starting = true;
@@ -1533,6 +1583,7 @@ async function startListening() {
     ears = next;
     S.listening = true;
     syncMic();
+    keepAwake(true);
     // Opened while it talks: it listens, and goes on talking.
     if (speakingDone) $("state").textContent = "מקשיב · אפשר לדבר מעליי";
     else setMode("listening", "מקשיב… קרא מהדף, או תגיד מה אתה חושב שכתוב.");
@@ -1544,6 +1595,7 @@ function muteMic() {
   S.listening = false;
   if (ears) ears.stop();
   ears = null;
+  keepAwake(false);
   syncMic();
   if (speakingDone) $("state").textContent = "המיקרופון סגור · ממשיך לדבר";
   else setMode("idle", "המיקרופון סגור — לחיצה פותחת.");
@@ -1562,6 +1614,7 @@ function stopListening() {
   S.listening = false;
   if (ears) ears.stop();
   ears = null;
+  keepAwake(false);
   for (const c of aborts) c.abort();
   aborts.clear();
   asks.length = 0;
@@ -1579,7 +1632,13 @@ function stopListening() {
 function micDenied() {
   S.listening = false;
   syncMic();
-  setMode("idle", "צריך אישור למיקרופון — לחץ על סמל המנעול בשורת הכתובת ואפשר מיקרופון.", true);
+  // Where the switch is depends on the device: a phone has no lock in an address bar (and an
+  // app on the home screen has no address bar at all).
+  const ua = navigator.userAgent, ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+  const how = ios ? "בהגדרות של האייפון: אפליקציות ← Safari ← מיקרופון ← לאפשר, ואז לפתוח שוב."
+    : /Android/.test(ua) ? "בהגדרות הדפדפן: הגדרות אתרים ← מיקרופון ← לאפשר לאתר הזה, ואז לפתוח שוב."
+    : "לחץ על סמל המנעול בשורת הכתובת ואפשר מיקרופון.";
+  setMode("idle", "צריך אישור למיקרופון — " + how, true);
 }
 
 // Talking over it stops it at once -- and holds its place. What they said
@@ -2417,12 +2476,14 @@ function openPanel(build, kind) {
   if (SHEET.matches && was !== S.panel) sheetTo(SHEETS[S.panel] || "half", !was);
   $("over").classList.add("open");
   syncTabs();
+  syncLayer();
 }
 function closePanel() {
   S.panel = null;
   $("over").classList.remove("open");
   document.body.classList.remove("docked");
   syncTabs();
+  syncLayer();
 }
 // The tabs under the conversation show what is open; a second tap closes it.
 function syncTabs() {
@@ -3516,6 +3577,7 @@ function openSettings() {
     keys.innerHTML = "<kbd>רווח</kbd> מיקרופון · <kbd>←</kbd> <kbd>→</kbd> עמוד הבא / הקודם · " +
       "<kbd>↑</kbd> <kbd>↓</kbd> שורה · <kbd>Esc</kbd> סגור";
     k.append(keys); panel.append(k);
+    panel.append(...installBox());
     if (versionText()) panel.append(el("div", "sub", versionText()));
   }, "settings");
 }
@@ -3578,6 +3640,29 @@ async function checkVersion() {
   } else if (v.id !== VERSION.id) {
     news("יש גרסה חדשה", () => location.reload());
   }
+}
+// On the home screen, like an app: a button where the browser offers it
+// (Android, the computer), the two taps it takes on an iPhone, and nothing
+// once it is installed.
+function installBox() {
+  const standalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+  if (standalone) return [];
+  const ua = navigator.userAgent, ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+  const box = el("div", "set install"); box.append(el("div", "lbl", "להתקין כאפליקציה"));
+  if (window.installPrompt) {
+    const b = el("button", "btn", "להתקין על המכשיר הזה");
+    b.onclick = async () => {
+      const p = window.installPrompt; window.installPrompt = null;
+      try { await p.prompt(); await p.userChoice; } catch (e) {}
+      box.remove();
+    };
+    box.append(b);
+  } else if (ios) {
+    box.append(el("div", "help", "ב-Safari: כפתור השיתוף (הריבוע עם החץ למעלה) ← הוספה למסך הבית. נפתח במסך מלא, כמו אפליקציה."));
+  } else if (/Android/.test(ua)) {
+    box.append(el("div", "help", "בתפריט הדפדפן (⋮ או ☰) ← הוספה למסך הבית / התקנת אפליקציה."));
+  } else return [];
+  return [box];
 }
 const versionText = () => VERSION.at ? "גרסה מ-" + new Date(VERSION.at).toLocaleString("he-IL",
   { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" }) : "";

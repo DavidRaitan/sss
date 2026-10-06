@@ -6,7 +6,7 @@ cites. The user (David) is not a developer. Explain in plain words, and don't ha
 commands he does not need.
 
 Read `README.md` for what the app does, and `docs/decisions.md` for why it is the way it
-is (numbered entries, 1–77+). This file covers how to work on it.
+is (numbered entries, 1–78+). This file covers how to work on it.
 
 ## Two branches, two versions: keep them apart
 
@@ -58,6 +58,10 @@ web/                static page (Workers static assets, run_worker_first: /x/*)
     net.js          config + route(): other sites go through /x/fetch; web_rewrite for tests
     store.js        kv (IndexedDB) and log (D1 via /x/events)
     py.js           Python semantics helpers: re() (Hebrew-aware \b \w), truthy, sorted, …
+  sw.js             service worker, registered on https only (not ./run.sh or tests):
+                    network-first for same-origin GETs, never /x/*, ranges or other sites;
+                    the cache is used only offline. Kill switch: publish a sw.js that calls
+                    self.registration.unregister()
   vendor/daf-renderer/   MIT, patched (try/catch around cross-origin cssRules)
 worker/src/index.js /x/openai/v1/* (key added), /x/voice (TTS GET, edge-cached),
                     /x/sefaria/* (cached a day), /x/fetch?url= (cached an hour),
@@ -108,6 +112,30 @@ Phone mode is `PHONE` matchMedia: width ≤ 760, or a short landscape touch scre
   - It snaps only near the bottom or on a strong flick (`FLICK` 0.8 px/ms), which hides it.
     A flick up restores it.
   - The user called three-step snapping "too sensitive"; don't bring it back.
+
+### Devices the app must work on
+
+iPhone (Safari and installed to the home screen), Samsung (Chrome and Samsung Internet),
+Nothing Phone (Chrome), iPad, and computers.
+
+- **Minimum browser:** iOS/Safari 16.4 or a current Chrome or Samsung Internet. The code uses
+  regex lookbehind (Safari 16.4+) throughout `web/lib`. An inline check in `index.html`
+  shows an "update your browser" screen instead of a blank page.
+- **Installing:** manifest with `id` and `scope`, maskable icon, Apple meta tags,
+  `sw.js`. Settings shows an install button (`beforeinstallprompt`, kept in boot.js),
+  iPhone steps (Share → Add to Home Screen), or Android menu steps; nothing once installed.
+- **Android back:** while a sheet or the page picker is up, one history entry is pushed
+  (`syncLayer`), so back closes the sheet instead of leaving the app.
+- **Mic on phones:**
+  - A screen wake lock is held while listening.
+  - Returning to the app resumes the suspended `AudioContext`, or reopens the mic if the
+    phone ended the stream (`wakeEars`).
+  - iOS records `audio/mp4`; others record webm. The upload name follows the type.
+  - The mic-permission help text is per device.
+- **Touch targets:** ~36–40 px on `(pointer: coarse)`, including iPad's desktop layout.
+- **Sweep script:** screenshots and overflow/clipping checks across 13 device sizes. It was
+  used once, from the scratchpad. Recreate it from the e2e stack when layout changes are
+  large.
 
 ### Voice and conversation
 

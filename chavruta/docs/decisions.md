@@ -881,3 +881,22 @@ to the mishna the gemara is on, brings its text, and recaps the pages since.
 - The computer the same, with the mouse. (Its old handle only set a maximum
   height, so with a short answer dragging did nothing visible, and it never
   went below 70 px: "doesn't work on the PC".)
+
+**78. Ready for iPhone, Samsung, Nothing Phone, iPad and the computer.**
+- Installable everywhere: the manifest has an id, scope and description; a
+  service worker (`sw.js`, network first, so a new version is never held
+  back) lets Samsung Internet and Chrome offer to install it, and lets it
+  open with no signal on the pages already learned. ⚙ shows the way to
+  install on this device: a button where the browser has one, the Share →
+  Add to Home Screen steps on an iPhone, the menu on Android.
+- The mic on a phone: the screen stays awake while it listens (a locked phone
+  stops the microphone); coming back to the app wakes the sound engine, or
+  opens the mic anew if the phone ended it. "Allow the microphone" says where
+  that switch is on an iPhone, on Android, or on the computer.
+- Android's back button closes the sheet that is up, not the app.
+- Buttons a finger can hit (~40px) on every touch screen, the iPad included.
+- A browser too old to run the app (before iOS 16.4, March 2023) says so,
+  instead of showing an empty page.
+- Checked at 13 sizes, from the iPhone SE and a folded Galaxy Fold to a
+  1920px screen, light and dark: nothing wider than the screen, nothing cut off.
+

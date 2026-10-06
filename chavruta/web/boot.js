@@ -33,6 +33,13 @@ addEventListener("error", (e) => {
 // A promise that failed unseen: only kept, not shown -- most are a slow network, and handled.
 addEventListener("unhandledrejection", (e) => broke(e.reason && (e.reason.message || e.reason), false));
 
+// Installable, and openable with no signal (sw.js) -- on the real site only:
+// on this computer (./run.sh, the tests) a kept copy would only get in the way.
+if ("serviceWorker" in navigator && location.protocol === "https:")
+  navigator.serviceWorker.register("/sw.js").catch((e) => broke("sw: " + (e && e.message), false));
+// Android and the computer offer to install it; kept until ⚙ asks.
+addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); window.installPrompt = e; });
+
 const python = await fetch("/api/health").then((r) => r.ok && /json/.test(r.headers.get("Content-Type") || ""))
   .catch(() => false);
 let api = null;
