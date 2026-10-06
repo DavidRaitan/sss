@@ -102,7 +102,8 @@ Phone mode is `PHONE` matchMedia: width ≤ 760, or a short landscape touch scre
 - No desk (שולחן); that is "a computer thing". Panels are bottom sheets with detents.
 - A player strip (pause/skip) shows while it speaks.
 - The conversation area above the toolbar is resized by its top edge (`#foot-grip`), freely
-  to the pixel.
+  to the pixel. The computer works the same way with the mouse; flicks on the toolbar are
+  touch-only.
   - Below ~120 px only the answer's words show.
   - It snaps only near the bottom or on a strong flick (`FLICK` 0.8 px/ms), which hides it.
     A flick up restores it.

@@ -878,4 +878,6 @@ to the mishna the gemara is on, brings its text, and recaps the pages since.
 - It snaps only at the ends: let go near the bottom, or flicked down hard,
   it is gone -- nothing above the toolbar, speak and listen; flicked up (on
   the toolbar too), it comes back as tall as it was. Kept between visits.
-  The computer keeps its free handle.
+- The computer the same, with the mouse. (Its old handle only set a maximum
+  height, so with a short answer dragging did nothing visible, and it never
+  went below 70 px: "doesn't work on the PC".)

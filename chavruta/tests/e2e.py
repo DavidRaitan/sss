@@ -953,6 +953,27 @@ def main():
         page.wait_for_function("S.pack && DESK.open && document.querySelectorAll('#desk .dc').length === 3",
                                timeout=20000)
         check("the ★ layout opens by itself", page.evaluate("DESK.place") == "side")
+        # The conversation's top edge, with the mouse: any height, and away at the bottom; pulled back up.
+        page.evaluate("showReply('שורה. ועוד שורה. ועוד אחת ארוכה שממשיכה הלאה והלאה כדי למלא את המקום.')")
+        page.wait_for_timeout(200)
+        def mdrag(dy):
+            g = page.locator("#foot-grip").bounding_box(); x, y = g["x"] + g["width"] / 2, g["y"] + g["height"] / 2
+            page.mouse.move(x, y); page.mouse.down()
+            for k in range(1, 11):
+                page.mouse.move(x, y + dy * k / 10); page.wait_for_timeout(30)
+            page.mouse.up(); page.wait_for_timeout(300)
+        t0 = page.locator("#talk").bounding_box()["height"]
+        mdrag(-150)
+        t1 = page.locator("#talk").bounding_box()["height"]
+        check("computer: the conversation's edge pulled up, it grows by as much", abs(t1 - t0 - 150) < 4, str([t0, t1]))
+        mdrag(80)
+        check("computer: …and down, shrinks by as much", abs(page.locator("#talk").bounding_box()["height"] - (t1 - 80)) < 4)
+        mdrag(t1)
+        check("computer: …let go near the bottom, it is gone", not page.locator("#talk").is_visible())
+        mdrag(-160)
+        check("computer: …and pulled up again, back", page.locator("#talk").is_visible()
+              and abs(page.locator("#talk").bounding_box()["height"] - 160) < 6)
+        page.dblclick("#foot-grip")
         check("no JavaScript errors", not errors, "; ".join(errors[:3]))
         if args.part in ("all", "phone"):
             phone(browser, app, check, args.shots, sef)

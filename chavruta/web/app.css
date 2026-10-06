@@ -128,6 +128,15 @@ body.resizing-v, body.resizing-v * { cursor: row-resize !important; user-select:
 .talkcol { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .talk-top { display: flex; align-items: center; gap: 12px; min-height: 28px; }
 .talk { min-width: 0; max-height: var(--talk-h); overflow-y: auto; padding-inline-end: 2px; }
+/* Sized by hand: as tall as pulled, to the pixel (it follows the finger); low, only the answer's words. */
+body.talk-sized .talk { height: var(--talk-h); max-height: none; }
+body.talk-settling .talk { transition: height 240ms cubic-bezier(.2, .8, .3, 1); }
+body.talk-small #chips, body.talk-small #mine, body.talk-small #asked, body.talk-small .reply.hint { display: none; }
+body.talk-small .talk { padding-top: 8px; }
+/* Let go near the bottom, or flicked down: nothing above the toolbar -- speak and listen. */
+body.talk-hidden .state, body.talk-hidden .talk, body.talk-hidden .queue { display: none; }
+body.talk-hidden .foot-grip::after { opacity: 1; }
+
 
 /* The icons: drawn in the colour and weight of the text beside them. */
 .ic { width: 1.2em; height: 1.2em; flex: none; fill: none; stroke: currentColor; stroke-width: 1.7;
@@ -656,15 +665,6 @@ button.m-title, .m-amud, .pick-head, #open-view, .scrim, button.skipnow { displa
   .tab:active { transform: scale(.92); }
   .foot-grip { top: -10px; height: 20px; }
   .foot-grip::after { top: 8px; }
-
-  /* Sized by hand: as tall as pulled, to the pixel (it follows the finger); low, only the answer's words. */
-  body.talk-sized .talk { height: var(--talk-h); max-height: none; }
-  body.talk-settling .talk { transition: height 240ms cubic-bezier(.2, .8, .3, 1); }
-  body.talk-small #chips, body.talk-small #mine, body.talk-small #asked, body.talk-small .reply.hint { display: none; }
-  body.talk-small .talk { padding-top: 8px; }
-  /* Let go near the bottom, or flicked down: nothing above the toolbar -- speak and listen. */
-  body.talk-hidden .state, body.talk-hidden .talk, body.talk-hidden .queue { display: none; }
-  body.talk-hidden .foot-grip::after { opacity: 1; }
 
   /* While a sheet is up, the toolbar stays and the conversation steps aside for it. */
   body.docked .state, body.docked .talk, body.docked .queue, body.docked .foot-grip { display: none; }
