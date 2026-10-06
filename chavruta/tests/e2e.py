@@ -334,6 +334,13 @@ def phone(browser, app, check, shots, sef):
     page.tap("#news-x")
     page.unroute("**/x/version")
     check("phone: no JavaScript errors", not errors, "; ".join(errors[:3]))
+    # And if something does break on the phone: it is said on the screen, and kept in the record.
+    page.evaluate("setTimeout(() => { throw new Error('test-boom') })")
+    page.wait_for_selector("#news:not([hidden])", timeout=5000)
+    check("phone: an error on the phone is said on its screen", "test-boom" in page.inner_text("#news-text"),
+          page.inner_text("#news-text"))
+    page.wait_for_timeout(500)
+    check("phone: …and kept in the record", any("test-boom" in (r.get("text") or "") for r in records(app, ["error"])))
     ctx.close()
 
 
