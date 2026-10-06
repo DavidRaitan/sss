@@ -333,6 +333,41 @@ def phone(browser, app, check, shots, sef):
           and page.locator("#news-act").is_visible())
     page.tap("#news-x")
     page.unroute("**/x/version")
+    # The conversation, pulled down: first only the answer's words, then nothing; swiped up, back again.
+    page.evaluate("closePanel(); showReply('הנה שורה ראשונה של תשובה. ועוד אחת. ועוד שלישית. ורביעית, שגוללת.')")
+    page.wait_for_timeout(200)
+    vis = lambda sel: page.locator(sel).is_visible()
+    check("phone: the whole conversation to start with", vis("#reply") and vis("#chips") and vis("#state"))
+    g = box("#foot-grip"); gx, gy = g["x"] + g["width"] / 2, g["y"] + g["height"] / 2
+    touch("touchStart", [(gx, gy)])
+    for k in range(1, 6):
+        touch("touchMove", [(gx, gy + 12 * k)])
+    touch("touchEnd", [])
+    page.wait_for_timeout(200)
+    check("phone: pulled down a little, only the answer's words", page.evaluate("S.talkMode") == "small"
+          and vis("#reply") and not vis("#chips") and not vis("#state") and box("#talk")["height"] < 100,
+          str([page.evaluate("S.talkMode"), box("#talk")]))
+    shot("p4-talk-small")
+    g = box("#foot-grip"); gx, gy = g["x"] + g["width"] / 2, g["y"] + g["height"] / 2
+    touch("touchStart", [(gx, gy)])
+    for k in range(1, 8):
+        touch("touchMove", [(gx, gy + 15 * k)])
+    touch("touchEnd", [])
+    page.wait_for_timeout(200)
+    check("phone: …all the way down, nothing but the toolbar", page.evaluate("S.talkMode") == "hidden"
+          and not vis("#talk") and vis("#mic"))
+    shot("p4-talk-hidden")
+    page.reload(wait_until="domcontentloaded")
+    page.wait_for_function("typeof S !== 'undefined' && S.pack", timeout=20000)
+    check("phone: …and kept so next time", page.evaluate("S.talkMode") == "hidden")
+    m = box("#open-log"); sx, sy = m["x"] + m["width"] / 2, m["y"] + 5
+    for _ in range(2):
+        touch("touchStart", [(sx, sy)])
+        for k in range(1, 6):
+            touch("touchMove", [(sx, sy - 14 * k)])
+        touch("touchEnd", [])
+        page.wait_for_timeout(250)
+    check("phone: swiped up twice, the whole conversation again", page.evaluate("S.talkMode") == "full" and vis("#talk"))
     check("phone: no JavaScript errors", not errors, "; ".join(errors[:3]))
     # And if something does break on the phone: it is said on the screen, and kept in the record.
     page.evaluate("setTimeout(() => { throw new Error('test-boom') })")

@@ -869,3 +869,10 @@ to the mishna the gemara is on, brings its text, and recaps the pages since.
   version metadata). The first time a new one opens, a short note says
   "עודכן ✓" (just that: the learner asked for no more); if one is published while the app
   is open, it offers a refresh. Settings shows the version's date.
+
+**77. The conversation on a phone, pulled down out of the way.**
+- Its top edge (or a swipe on it) snaps to three sizes: whole (as before);
+  small -- only the answer's own words, three lines scrolling with the voice,
+  no "last time", review buttons, state line or queue; and hidden -- nothing
+  above the toolbar: speak and listen. Swiped or pulled up, a step at a time,
+  it comes back. Kept between visits. The computer keeps its free handle.

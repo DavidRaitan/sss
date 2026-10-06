@@ -2433,16 +2433,58 @@ function syncTabs() {
 }
 
 // The conversation area: drag its top edge for more or less of it. Kept.
+// On a phone it also snaps smaller: pulled down a little, only the answer's
+// own words, a few lines that scroll with the voice (no "last time", no
+// review buttons, no queue); pulled all the way down, nothing -- you speak
+// and listen, and only the toolbar is left. A swipe on the area does the
+// same, a step at a time; pulled (or swiped) up, it comes back.
+const TALK_MODES = ["hidden", "small", "full"];
+function talkMode(mode) {
+  if (!TALK_MODES.includes(mode)) mode = "full";
+  document.body.classList.toggle("talk-small", mode === "small");
+  document.body.classList.toggle("talk-hidden", mode === "hidden");
+  S.talkMode = mode;
+}
+const talkStep = (by) => { talkMode(TALK_MODES[Math.max(0, Math.min(2, TALK_MODES.indexOf(S.talkMode || "full") + by))]);
+  remember("talkmode", S.talkMode); };
 (function sizeTalk() {
   const grip = $("foot-grip"), root = document.documentElement.style;
   const apply = (px) => root.setProperty("--talk-h", Math.round(Math.min(Math.max(px, 70), innerHeight * 0.7)) + "px");
   const saved = +(recall("talk") || 0);
   if (saved) apply(saved);
-  let startY = 0, startH = 0;
-  grip.addEventListener("pointerdown", (e) => { startY = e.clientY; startH = $("talk").getBoundingClientRect().height; });
-  onDrag(grip, "resizing-v", (ev) => apply(startH + (startY - ev.clientY)), () =>
-    remember("talk", parseInt(getComputedStyle(document.documentElement).getPropertyValue("--talk-h"), 10) || ""));
-  grip.addEventListener("dblclick", () => { root.removeProperty("--talk-h"); remember("talk", ""); });
+  talkMode(PHONE.matches ? recall("talkmode") : "full");
+  let startY = 0, startH = 0, startMode = "full";
+  grip.addEventListener("pointerdown", (e) => {
+    startY = e.clientY; startMode = S.talkMode || "full";
+    startH = startMode === "full" ? $("talk").getBoundingClientRect().height : startMode === "small" ? 60 : 0;
+  });
+  onDrag(grip, "resizing-v", (ev) => {
+    const h = startH + (startY - ev.clientY);
+    if (!PHONE.matches) return apply(h);
+    // The phone: snap as it is dragged -- nothing, a few lines, or as tall as pulled.
+    talkMode(h < 28 ? "hidden" : h < 95 ? "small" : "full");
+    if (S.talkMode === "full") apply(Math.max(h, 110));
+  }, () => {
+    remember("talkmode", S.talkMode || "full");
+    remember("talk", parseInt(getComputedStyle(document.documentElement).getPropertyValue("--talk-h"), 10) || "");
+  });
+  grip.addEventListener("dblclick", () => { root.removeProperty("--talk-h"); remember("talk", ""); talkMode("full");
+    remember("talkmode", "full"); });
+  // A swipe on the conversation or the toolbar: down a step (when the words are at their top), up a step.
+  let sw = null;
+  $("foot").addEventListener("touchstart", (e) => {
+    if (!PHONE.matches || e.touches.length !== 1 || e.target.closest("#foot-grip")) return (sw = null);
+    const t = e.touches[0], inTalk = e.target.closest("#talk, .queue");
+    sw = { x: t.clientX, y: t.clientY, at: Date.now(), top: !inTalk || inTalk.scrollTop <= 0 };
+  }, { passive: true });
+  $("foot").addEventListener("touchend", (e) => {
+    if (!sw) return;
+    const t = e.changedTouches[0], dx = t.clientX - sw.x, dy = t.clientY - sw.y, quick = Date.now() - sw.at < 700;
+    const was = sw; sw = null;
+    if (!quick || Math.abs(dy) < 45 || Math.abs(dx) > Math.abs(dy) * 0.6) return;
+    if (dy > 0 && was.top) talkStep(-1);
+    else if (dy < 0 && S.talkMode !== "full") talkStep(1);
+  }, { passive: true });
 })();
 // ✕ sits outside the scrolling panel, so it is always in reach.
 $("close-panel").onclick = closePanel;
