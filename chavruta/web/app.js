@@ -1351,14 +1351,42 @@ function transcribePiece(blob) {
     .then((r) => (r.ok ? r.json() : { said: "" })).catch(() => ({ said: "" }));
 }
 
+// The microphone, asked for once and kept. Every getUserMedia is a new
+// request, and an iPhone (whose Safari "asks" by default) can show its
+// permission prompt again for each one -- so muting does not give the
+// microphone back at once: it is switched off (nothing is heard, nothing
+// recorded) and kept for a while, and the mic button turns it straight back
+// on. Only after a long pause is it released, so the phone's "mic in use"
+// mark does not linger. A microphone the phone itself ended (after the lock
+// screen) is asked for anew.
+const MIC_KEEP = 10 * 60 * 1000;
+let micStream = null, micDrop = 0;
+async function getMic() {
+  clearTimeout(micDrop);
+  const live = micStream && micStream.getAudioTracks().some((t) => t.readyState === "live");
+  if (!live) micStream = await navigator.mediaDevices.getUserMedia({
+    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+  micStream.getAudioTracks().forEach((t) => { t.enabled = true; });
+  return micStream;
+}
+function releaseMic(now) {
+  if (!micStream) return;
+  micStream.getAudioTracks().forEach((t) => { t.enabled = false; });
+  clearTimeout(micDrop);
+  const drop = () => { if (micStream) micStream.getTracks().forEach((t) => t.stop()); micStream = null; };
+  if (now) drop(); else micDrop = setTimeout(drop, MIC_KEEP);
+}
+// Out of sight for long (the app put away), it is let go: a phone in a pocket
+// should not keep a microphone open for an app that is not listening.
+document.addEventListener("visibilitychange", () => { if (document.hidden && !S.listening) releaseMic(true); });
+
 class Ears {
   constructor(onUtterance, onBarge) {
     this.onUtterance = onUtterance; this.onBarge = onBarge;
     this.guard = false; this.active = false;
   }
   async start() {
-    this.stream = await navigator.mediaDevices.getUserMedia({
-      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+    this.stream = await getMic();
     const Ctx = window.AudioContext || window.webkitAudioContext;
     this.ctx = new Ctx();
     const src = this.ctx.createMediaStreamSource(this.stream);
@@ -1473,7 +1501,7 @@ class Ears {
     this.active = false;
     clearInterval(this.timer);
     try { if (this.rec && this.rec.state !== "inactive") { this.discard = true; this.rec.stop(); } } catch (e) {}
-    if (this.stream) this.stream.getTracks().forEach((t) => t.stop());
+    if (this.stream) releaseMic();          // switched off and kept a while, not given back (see getMic)
     if (this.ctx) this.ctx.close();
     level(0);
   }
@@ -3644,10 +3672,18 @@ async function checkVersion() {
 // On the home screen, like an app: a button where the browser offers it
 // (Android, the computer), the two taps it takes on an iPhone, and nothing
 // once it is installed.
+const installed = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
 function installBox() {
-  const standalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
-  if (standalone) return [];
   const ua = navigator.userAgent, ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+  const macSafari = !ios && /Macintosh/.test(ua) && /Safari/.test(ua) && !/Chrome|Chromium|Edg|Firefox/.test(ua);
+  // The microphone, allowed once for good. Android and Chrome remember it by
+  // themselves; an iPhone's Safari is set to "ask" until told otherwise, and
+  // Safari on a Mac asks on each visit -- only the learner can switch that.
+  const mic = el("div", "set mic-tip"); mic.append(el("div", "lbl", "שלא ישאל כל פעם על המיקרופון"));
+  if (ios) mic.append(el("div", "help", "בהגדרות של האייפון: אפליקציות ← Safari ← מיקרופון ← לאפשר. מאז הוא לא שואל שוב."));
+  else if (macSafari) mic.append(el("div", "help", "ב-Safari: הגדרות ← אתרים ← מיקרופון ← לאתר הזה: לאפשר."));
+  const tips = ios || macSafari ? [mic] : [];
+  if (installed()) return tips;
   const box = el("div", "set install"); box.append(el("div", "lbl", "להתקין כאפליקציה"));
   if (window.installPrompt) {
     const b = el("button", "btn", "להתקין על המכשיר הזה");
@@ -3661,8 +3697,8 @@ function installBox() {
     box.append(el("div", "help", "ב-Safari: כפתור השיתוף (הריבוע עם החץ למעלה) ← הוספה למסך הבית. נפתח במסך מלא, כמו אפליקציה."));
   } else if (/Android/.test(ua)) {
     box.append(el("div", "help", "בתפריט הדפדפן (⋮ או ☰) ← הוספה למסך הבית / התקנת אפליקציה."));
-  } else return [];
-  return [box];
+  } else return tips;
+  return [box, ...tips];
 }
 const versionText = () => VERSION.at ? "גרסה מ-" + new Date(VERSION.at).toLocaleString("he-IL",
   { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
@@ -3676,6 +3712,9 @@ const versionText = () => VERSION.at ? "גרסה מ-" + new Date(VERSION.at).toL
   checkHealth();          // not awaited: a slow Sefaria must not hold up a cached page
   checkVersion();
   setInterval(checkVersion, 15 * 60 * 1000);
+  // Installed: what it keeps in the phone (settings, the pages already built) is kept for good,
+  // not cleared when the phone runs short of room. Asked quietly; no browser shows a prompt for it here.
+  if (installed() && navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
   document.addEventListener("visibilitychange", () => { if (!document.hidden) checkVersion(); });
   await buildPickers();
   setInterval(checkHealth, 60000);

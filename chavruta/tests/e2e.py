@@ -374,6 +374,19 @@ def phone(browser, app, check, shots, sef):
     check("phone: …and a hard flick down, gone again", not vis("#talk"))
     drag(-140)
     check("phone: …or pulled up by hand", abs(box("#talk")["height"] - 140) < 6, str(box("#talk")))
+    # The microphone is asked for once: off and on again uses the one it was given (an iPhone may ask anew
+    # for each request), and while off it hears nothing.
+    page.evaluate("""() => { window.__gum = 0; const g = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+        navigator.mediaDevices.getUserMedia = (c) => { window.__gum++; return g(c); }; }""")
+    page.evaluate("S.listening ? muteMic() : null")
+    page.evaluate("startListening()"); page.wait_for_timeout(600)
+    page.evaluate("muteMic()"); page.wait_for_timeout(200)
+    off = page.evaluate("micStream ? micStream.getAudioTracks().every((t) => !t.enabled) : null")
+    page.evaluate("startListening()"); page.wait_for_timeout(600)
+    check("phone: the microphone is asked for once, not at every tap", page.evaluate("window.__gum") <= 1
+          and page.evaluate("S.listening"), str(page.evaluate("window.__gum")))
+    check("phone: …and while it is off, it hears nothing", off is True, str(off))
+    page.evaluate("muteMic()")
     # Android's back button: closes the sheet that is up, not the app; and again for the page picker.
     page.tap("#open-sources")
     page.wait_for_selector("#over.open")

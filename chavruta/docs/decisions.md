@@ -900,3 +900,17 @@ to the mishna the gemara is on, brings its text, and recaps the pages since.
 - Checked at 13 sizes, from the iPhone SE and a folded Galaxy Fold to a
   1920px screen, light and dark: nothing wider than the screen, nothing cut off.
 
+
+**79. Allowed once, not asked every time.**
+- The microphone is the only thing the app asks for (sound, the clipboard and
+  the stored pages need no permission; it never asks for location). It used
+  to ask for the microphone afresh at every tap of the mic, and give it back
+  at every mute -- and an iPhone, whose Safari "asks" by default, can show its
+  prompt again for each request. Now it is asked for once and kept: muting
+  switches it off (nothing heard or recorded) and the mic button turns it
+  straight back on. It is let go after ten minutes off, or at once when the
+  app is put away while off, so the phone's "mic in use" mark does not linger.
+- What only the learner can switch: on an iPhone, Settings → Apps → Safari →
+  Microphone → Allow; Safari on a Mac, per site. ⚙ says so, on those devices
+  only. Android and Chrome remember on their own.
+- Installed, it asks the phone to keep its data for good (no prompt).

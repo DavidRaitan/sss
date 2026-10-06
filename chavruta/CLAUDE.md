@@ -6,7 +6,7 @@ cites. The user (David) is not a developer. Explain in plain words, and don't ha
 commands he does not need.
 
 Read `README.md` for what the app does, and `docs/decisions.md` for why it is the way it
-is (numbered entries, 1–78+). This file covers how to work on it.
+is (numbered entries, 1–79+). This file covers how to work on it.
 
 ## Two branches, two versions: keep them apart
 
@@ -131,6 +131,9 @@ Nothing Phone (Chrome), iPad, and computers.
   - Returning to the app resumes the suspended `AudioContext`, or reopens the mic if the
     phone ended the stream (`wakeEars`).
   - iOS records `audio/mp4`; others record webm. The upload name follows the type.
+  - The microphone is requested once and kept (`getMic`/`releaseMic`). Muting disables the
+    track, and the stream is dropped after 10 minutes off or when hidden while off. Don't go
+    back to a getUserMedia per tap: an iPhone can prompt for each one.
   - The mic-permission help text is per device.
 - **Touch targets:** ~36–40 px on `(pointer: coarse)`, including iPad's desktop layout.
 - **Sweep script:** screenshots and overflow/clipping checks across 13 device sizes. It was
