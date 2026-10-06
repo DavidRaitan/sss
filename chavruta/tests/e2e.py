@@ -316,12 +316,12 @@ def phone(browser, app, check, shots, sef):
     check("phone on its side: the commentaries beside the page", box("#over")["width"] < 844 * 0.6 and
           box("main")["width"] > 400, str([box("#over"), box("main")]))
     shot("p3-landscape")
-    # A new version: said once, with what is new; and, if one comes while it is open, an offer to refresh.
+    # A new version: said once, briefly; and, if one comes while it is open, an offer to refresh.
     page.set_viewport_size({"width": 390, "height": 844})
     page.route("**/x/version", lambda r: r.fulfill(json={"id": "v2", "at": "2026-10-04T08:00:00Z"}))
     page.evaluate("localStorage.setItem('chavruta.version', 'v1'); VERSION.id = null; checkVersion()")
     page.wait_for_selector("#news:not([hidden])", timeout=5000)
-    check("phone: it says it was updated, and what is new", page.inner_text("#news-text").startswith("עודכן לגרסה החדשה · וילנא")
+    check("phone: it says, briefly, that it was updated", page.inner_text("#news-text") == "עודכן ✓"
           and page.locator("#news-act").is_hidden(), page.inner_text("#news-text"))
     shot("p3-updated")
     page.tap("#news-x")

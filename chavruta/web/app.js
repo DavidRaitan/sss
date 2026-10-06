@@ -3504,8 +3504,8 @@ document.addEventListener("touchend", (e) => {
   if (Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 1.8) flip(dx < 0 ? 1 : -1);
 });
 
-// -- "updated": once, when a new version first opens -- with what is new --
-// and, if one is published while the app is open, an offer to refresh.
+// -- "updated": once, when a new version first opens; and, if one is
+// published while the app is open, an offer to refresh.
 const VERSION = { id: null, at: null };
 function news(text, act) {
   $("news-text").textContent = text;
@@ -3513,7 +3513,7 @@ function news(text, act) {
   if (act) $("news-act").onclick = act;
   $("news").hidden = false;
   clearTimeout(news.timer);
-  if (!act) news.timer = setTimeout(() => { $("news").hidden = true; }, 9000);
+  if (!act) news.timer = setTimeout(() => { $("news").hidden = true; }, 4000);
 }
 $("news-x").onclick = () => { $("news").hidden = true; };
 async function checkVersion() {
@@ -3524,11 +3524,7 @@ async function checkVersion() {
     Object.assign(VERSION, v);
     let seen = null;
     try { seen = localStorage.getItem("chavruta.version"); localStorage.setItem("chavruta.version", v.id); } catch (e) {}
-    if (seen && seen !== v.id) {
-      let what = "";
-      try { what = (await (await fetch("whatsnew.json", { cache: "no-store" })).json()).he || ""; } catch (e) {}
-      news("עודכן לגרסה החדשה" + (what ? " · " + what : ""));
-    }
+    if (seen && seen !== v.id) news("עודכן ✓");
   } else if (v.id !== VERSION.id) {
     news("יש גרסה חדשה", () => location.reload());
   }

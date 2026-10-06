@@ -866,6 +866,6 @@ to the mishna the gemara is on, brings its text, and recaps the pages since.
   graphics chip; when they stop it is laid out once at its new size and the
   place zoomed at is put back under the fingers.
 - "Updated": the Worker says which deployment it is (/x/version, Cloudflare's
-  version metadata). The first time a new one opens, a note says so, with
-  web/whatsnew.json's line of what is new; if one is published while the app
+  version metadata). The first time a new one opens, a short note says
+  "עודכן ✓" (just that: the learner asked for no more); if one is published while the app
   is open, it offers a refresh. Settings shows the version's date.
