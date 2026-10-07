@@ -179,8 +179,9 @@
   body.rtl .credit .brand{font-family:"Frank Ruhl Libre",serif;letter-spacing:.05em;font-size:1.5rem}
   .credit:not(.on){display:none}
   /* the couple's way in: a dot only they know about */
-  .gm-dot{display:block;width:7px;height:7px;margin:26px auto 0;border-radius:50%;background:var(--line);opacity:.55}
-  .gm-dot:hover,.gm-dot:focus-visible{opacity:1;background:var(--gold)}
+  .gm-dot{display:block;width:32px;height:32px;margin:14px auto 0;border-radius:50%;opacity:.6;
+    background:radial-gradient(circle,var(--line) 3.5px,transparent 4px)}   /* looks like 7px, taps like 32px */
+  .gm-dot:hover,.gm-dot:focus-visible{opacity:1;background:radial-gradient(circle,var(--gold) 3.5px,transparent 4px)}
   .gm-dot[hidden]{display:none}
 
   [hidden]{display:none!important}
