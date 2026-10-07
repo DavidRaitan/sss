@@ -139,13 +139,15 @@ with a visible focus ring, and its colour clears AA against the card. Do
 not add analytics, a tracking pixel, or any third-party script to an
 invitation site — the counting belongs on the destination.
 
-### The couple's dot
+### The couple's rings
 
 `GUESTS_LINK` takes the secret link from the Dudaim guest manager (Access
-code → secret link, `https://dudaim.netlify.app/guests/?d=…`). It puts a
-small dot under the footer that only the couple knows about: it opens the
-code screen, and the access code opens their guest list on any phone. The
-link shows nothing without the code. Left empty, there is no dot.
+code → secret link, `https://dudaim.netlify.app/guests/?d=…`). It puts two
+small gold rings in a soft circle at the top right of the page, with a slow
+swing every few seconds (still for visitors who ask for less motion). To a
+guest it is decoration; the couple know it opens their guest list. The link
+asks for the access code and shows nothing without it. Left empty, there
+are no rings.
 
 ## If a language has no artwork
 

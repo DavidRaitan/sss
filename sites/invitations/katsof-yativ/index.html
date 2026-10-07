@@ -178,10 +178,19 @@
   body.rtl .credit .lead{letter-spacing:.08em}
   body.rtl .credit .brand{font-family:"Frank Ruhl Libre",serif;letter-spacing:.05em;font-size:1.5rem}
   .credit:not(.on){display:none}
-  /* the couple's way in: a dot only they know about */
-  .gm-dot{display:block;width:32px;height:32px;margin:14px auto 0;border-radius:50%;opacity:.6;
-    background:radial-gradient(circle,var(--line) 3.5px,transparent 4px)}   /* looks like 7px, taps like 32px */
-  .gm-dot:hover,.gm-dot:focus-visible{opacity:1;background:radial-gradient(circle,var(--gold) 3.5px,transparent 4px)}
+  /* the couple's way in: two small rings in the top corner. Guests read it
+     as decoration; the couple know it opens their guest list (behind a code) */
+  .gm-dot{position:absolute;top:14px;right:14px;z-index:5;width:40px;height:40px;border-radius:50%;
+    display:grid;place-items:center;background:rgba(255,255,255,.72);border:1px solid var(--line);
+    color:var(--gold);box-shadow:0 2px 10px rgba(80,90,60,.10);transition:transform .3s,border-color .3s;
+    -webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}
+  .gm-dot svg{width:22px;height:22px;overflow:visible}
+  .gm-dot .r2{animation:gmRing 4.5s ease-in-out infinite;transform-origin:15px 13px}
+  .gm-dot::after{content:"";position:absolute;inset:-1px;border-radius:50%;border:1px solid var(--gold);opacity:0;animation:gmGlow 4.5s ease-out infinite}
+  .gm-dot:hover,.gm-dot:focus-visible{transform:scale(1.08);border-color:var(--gold);outline:none}
+  @keyframes gmRing{0%,70%,100%{transform:rotate(0)}80%{transform:rotate(-14deg)}90%{transform:rotate(6deg)}}
+  @keyframes gmGlow{0%,60%{opacity:0;transform:scale(1)}72%{opacity:.7}100%{opacity:0;transform:scale(1.45)}}
+  @media (prefers-reduced-motion:reduce){.gm-dot .r2,.gm-dot::after{animation:none}}
   .gm-dot[hidden]{display:none}
 
   [hidden]{display:none!important}
@@ -263,6 +272,11 @@
 </style>
 </head>
 <body>
+  <a class="gm-dot" id="gmDot" hidden aria-label="For the couple: guest list" title="For the couple">
+    <svg viewBox="0 0 24 22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6">
+      <circle cx="9" cy="13" r="6"/><circle class="r2" cx="15" cy="13" r="6"/><path d="M13.5 3.5l1.5-2 1.5 2-1.5 1.6z" stroke-width="1.2"/>
+    </svg>
+  </a>
   <div id="splash" aria-hidden="true">
     <div class="monogram">
       <div class="ring">
@@ -482,7 +496,6 @@
           <span class="brand" data-t="credit_brand"></span>
         </a>
       </div>
-      <a class="gm-dot" id="gmDot" hidden aria-label="Guest list" title=""></a>
       </div><!-- /card-body -->
     </div>
   </div>
