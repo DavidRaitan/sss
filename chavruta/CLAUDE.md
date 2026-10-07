@@ -6,7 +6,7 @@ cites. The user (David) is not a developer. Explain in plain words, and don't ha
 commands he does not need.
 
 Read `README.md` for what the app does, and `docs/decisions.md` for why it is the way it
-is (numbered entries, 1–79+). This file covers how to work on it.
+is (numbered entries, 1–80+). This file covers how to work on it.
 
 ## Two branches, two versions: keep them apart
 
@@ -148,8 +148,10 @@ These are already built; see decisions 26, 41, 44, 58 and 63.
 - Speaking over an answer stops it. The new words are judged: an aside resumes the old answer
   ("as I was saying"); "no, I mean" merges; a new question holds the old one.
 - Questions asked while one is still being thought about are answered together, once.
-- On the speaker setting it doesn't listen while it talks (it would hear itself); with
-  headphones you can talk over it.
+- It always listens, also while it talks (decision 80). There is no earbuds/speaker setting:
+  `detectEars` guesses from device labels, and on the speaker barge-in needs a louder, longer
+  voice, with `S.echoGuard` growing after each echo. Never bring back a mode that stops
+  listening while it talks; the user wants Claude/ChatGPT-style interruption only.
 
 ## Tests: run them before every push
 

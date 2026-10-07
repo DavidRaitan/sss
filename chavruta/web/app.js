@@ -43,7 +43,7 @@ function el(tag, cls, text) {
 
 const DEFAULTS = { view: "daf", depth: "daf", language: "en", voice: "natural",
   hearing: "api", speak: true, pause: "normal", nudges: true, checks: true, translate: false, stops: false,
-  speakers: false, rate: 1.15, favor: {}, voices: 3, open: "last", mine: [], explain: "stz", script: "plain", voice_name: "mix", scale: 1,
+  rate: 1.15, favor: {}, voices: 3, open: "last", mine: [], explain: "stz", script: "plain", voice_name: "mix", scale: 1,
   sites: ["halachayomit.co.il", "he.wikisource.org", "dafyomi.co.il"], sites_halacha: true };
 const PAUSES = { short: 1000, normal: 1500, long: 2400 };
 function loadSettings() {
@@ -61,6 +61,7 @@ function loadSettings() {
   }
   if (!["mix", "cedar", "verse"].includes(s.voice_name)) s.voice_name = "mix";   // the voices on offer
   if (s.view === "img") s.view = "vilna";        // the scan view became the Vilna page
+  delete s.speakers;                              // earbuds or speaker is told by itself now; it always listens
   return s;
 }
 function saveSettings() {
@@ -1380,6 +1381,30 @@ function releaseMic(now) {
 // should not keep a microphone open for an app that is not listening.
 document.addEventListener("visibilitychange", () => { if (document.hidden && !S.listening) releaseMic(true); });
 
+// Earbuds or the phone's own speaker -- told by the devices' names, as the
+// phone reports them once the microphone is allowed (AirPods, a headset, Galaxy
+// Buds...), and told again when something is plugged in or connected. It is
+// only a guess: wired earbuds without a microphone look like the speaker. Both
+// listen all the time, as Claude's and ChatGPT's voice modes do -- talk over
+// it and it stops; with the speaker it needs a clearly louder voice to stop,
+// so its own voice coming back does not cut it off.
+const EARBUDS = /airpods|head ?phone|head ?set|ear ?bud|ear ?phone|\bbuds|bluetooth|hands-?free|beats|bose|jabra|soundcore|nothing ear|אוזניות/i;
+S.ears = "speaker";
+async function detectEars(stream) {
+  try {
+    // The microphone in use, and the devices the browser marks as the default (a computer lists
+    // everything plugged in, used or not); a phone marks none, so there all of them.
+    const all = (await navigator.mediaDevices.enumerateDevices()).filter((d) => /^audio/.test(d.kind));
+    const chosen = all.filter((d) => d.deviceId === "default" || d.deviceId === "communications");
+    const labels = (stream ? stream.getAudioTracks().map((t) => t.label) : [])
+      .concat((chosen.length ? chosen : all).map((d) => d.label));
+    S.ears = labels.some((l) => EARBUDS.test(l) && !/speaker/i.test(l)) ? "earbuds" : "speaker";
+  } catch (e) {}
+  return S.ears;
+}
+if (navigator.mediaDevices && navigator.mediaDevices.addEventListener)
+  navigator.mediaDevices.addEventListener("devicechange", () => { if (micStream) detectEars(micStream); });
+
 class Ears {
   constructor(onUtterance, onBarge) {
     this.onUtterance = onUtterance; this.onBarge = onBarge;
@@ -1387,6 +1412,7 @@ class Ears {
   }
   async start() {
     this.stream = await getMic();
+    detectEars(this.stream);
     const Ctx = window.AudioContext || window.webkitAudioContext;
     this.ctx = new Ctx();
     const src = this.ctx.createMediaStreamSource(this.stream);
@@ -1450,8 +1476,10 @@ class Ears {
     let sum = 0; for (const x of this.buf) sum += x * x;
     const rms = Math.sqrt(sum / this.buf.length), now = performance.now();
     if (!this.talking) this.floor = this.floor * 0.97 + Math.min(rms, this.floor * 3) * 0.03;
-    // While it is talking, only a clearly louder voice counts as the learner.
-    const threshold = Math.max(0.012, this.floor * 3) * (this.guard ? 2.6 : 1);
+    // While it is talking, only a clearly louder voice counts as the learner -- louder
+    // still from the speaker, and more so each time it has caught itself (S.echoGuard).
+    const guardBy = S.ears === "earbuds" ? 2.6 : Math.min(5, 3.4 + (S.echoGuard || 0));
+    const threshold = Math.max(0.012, this.floor * 3) * (this.guard ? guardBy : 1);
     level(Math.min(1, rms / (threshold * 3)));
     // `loud` is how long they have been audibly speaking just now. Capped, and
     // cleared when an utterance ends and when the partner starts to talk: in
@@ -1463,19 +1491,16 @@ class Ears {
     if (rms > threshold) { this.loud = Math.min(1500, this.loud + 40); this.quiet = 0; this.recSpeech += 40; }
     else { this.quiet += 40; this.loud = Math.max(0, this.loud - 20); }
 
-    // Speaker mode (no earbuds): while it talks, and a moment after, it does
-    // not listen -- its own voice would be heard as the learner's. ⏸ stops it.
-    const deaf = S.settings.speakers && (this.guard || now - (this.spokeAt || 0) < 700);
+    // It always listens, also while it talks: talking over it stops it, as in
+    // Claude's and ChatGPT's voice modes. (A "speaker mode" that stopped
+    // listening while it talked was tried, and switched itself on after two
+    // echoes -- and then it could not be interrupted at all.)
     if (this.guard) this.spokeAt = now;
     if (now - (this.spokeAt || 0) < 1500) this.overlap = true;
-    if (deaf) {
-      this.loud = 0;
-      if (this.talking) { this.talking = false; this.discard = true; this.lastSpeech = 0; this.stopRec(); }
-    }
     // Only while a recorder is running: speech noticed in the gap between two
     // recordings would be sent without its beginning.
     const live = this.rec && this.rec.state === "recording";
-    if (!deaf && live && !this.talking && this.loud >= (this.guard ? 500 : 140)) {
+    if (live && !this.talking && this.loud >= (this.guard ? (S.ears === "earbuds" ? 500 : 650) : 140)) {
       this.talking = true; this.startedAt = now - this.loud;
       if (this.guard) this.onBarge();
       setMode("capturing", "שומע אותך…");
@@ -1769,15 +1794,13 @@ async function hearOne(u, g, t0) {
   if (g !== S.gen) return;
   if (!heard.said || heard.mode === "silence") { goOn(); return idleMode(); }
   if (heard.mode === "echo") {
-    // It heard its own voice through the speakers. Twice, and it stops
-    // listening while it talks (speaker mode); ⏸ is how to stop it then.
+    // It heard its own voice through the speaker: from now on, while it talks,
+    // it waits for a louder voice before it stops -- but it goes on listening.
     S.echoes = (S.echoes || 0) + 1;
-    if (S.echoes >= 2 && !S.settings.speakers) {
-      S.settings.speakers = true; saveSettings();
-      showReply("נשמע שאין אוזניות — שמעתי את עצמי. מעכשיו, בזמן שאני מדבר אני לא מקשיב; לעצור אותי: כפתור העצירה או רווח.", { hint: true });
-      logPush({ me: false, error: true, stage: "echo", text: "עברתי למצב רמקול (בלי אוזניות).", detail: "heard itself twice",
-        ms: 0, at: new Date().toLocaleTimeString() });
-    }
+    S.ears = "speaker";
+    S.echoGuard = Math.min(1.6, (S.echoGuard || 0) + 0.4);
+    logPush({ me: false, error: true, stage: "echo", text: "שמעתי את עצמי — מקשיב בזהירות יותר בזמן שאני מדבר.",
+      detail: "echo " + S.echoes, ms: 0, at: new Date().toLocaleTimeString() });
     goOn();
     return idleMode();
   }
@@ -2118,8 +2141,6 @@ const SAID = {
   view: { daf: ["The page as it's printed.", "צורת הדף."], lin: ["The Steinsaltz view.", "תצוגת שטיינזלץ."] },
   translate: { true: ["Translation on.", "תרגום מופעל."], false: ["Translation off.", "בלי תרגום."] },
   stops: { true: ["Marking where sentences stop.", "מסמן עצירות."], false: ["Not marking the stops.", "בלי סימון עצירות."] },
-  speakers: { true: ["Speaker mode — I won't listen while I talk.", "מצב רמקול — בזמן שאני מדבר אני לא מקשיב."],
-              false: ["Earbuds mode.", "מצב אוזניות."] },
   sites_halacha: { true: ["I'll check Halacha Yomit on halacha questions.", "אבדוק גם בהלכה יומית בשאלות הלכה."],
                    false: ["Only when you ask.", "רק כשתבקש."] },
   open: { today: ["I'll open on the daf yomi.", "אפתח על הדף היומי."], last: ["I'll open where you stopped.", "אפתח איפה שהפסקת."] },
@@ -2148,6 +2169,10 @@ function applySettings(changes, he) {
       fillMasechtot();
       said.push((m ? m.he : value.masechta) + (value.add ? (he ? " נוספה למסכתות שלך." : " is in your tractates.")
         : (he ? " הוסרה מהמסכתות שלך." : " is out of your tractates.")));
+      continue;
+    }
+    if (name === "speakers") {        // nothing to choose: it tells earbuds from the speaker by itself
+      said.push(he ? "אני מזהה לבד אם יש אוזניות, ותמיד אפשר לדבר מעליי." : "I tell earbuds from the speaker by myself — you can always talk over me.");
       continue;
     }
     S.settings[name] = value;
@@ -3596,8 +3621,6 @@ function openSettings() {
       choice("voice_name", "איזה קול", [["mix", "שניהם · Cedar מסביר, Verse עונה קצר"], ["cedar", "Cedar · חם, רגוע"],
         ["verse", "Verse · חי, ער"]],
         "לחיצה משמיעה דוגמה."),
-      choice("speakers", "שמע", [[false, "אוזניות"], [true, "רמקול"]],
-        "ברמקול, בזמן שאני מדבר אני לא מקשיב (אחרת אני שומע את עצמי). לעצור: כפתור העצירה או רווח."),
       choice("hearing", "זיהוי דיבור", [["api", "מדויק, עברית ואנגלית יחד"], ["browser", "הדפדפן (חינם, שפה אחת)"]]),
     );
     const k = el("div", "set"); k.append(el("div", "lbl", "מקשים"));

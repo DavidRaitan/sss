@@ -914,3 +914,20 @@ to the mishna the gemara is on, brings its text, and recaps the pages since.
   Microphone → Allow; Safari on a Mac, per site. ⚙ says so, on those devices
   only. Android and Chrome remember on their own.
 - Installed, it asks the phone to keep its data for good (no prompt).
+
+**80. Always listening, as Claude's and ChatGPT's voice modes are; earbuds told by themselves.**
+- Talking over it stops it, with earbuds or from the phone's speaker alike.
+  There is no "earbuds / speaker" choice any more: the learner did not know
+  the difference and asked for the Claude/ChatGPT behaviour as the only one.
+- The old speaker mode stopped listening while it talked -- and switched
+  itself on, for good, the second time it heard its own voice; from then on it
+  could not be interrupted at all. Gone, and dropped from saved settings.
+- Earbuds or speaker is told from the devices' names once the mic is allowed
+  (the mic in use and the default devices; AirPods, Galaxy/Pixel Buds,
+  Nothing Ear, headsets, Bluetooth hands-free), and again when something is
+  connected. From the speaker, while it talks, a clearly louder voice is
+  needed to stop it (3.4× the room, held 650 ms; earbuds 2.6×, 500 ms), and
+  each time it catches its own voice it waits for a little more -- but it
+  never stops listening. Wired earbuds without a mic look like the speaker:
+  then it is only a little harder to interrupt.
+- Asked by voice for "speaker mode", it says it tells them apart by itself.

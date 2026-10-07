@@ -387,6 +387,16 @@ def phone(browser, app, check, shots, sef):
           and page.evaluate("S.listening"), str(page.evaluate("window.__gum")))
     check("phone: …and while it is off, it hears nothing", off is True, str(off))
     page.evaluate("muteMic()")
+    # Earbuds or the speaker, told by the devices' names; either way it always listens (no "speaker mode").
+    check("phone: AirPods are told as earbuds", page.evaluate(
+          "detectEars({ getAudioTracks: () => [{ label: 'AirPods Pro' }] })") == "earbuds")
+    check("phone: …the phone's own microphone as the speaker", page.evaluate(
+          "detectEars({ getAudioTracks: () => [{ label: 'iPhone Microphone' }] })") == "speaker")
+    check("phone: …and Galaxy Buds as earbuds", page.evaluate(
+          "detectEars({ getAudioTracks: () => [{ label: 'Galaxy Buds2 Pro' }] })") == "earbuds")
+    page.tap("#open-settings-tab"); page.wait_for_selector("#over.open")
+    check("phone: no earbuds/speaker choice to make in settings", "אוזניות" not in page.inner_text("#panel"))
+    page.evaluate("closePanel()")
     # Android's back button: closes the sheet that is up, not the app; and again for the page picker.
     page.tap("#open-sources")
     page.wait_for_selector("#over.open")
@@ -404,6 +414,11 @@ def phone(browser, app, check, shots, sef):
     page.tap("#open-view"); page.wait_for_selector("#over.open"); page.wait_for_timeout(300)
     page.tap("#close-panel"); page.wait_for_timeout(500)
     check("phone: …and a sheet closed by hand leaves no step behind", not page.evaluate("!!(history.state && history.state.chavrutaLayer)"))
+    # A phone that had been switched to the old speaker mode (deaf while it talks) listens again.
+    page.evaluate("localStorage.setItem('chavruta.settings', JSON.stringify(Object.assign({}, S.settings, { speakers: true })))")
+    page.reload(wait_until="domcontentloaded")
+    page.wait_for_function("typeof S !== 'undefined' && S.pack", timeout=20000)
+    check("phone: an old 'speaker mode' is dropped: it listens while it talks", page.evaluate("!('speakers' in S.settings)"))
     check("phone: no JavaScript errors", not errors, "; ".join(errors[:3]))
     # And if something does break on the phone: it is said on the screen, and kept in the record.
     page.evaluate("setTimeout(() => { throw new Error('test-boom') })")

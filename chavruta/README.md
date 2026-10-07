@@ -78,9 +78,10 @@ conversation, not a chat.
   "no, I mean…" folds into the question; a new question is answered and the old
   answer waits ("go back" / "תמשיך במה שאמרת" brings it back). Several things said
   while it is still thinking are answered together, once. **⏸** (or space) pauses it
-  without talking over it; **🔊** says the last answer again. On the phone's speaker it
-  cannot listen while it talks (it would hear itself) — tap ⏸ or the mic; with
-  earbuds, just talk over it.
+  without talking over it; **🔊** says the last answer again. It always listens, as
+  Claude's and ChatGPT's voice modes do — with earbuds or from the phone's speaker
+  (it tells which by itself, and from the speaker waits for a clearly louder voice,
+  so its own does not cut it off).
 - **Keep reading while it thinks.** It follows your reading at once, answers when you
   pause, and if you've read on it says which question it's answering.
 
