@@ -143,8 +143,10 @@ invitation site — the counting belongs on the destination.
 
 `GUESTS_LINK` takes the secret link from the Dudaim guest manager (Access
 code → secret link, `https://dudaim.netlify.app/guests/?d=…`). It puts two
-small gold rings in a soft circle at the top right of the page, with a slow
-swing every few seconds (still for visitors who ask for less motion). To a
+tiny gold rings at the top right of the page (26px on a phone, 30px on a
+computer, the same in every language). They fade away the moment the page
+scrolls, and swing once every few seconds (still for visitors who ask for
+less motion). Most guests never notice them. To a
 guest it is decoration; the couple know it opens their guest list. The link
 asks for the access code and shows nothing without it. Left empty, there
 are no rings.

@@ -180,17 +180,16 @@
   .credit:not(.on){display:none}
   /* the couple's way in: two small rings in the top corner. Guests read it
      as decoration; the couple know it opens their guest list (behind a code) */
-  .gm-dot{position:absolute;top:14px;right:14px;z-index:5;width:40px;height:40px;border-radius:50%;
-    display:grid;place-items:center;background:rgba(255,255,255,.72);border:1px solid var(--line);
-    color:var(--gold);box-shadow:0 2px 10px rgba(80,90,60,.10);transition:transform .3s,border-color .3s;
-    -webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}
-  .gm-dot svg{width:22px;height:22px;overflow:visible}
-  .gm-dot .r2{animation:gmRing 4.5s ease-in-out infinite;transform-origin:15px 13px}
-  .gm-dot::after{content:"";position:absolute;inset:-1px;border-radius:50%;border:1px solid var(--gold);opacity:0;animation:gmGlow 4.5s ease-out infinite}
-  .gm-dot:hover,.gm-dot:focus-visible{transform:scale(1.08);border-color:var(--gold);outline:none}
-  @keyframes gmRing{0%,70%,100%{transform:rotate(0)}80%{transform:rotate(-14deg)}90%{transform:rotate(6deg)}}
-  @keyframes gmGlow{0%,60%{opacity:0;transform:scale(1)}72%{opacity:.7}100%{opacity:0;transform:scale(1.45)}}
-  @media (prefers-reduced-motion:reduce){.gm-dot .r2,.gm-dot::after{animation:none}}
+  .gm-dot{position:absolute;top:10px;right:10px;left:auto;z-index:5;width:26px;height:26px;border-radius:50%;
+    display:grid;place-items:center;background:rgba(255,255,255,.55);border:1px solid var(--line);
+    color:var(--gold);opacity:.6;transition:opacity .35s,visibility .35s}
+  .gm-dot svg{width:14px;height:14px;overflow:visible}
+  .gm-dot .r2{animation:gmRing 8s ease-in-out infinite;transform-origin:15px 13px}
+  .gm-dot:hover,.gm-dot:focus-visible{opacity:1;border-color:var(--gold);outline:none}
+  .gm-dot.away{opacity:0;visibility:hidden;pointer-events:none}   /* gone as soon as the page moves */
+  @keyframes gmRing{0%,85%,100%{transform:rotate(0)}90%{transform:rotate(-12deg)}95%{transform:rotate(5deg)}}
+  @media (min-width:700px){.gm-dot{top:14px;right:14px;width:30px;height:30px}.gm-dot svg{width:16px;height:16px}}
+  @media (prefers-reduced-motion:reduce){.gm-dot .r2{animation:none}}
   .gm-dot[hidden]{display:none}
 
   [hidden]{display:none!important}
@@ -272,7 +271,7 @@
 </style>
 </head>
 <body>
-  <a class="gm-dot" id="gmDot" hidden aria-label="For the couple: guest list" title="For the couple">
+  <a class="gm-dot" id="gmDot" dir="ltr" hidden aria-label="For the couple: guest list" title="For the couple">
     <svg viewBox="0 0 24 22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6">
       <circle cx="9" cy="13" r="6"/><circle class="r2" cx="15" cy="13" r="6"/><path d="M13.5 3.5l1.5-2 1.5 2-1.5 1.6z" stroke-width="1.2"/>
     </svg>
@@ -650,7 +649,11 @@ function paintLang(l){
     el.placeholder = t[el.getAttribute("data-ph")] || "";
   });
   const dot = document.getElementById("gmDot");
-  if (dot && GUESTS_LINK){ dot.href = GUESTS_LINK; dot.hidden = false; }
+  if (dot && GUESTS_LINK && dot.hidden){
+    dot.href = GUESTS_LINK; dot.hidden = false;
+    const away = () => dot.classList.toggle("away", window.scrollY > 24);
+    window.addEventListener("scroll", away, { passive: true }); away();
+  }
   const credit = document.getElementById("creditLink");
   if (credit){
     const href = CREDIT.url || chatHref(t);
