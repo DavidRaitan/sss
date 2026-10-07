@@ -139,6 +139,14 @@ with a visible focus ring, and its colour clears AA against the card. Do
 not add analytics, a tracking pixel, or any third-party script to an
 invitation site — the counting belongs on the destination.
 
+### The couple's dot
+
+`GUESTS_LINK` takes the secret link from the Dudaim guest manager (Access
+code → secret link, `https://dudaim.netlify.app/guests/?d=…`). It puts a
+small dot under the footer that only the couple knows about: it opens the
+code screen, and the access code opens their guest list on any phone. The
+link shows nothing without the code. Left empty, there is no dot.
+
 ## If a language has no artwork
 
 `$SKILL/invitation-typeset.html` is the same invitation with the wording as real
