@@ -169,3 +169,10 @@ and still reads correctly.
 
 Netlify, Vercel, Cloudflare Pages, GitHub Pages — serve the folder, no
 build command. The file also opens straight from disk.
+
+### The Dudaim opening
+
+`template.html` starts with the Dudaim loading mark (`#dudaim-loader`, quick
+version, about a second). When it lifts it fires `dudaim-loader-done`, and
+the couple's own monogram opening starts then, so the two never overlap. The
+loader's source lives in the Dudaim repo at `loader/dudaim-loader.html`.
