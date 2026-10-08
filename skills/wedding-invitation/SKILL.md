@@ -155,8 +155,11 @@ are no rings.
 
 When the couple turns on "Find your seat" in the guest manager's seating
 plan, a gold **Find your seat** button appears at the bottom of the
-invitation by itself (the page asks the guest manager when it opens; the
-wording is the `seat_find` key in each language). Guests use the link they
+invitation by itself, for a guest who replied "yes" on that phone (the page
+remembers the reply, and asks the guest manager when it opens; the wording
+is the `seat_find` key in each language). The button opens the seat page
+with the guest's name already searched. Guests who replied some other way
+use the QR code at the entrance. Guests use the link they
 already have; it opens a page where they type their name and see their
 table on a map of the hall. Off, there is no button. It needs
 `GUESTS_LINK`, since that is how the page knows whose seating to ask about.

@@ -646,14 +646,21 @@ function applyLang(l, animate){
 /* Find your seat: when the couple publishes the seating in the guest manager,
    a button appears here, so guests use the same invitation link they already have. */
 let seatsChecked = false;
+/* this phone's reply, so the seat button shows only to a guest who said yes */
+function rememberReply(p){
+  try { localStorage.setItem("rsvp-reply", JSON.stringify({ name: p.name, yes: p.attending === "Yes" })); } catch(e){}
+  seatsChecked = false; checkSeats();
+}
+function myReply(){ try { return JSON.parse(localStorage.getItem("rsvp-reply") || "null"); } catch(e){ return null; } }
 function checkSeats(){
-  if (seatsChecked || !GUESTS_LINK) return; seatsChecked = true;
+  const me = myReply();
+  if (seatsChecked || !GUESTS_LINK || !me || !me.yes) return; seatsChecked = true;
   let u; try { u = new URL(GUESTS_LINK, location.href); } catch(e){ return; }
   const door = u.searchParams.get("d"); if (!door) return;
   fetch(u.origin + "/api/guests?find=" + encodeURIComponent(door)).then(r=>r.json()).then(j=>{
     if (!j || !j.on) return;
     const bar = document.getElementById("seatBar");
-    bar.href = u.origin + u.pathname + "?find=" + encodeURIComponent(door); bar.hidden = false;
+    bar.href = u.origin + u.pathname + "?find=" + encodeURIComponent(door) + "&n=" + encodeURIComponent(me.name); bar.hidden = false;
   }).catch(()=>{});
 }
 function paintLang(l){
@@ -812,7 +819,7 @@ btn.addEventListener("click", async ()=>{
 
   if (!ENDPOINT){
     console.log("RSVP (endpoint not set):", payload);
-    showThanks();
+    rememberReply(payload); showThanks();
     return;
   }
 
@@ -825,7 +832,7 @@ btn.addEventListener("click", async ()=>{
       headers:{"Content-Type":"text/plain;charset=utf-8"},
       body: JSON.stringify(payload)
     });
-    showThanks();
+    rememberReply(payload); showThanks();
   }catch(e){
     console.error(e);
     msg.textContent = t.fail; msg.classList.remove("ok"); msg.classList.add("err");
