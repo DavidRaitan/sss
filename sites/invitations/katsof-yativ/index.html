@@ -654,13 +654,16 @@ function rememberReply(p){
 function myReply(){ try { return JSON.parse(localStorage.getItem("rsvp-reply") || "null"); } catch(e){ return null; } }
 function checkSeats(){
   const me = myReply();
-  if (seatsChecked || !GUESTS_LINK || !me || !me.yes) return; seatsChecked = true;
+  // everyone sees it once the seating is published, except a guest who said no on this phone;
+  // a "yes" here also brings their name, so the seat page searches it straight away
+  if (me && !me.yes){ const b = document.getElementById("seatBar"); if (b) b.hidden = true; return; }
+  if (seatsChecked || !GUESTS_LINK) return; seatsChecked = true;
   let u; try { u = new URL(GUESTS_LINK, location.href); } catch(e){ return; }
   const door = u.searchParams.get("d"); if (!door) return;
   fetch(u.origin + "/api/guests?find=" + encodeURIComponent(door)).then(r=>r.json()).then(j=>{
     if (!j || !j.on) return;
     const bar = document.getElementById("seatBar");
-    bar.href = u.origin + u.pathname + "?find=" + encodeURIComponent(door) + "&n=" + encodeURIComponent(me.name); bar.hidden = false;
+    bar.href = u.origin + u.pathname + "?find=" + encodeURIComponent(door) + (me && me.name ? "&n=" + encodeURIComponent(me.name) : ""); bar.hidden = false;
   }).catch(()=>{});
 }
 function paintLang(l){
