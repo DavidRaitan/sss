@@ -151,6 +151,16 @@ guest it is decoration; the couple know it opens their guest list. The link
 asks for the access code and shows nothing without it. Left empty, there
 are no rings.
 
+### Find your seat
+
+When the couple turns on "Find your seat" in the guest manager's seating
+plan, a gold **Find your seat** button appears at the bottom of the
+invitation by itself (the page asks the guest manager when it opens; the
+wording is the `seat_find` key in each language). Guests use the link they
+already have; it opens a page where they type their name and see their
+table on a map of the hall. Off, there is no button. It needs
+`GUESTS_LINK`, since that is how the page knows whose seating to ask about.
+
 ## If a language has no artwork
 
 `$SKILL/invitation-typeset.html` is the same invitation with the wording as real

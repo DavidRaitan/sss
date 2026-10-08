@@ -191,6 +191,15 @@
   @media (min-width:700px){.gm-dot{top:14px;right:14px;width:30px;height:30px}.gm-dot svg{width:16px;height:16px}}
   @media (prefers-reduced-motion:reduce){.gm-dot .r2{animation:none}}
   .gm-dot[hidden]{display:none}
+  /* "Find your seat": appears by itself once the couple publishes the seating */
+  .seatbar{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:20;display:inline-flex;align-items:center;gap:10px;
+    padding:13px 20px;border-radius:999px;background:var(--gold,#b8913f);color:#fff;text-decoration:none;font-size:16px;letter-spacing:.02em;
+    box-shadow:0 10px 30px rgba(60,45,20,.25);animation:seatIn .6s cubic-bezier(.2,.8,.2,1) both;white-space:nowrap}
+  .seatbar:focus-visible{outline:2px solid #fff;outline-offset:3px}
+  .seatbar[hidden]{display:none}
+  [dir="rtl"] .seatbar .arr{transform:scaleX(-1)}
+  @keyframes seatIn{from{opacity:0;transform:translate(-50%,16px)}}
+  @media (prefers-reduced-motion:reduce){.seatbar{animation:none}}
 
   [hidden]{display:none!important}
 
@@ -271,6 +280,7 @@
 </style>
 </head>
 <body>
+  <a class="seatbar" id="seatBar" hidden><span data-t="seat_find">Find your seat</span><span class="arr" aria-hidden="true">→</span></a>
   <a class="gm-dot" id="gmDot" dir="ltr" hidden aria-label="For the couple: guest list" title="For the couple">
     <svg viewBox="0 0 24 22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6">
       <circle cx="9" cy="13" r="6"/><circle class="r2" cx="15" cy="13" r="6"/><path d="M13.5 3.5l1.5-2 1.5 2-1.5 1.6z" stroke-width="1.2"/>
@@ -546,6 +556,7 @@ const AUTO_DETECT  = true;   // open in the visitor's own language when we have 
    ============================================================ */
 const T = {
   en:{
+    seat_find:"Find your seat",
     name:"English",
     dir:"ltr",
     date:"Thursday, 29 October 2026",
@@ -576,6 +587,7 @@ const T = {
     sending:"Sending…", fail:"Something went wrong. Please try again."
   },
   he:{
+    seat_find:"מצאו את המקום שלכם",
     name:"עברית",
     dir:"rtl",
     date:"יום חמישי, 29 באוקטובר 2026",
@@ -631,6 +643,19 @@ function applyLang(l, animate){
   paintLang(l);
 }
 
+/* Find your seat: when the couple publishes the seating in the guest manager,
+   a button appears here, so guests use the same invitation link they already have. */
+let seatsChecked = false;
+function checkSeats(){
+  if (seatsChecked || !GUESTS_LINK) return; seatsChecked = true;
+  let u; try { u = new URL(GUESTS_LINK, location.href); } catch(e){ return; }
+  const door = u.searchParams.get("d"); if (!door) return;
+  fetch(u.origin + "/api/guests?find=" + encodeURIComponent(door)).then(r=>r.json()).then(j=>{
+    if (!j || !j.on) return;
+    const bar = document.getElementById("seatBar");
+    bar.href = u.origin + u.pathname + "?find=" + encodeURIComponent(door); bar.hidden = false;
+  }).catch(()=>{});
+}
 function paintLang(l){
   lang = l;
   const t = T[l];
@@ -646,6 +671,7 @@ function paintLang(l){
   document.querySelectorAll("[data-ph]").forEach(el=>{
     el.placeholder = t[el.getAttribute("data-ph")] || "";
   });
+  checkSeats();
   const dot = document.getElementById("gmDot");
   if (dot && GUESTS_LINK && dot.hidden){
     dot.href = GUESTS_LINK; dot.hidden = false;
