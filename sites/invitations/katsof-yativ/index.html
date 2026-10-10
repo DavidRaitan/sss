@@ -145,7 +145,8 @@
   .thanks .mark{font-size:2.4rem;color:var(--gold);font-family:"Cormorant Garamond",serif}
   .thanks h3{font-family:"Cormorant Garamond",serif;font-weight:600;font-size:1.7rem;color:var(--sage-deep);margin:6px 0}
   .thanks p{color:var(--ink-soft)}
-  .thanks .seatlater{margin-top:10px;font-style:italic;color:var(--sage-deep)}
+  .thanks .seatlater{display:inline-block;margin:14px auto 0;padding:9px 16px;border-radius:999px;background:var(--paper-warm,#efece0);color:var(--sage-deep);font-size:.95rem;line-height:1.35;max-width:300px}
+  .thanks .seatlater[hidden]{display:none}
   .thanks button{margin-top:14px;background:transparent;border:1px solid var(--line);color:var(--ink-soft);padding:9px 18px;border-radius:999px;cursor:pointer;font-family:"EB Garamond",serif;font-size:.9rem;transition:.2s}
   .thanks button:hover{border-color:var(--sage);color:var(--sage-deep)}
 
@@ -193,12 +194,11 @@
   @media (prefers-reduced-motion:reduce){.gm-dot .r2{animation:none}}
   .gm-dot[hidden]{display:none}
   /* "Find your seat": appears by itself once the couple publishes the seating */
-  .seatbar{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:20;display:inline-flex;align-items:center;gap:10px;
-    padding:13px 20px;border-radius:999px;background:var(--gold,#b8913f);color:#fff;text-decoration:none;font-size:16px;letter-spacing:.02em;
+  .seatbar{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:20;display:inline-flex;align-items:center;justify-content:center;
+    padding:14px 30px;border-radius:999px;background:var(--gold,#b8913f);color:#fff;text-decoration:none;font-size:16px;letter-spacing:.02em;
     box-shadow:0 10px 30px rgba(60,45,20,.25);animation:seatIn .6s cubic-bezier(.2,.8,.2,1) both;white-space:nowrap}
   .seatbar:focus-visible{outline:2px solid #fff;outline-offset:3px}
   .seatbar[hidden]{display:none}
-  [dir="rtl"] .seatbar .arr{transform:scaleX(-1)}
   @keyframes seatIn{from{opacity:0;transform:translate(-50%,16px)}}
   @media (prefers-reduced-motion:reduce){.seatbar{animation:none}}
 
@@ -281,7 +281,7 @@
 </style>
 </head>
 <body>
-  <a class="seatbar" id="seatBar" hidden><span data-t="seat_find">Find your seat</span><span class="arr" aria-hidden="true">→</span></a>
+  <a class="seatbar" id="seatBar" hidden><span data-t="seat_find">Find your seat</span></a>
   <a class="gm-dot" id="gmDot" dir="ltr" hidden aria-label="For the couple: guest list" title="For the couple">
     <svg viewBox="0 0 24 22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6">
       <circle cx="9" cy="13" r="6"/><circle class="r2" cx="15" cy="13" r="6"/><path d="M13.5 3.5l1.5-2 1.5 2-1.5 1.6z" stroke-width="1.2"/>
@@ -495,7 +495,7 @@
         <div class="mark">✽</div>
         <h3 data-t="thanks_h"></h3>
         <p data-t="thanks_p"></p>
-        <p class="seatlater" id="seatLater" data-t="seat_later" hidden></p>
+        <span class="seatlater" id="seatLater" data-t="seat_later" hidden></span>
         <button id="againBtn" data-t="again"></button>
       </div>
 
@@ -559,7 +559,7 @@ const AUTO_DETECT  = true;   // open in the visitor's own language when we have 
 const T = {
   en:{
     seat_find:"Find your seat",
-    seat_later:"Closer to the day, open this invitation again to find your seat.",
+    seat_later:"Once the seating is ready, your seat will be right here.",
     name:"English",
     dir:"ltr",
     date:"Thursday, 29 October 2026",
@@ -591,7 +591,7 @@ const T = {
   },
   he:{
     seat_find:"מצאו את המקום שלכם",
-    seat_later:"קרוב לחתונה, פתחו שוב את ההזמנה הזו כדי למצוא את המקום שלכם.",
+    seat_later:"כשסידור הישיבה יהיה מוכן, המקום שלכם יחכה כאן.",
     name:"עברית",
     dir:"rtl",
     date:"יום חמישי, 29 באוקטובר 2026",
