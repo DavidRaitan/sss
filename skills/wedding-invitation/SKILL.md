@@ -164,6 +164,17 @@ already have; it opens a page where they type their name and see their
 table on a map of the hall. Off, there is no button. It needs
 `GUESTS_LINK`, since that is how the page knows whose seating to ask about.
 
+Until the seating is published, a guest who replies "yes" reads one more line
+under the thank-you: "Closer to the day, open this invitation again to find
+your seat" (the `seat_later` key). Once it is published the button is there
+instead, so the line is not shown. Translate `seat_find` and `seat_later` for
+every language the invitation has.
+
+The reply remembered on the phone is only the name and yes or no, kept in that
+browser (`localStorage` "rsvp-reply"). It is never sent anywhere, and the
+couple's sheet gets nothing extra: no phone number, no IP, no device ID. Replies
+made before a site had this have no note, so those guests type their name.
+
 ## If a language has no artwork
 
 `$SKILL/invitation-typeset.html` is the same invitation with the wording as real
