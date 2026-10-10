@@ -145,6 +145,7 @@
   .thanks .mark{font-size:2.4rem;color:var(--gold);font-family:"Cormorant Garamond",serif}
   .thanks h3{font-family:"Cormorant Garamond",serif;font-weight:600;font-size:1.7rem;color:var(--sage-deep);margin:6px 0}
   .thanks p{color:var(--ink-soft)}
+  .thanks .seatlater{margin-top:10px;font-style:italic;color:var(--sage-deep)}
   .thanks button{margin-top:14px;background:transparent;border:1px solid var(--line);color:var(--ink-soft);padding:9px 18px;border-radius:999px;cursor:pointer;font-family:"EB Garamond",serif;font-size:.9rem;transition:.2s}
   .thanks button:hover{border-color:var(--sage);color:var(--sage-deep)}
 
@@ -494,6 +495,7 @@
         <div class="mark">✽</div>
         <h3 data-t="thanks_h"></h3>
         <p data-t="thanks_p"></p>
+        <p class="seatlater" id="seatLater" data-t="seat_later" hidden></p>
         <button id="againBtn" data-t="again"></button>
       </div>
 
@@ -557,6 +559,7 @@ const AUTO_DETECT  = true;   // open in the visitor's own language when we have 
 const T = {
   en:{
     seat_find:"Find your seat",
+    seat_later:"Closer to the day, open this invitation again to find your seat.",
     name:"English",
     dir:"ltr",
     date:"Thursday, 29 October 2026",
@@ -588,6 +591,7 @@ const T = {
   },
   he:{
     seat_find:"מצאו את המקום שלכם",
+    seat_later:"קרוב לחתונה, פתחו שוב את ההזמנה הזו כדי למצוא את המקום שלכם.",
     name:"עברית",
     dir:"rtl",
     date:"יום חמישי, 29 באוקטובר 2026",
@@ -663,7 +667,7 @@ function checkSeats(){
   fetch(u.origin + "/api/guests?find=" + encodeURIComponent(door)).then(r=>r.json()).then(j=>{
     if (!j || !j.on) return;
     const bar = document.getElementById("seatBar");
-    bar.href = u.origin + u.pathname + "?find=" + encodeURIComponent(door) + (me && me.name ? "&n=" + encodeURIComponent(me.name) : ""); bar.hidden = false;
+    bar.href = u.origin + u.pathname + "?find=" + encodeURIComponent(door) + (me && me.name ? "&n=" + encodeURIComponent(me.name) : ""); bar.hidden = false; const sl = document.getElementById("seatLater"); if (sl) sl.hidden = true;
   }).catch(()=>{});
 }
 function paintLang(l){
@@ -847,6 +851,8 @@ btn.addEventListener("click", async ()=>{
 function showThanks(){
   document.getElementById("formArea").hidden = true;
   document.getElementById("thanks").classList.add("show");
+  const me = myReply(), sb = document.getElementById("seatBar");
+  document.getElementById("seatLater").hidden = !(me && me.yes) || (sb && !sb.hidden);
   msg.textContent = "";
 }
 
