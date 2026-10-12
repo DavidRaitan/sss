@@ -5,6 +5,9 @@ reading line by line. When asked, it answers aloud, grounded in sources (Sefaria
 cites. The user (David) is not a developer. Explain in plain words, and don't hand him
 commands he does not need.
 
+**Starting a new session? Read `docs/handoff.md` first**: where things stand, what is
+waiting on the user, and the separate Zichru/Kutzer project.
+
 Read `README.md` for what the app does, and `docs/decisions.md` for why it is the way it
 is (numbered entries, 1–80+). This file covers how to work on it.
 
