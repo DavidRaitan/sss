@@ -15,7 +15,7 @@
  */
 
 var SHEET_NAME = 'RSVPs';
-var HEADERS = ['Received', 'Name', 'Attending', 'Guests', 'Dietary', 'Details', 'Language'];
+var HEADERS = ['Received', 'Name', 'Attending', 'Guests', 'Dietary', 'Details', 'Language', 'Gender', 'With'];
 
 function doPost(e) {
   var lock = LockService.getScriptLock();       // two guests can reply at once
@@ -30,7 +30,9 @@ function doPost(e) {
       data.guests || '',
       data.diet || '',
       data.dietNote || '',
-      data.language || ''
+      data.language || '',
+      data.gender || '',                       // M or W, for the men's and women's tables
+      data.with || ''                          // the others: "Sarah (W); Yossi (M); (W)"
     ]);
     return json_({ ok: true });
   } catch (err) {
@@ -54,6 +56,9 @@ function getSheet_() {
     sheet.appendRow(HEADERS);
     sheet.getRange(1, 1, 1, HEADERS.length).setFontWeight('bold');
     sheet.setFrozenRows(1);
+  } else if (sheet.getLastColumn() < HEADERS.length) {     // a sheet from before Gender and With: add their headings
+    var from = sheet.getLastColumn() + 1;
+    sheet.getRange(1, from, 1, HEADERS.length - from + 1).setValues([HEADERS.slice(from - 1)]).setFontWeight('bold');
   }
   return sheet;
 }

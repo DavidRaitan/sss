@@ -119,6 +119,14 @@
   .field input:focus,.field select:focus{outline:none;border-color:var(--sage);background:var(--white);box-shadow:0 0 0 3px rgba(127,138,95,.18)}
 
   .attend{display:flex;gap:12px}
+  /* who's coming: a name for each extra guest (optional), man or woman for everyone */
+  .party{display:grid;gap:8px}
+  .prow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center}
+  .prow .you{font-size:1rem;color:var(--ink);padding:0 2px}
+  .mw{display:flex;border:1px solid var(--line);border-radius:3px;overflow:hidden;background:var(--paper)}
+  .mw button{border:0;background:none;font:inherit;font-size:.95rem;color:var(--ink);padding:10px 12px;cursor:pointer;min-width:58px}
+  .mw button+button{border-inline-start:1px solid var(--line)}
+  .mw button.on{background:rgba(127,138,95,.16);color:var(--sage-deep);font-weight:600}
   .attend label{flex:1;cursor:pointer;text-align:center;border:1px solid var(--line);border-radius:3px;padding:14px 8px;transition:.2s;background:var(--paper);font-size:1.05rem;color:var(--ink)}
   .attend input{position:absolute;opacity:0;pointer-events:none}
   .attend label.yes.on{border-color:var(--sage-deep);background:rgba(127,138,95,.16);color:var(--sage-deep);font-weight:600}
@@ -472,6 +480,11 @@
           </select>
         </div>
 
+        <div class="field" id="partyWrap">
+          <label data-t="party_l" id="partyLabel"></label>
+          <div class="party" id="party"></div>
+        </div>
+
         <div class="field">
           <label data-t="diet_l"></label>
           <select id="diet">
@@ -575,6 +588,7 @@ const T = {
     name_l:"Full name", name_ph:"Your full name",
     attend_l:"Will you attend?", attend_yes:"Joyfully yes", attend_no:"Sadly no",
     guests_l:"How many guests (including you)?",
+    party_l:"Who's coming with you?", party_one:"You are", you:"You", man:"Man", woman:"Woman", name_opt:"Their name (optional)",
     diet_l:"Anything we should know about food? (optional)",
     diet_none:"No restrictions", diet_vegetarian:"Vegetarian", diet_vegan:"Vegan",
     diet_gf:"Gluten free", diet_other:"Something else",
@@ -607,6 +621,7 @@ const T = {
     name_l:"שם מלא", name_ph:"השם המלא שלכם",
     attend_l:"האם תגיעו?", attend_yes:"בשמחה, מגיעים", attend_no:"לצערנו לא",
     guests_l:"כמה אורחים (כולל אתכם)?",
+    party_l:"מי מגיע איתכם?", party_one:"את/ה", you:"את/ה", man:"גבר", woman:"אישה", name_opt:"השם (לא חובה)",
     diet_l:"משהו שכדאי לדעת לגבי האוכל? (לא חובה)",
     diet_none:"ללא הגבלות", diet_vegetarian:"צמחוני", diet_vegan:"טבעוני",
     diet_gf:"ללא גלוטן", diet_other:"משהו אחר",
@@ -703,6 +718,7 @@ function paintLang(l){
   }
   document.querySelectorAll(".langbar button").forEach(b=>b.classList.toggle("on", b.dataset.lang === l));
   try { localStorage.setItem("rsvp-lang", l); } catch(e){}
+  renderParty();
 }
 
 function chatHref(t){
@@ -797,6 +813,27 @@ document.querySelectorAll("#attend label").forEach(l=>{
   });
 });
 
+/* one row per guest: "You" first, then a name box for each one with them;
+   man / woman for everyone, so the men's and women's tables can be filled */
+const party = [{n:"",g:""}];
+function renderParty(){
+  const t = T[lang], k = +document.getElementById("guests").value || 1;
+  while (party.length < k) party.push({n:"",g:""}); party.length = k;
+  document.getElementById("partyLabel").textContent = k > 1 ? (t.party_l || "") : (t.party_one || "");
+  const box = document.getElementById("party"); box.innerHTML = "";
+  party.forEach((p,i)=>{
+    const row = document.createElement("div"); row.className = "prow";
+    if (i === 0){ const s = document.createElement("span"); s.className = "you"; s.textContent = t.you || ""; row.appendChild(s); }
+    else { const inp = document.createElement("input"); inp.type = "text"; inp.maxLength = 60; inp.value = p.n; inp.placeholder = t.name_opt || "";
+      inp.addEventListener("input", ()=>{ p.n = inp.value; }); row.appendChild(inp); }
+    const mw = document.createElement("div"); mw.className = "mw";
+    [["M",t.man],["W",t.woman]].forEach(([v,l])=>{ const b = document.createElement("button"); b.type = "button"; b.textContent = l || v; b.classList.toggle("on", p.g === v);
+      b.addEventListener("click", ()=>{ p.g = p.g === v ? "" : v; mw.querySelectorAll("button").forEach(x=>x.classList.toggle("on", x === b && p.g === v)); }); mw.appendChild(b); });
+    row.appendChild(mw); box.appendChild(row);
+  });
+}
+document.getElementById("guests").addEventListener("change", renderParty);
+
 /* "something else" opens a line to write in */
 document.getElementById("diet").addEventListener("change", function(){
   const w = document.getElementById("dietNoteWrap");
@@ -823,6 +860,8 @@ btn.addEventListener("click", async ()=>{
     guests: attend === "yes" ? document.getElementById("guests").value : "0",
     diet: attend === "yes" ? document.getElementById("diet").value : "",
     dietNote: attend === "yes" ? document.getElementById("dietNote").value.trim() : "",
+    gender: attend === "yes" ? party[0].g : "",
+    with: attend === "yes" ? party.slice(1).map(p=>(p.n.trim() + (p.g ? " (" + p.g + ")" : "")).trim()).join("; ") : "",
     language: lang,
     timestamp: new Date().toISOString()
   };
@@ -866,7 +905,7 @@ document.getElementById("againBtn").addEventListener("click", ()=>{
   attend = null;
   document.querySelectorAll("#attend label").forEach(x=>x.classList.remove("on"));
   const w = document.getElementById("comingWrap"); w.classList.remove("show"); w.classList.add("hide");
-  document.getElementById("guests").value = "1";
+  document.getElementById("guests").value = "1"; party.length = 1; party[0] = {n:"",g:""}; renderParty();
   document.getElementById("diet").value = "none";
   document.getElementById("dietNote").value = "";
   const dn = document.getElementById("dietNoteWrap"); dn.classList.remove("show"); dn.classList.add("hide");
