@@ -109,50 +109,87 @@
   .maplink svg{flex:none}
   .maprow{text-align:center}
 
-  /* ---- form ---- */
-  .field{margin-bottom:18px}
-  .field label{display:block;font-size:.85rem;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:7px}
-  .field input,.field select{
-    width:100%;font-family:"EB Garamond",serif;font-size:1.05rem;color:var(--ink);
-    background:var(--paper);border:1px solid var(--line);border-radius:3px;padding:12px 14px;transition:.2s;
-  }
-  .field input:focus,.field select:focus{outline:none;border-color:var(--sage);background:var(--white);box-shadow:0 0 0 3px rgba(127,138,95,.18)}
+  /* ---- the reply: one question at a time, nothing square ---- */
+  .rsvp{max-width:440px;margin:0 auto;
+    --ui:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,system-ui,sans-serif;
+    --press:cubic-bezier(.2,.8,.2,1)}
+  .rsvp button,.rsvp input{font-family:var(--ui);-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+  .rsvp button{user-select:none;-webkit-user-select:none}
+  .rtop{display:flex;align-items:center;min-height:36px;margin-bottom:4px}
+  .back{border:0;background:none;color:var(--sage-deep);font-size:16px;padding:6px 8px 6px 0;cursor:pointer;display:inline-flex;align-items:center;gap:2px}
+  .back svg{width:18px;height:18px}
+  body.rtl .back svg{transform:scaleX(-1)}
+  .dots{display:flex;gap:6px;margin-inline-start:auto}
+  .dots i{width:6px;height:6px;border-radius:3px;background:var(--line);transition:width .35s var(--press),background .35s}
+  .dots i.on{width:20px;background:var(--sage-deep)}
+  .dots i.done{background:var(--sage)}
+  .step{text-align:center}
+  .step.in{animation:stepIn .42s var(--press) both}
+  .step.back-in{animation:stepBack .42s var(--press) both}
+  @keyframes stepIn{from{opacity:0;transform:translateX(22px)}}
+  @keyframes stepBack{from{opacity:0;transform:translateX(-22px)}}
+  body.rtl .step.in{animation-name:stepBack} body.rtl .step.back-in{animation-name:stepIn}
+  @media (prefers-reduced-motion:reduce){.step.in,.step.back-in{animation:fadeOnly .2s both}}
+  @keyframes fadeOnly{from{opacity:0}}
+  .step h2.sec{font-size:1.85rem;line-height:1.2;margin:6px 0 6px}
+  body.rtl .step h2.sec{font-size:1.6rem}
+  .step .sec-sub{margin-bottom:18px;font-size:1.05rem}
 
-  .attend{display:flex;gap:12px}
-  /* who's coming: a name for each extra guest (optional), man or woman for everyone */
-  .party{display:grid;gap:8px}
-  .prow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center}
-  .prow .you{font-size:1rem;color:var(--ink);padding:0 2px}
-  .mw{display:flex;border:1px solid var(--line);border-radius:3px;overflow:hidden;background:var(--paper)}
-  .mw button{border:0;background:none;font:inherit;font-size:.95rem;color:var(--ink);padding:10px 12px;cursor:pointer;min-width:58px}
-  .mw button+button{border-inline-start:1px solid var(--line)}
-  .mw button.on{background:rgba(127,138,95,.16);color:var(--sage-deep);font-weight:600}
-  .attend label{flex:1;cursor:pointer;text-align:center;border:1px solid var(--line);border-radius:3px;padding:14px 8px;transition:.2s;background:var(--paper);font-size:1.05rem;color:var(--ink)}
-  .attend input{position:absolute;opacity:0;pointer-events:none}
-  .attend label.yes.on{border-color:var(--sage-deep);background:rgba(127,138,95,.16);color:var(--sage-deep);font-weight:600}
-  .attend.sides label{padding:12px 6px;font-size:.98rem}
-  .attend.sides label.on{border-color:var(--sage-deep);background:rgba(127,138,95,.16);color:var(--sage-deep);font-weight:600}
-  .dupbox{margin:6px 0 14px;padding:16px;border:1px solid var(--line);border-radius:6px;background:rgba(127,138,95,.08);display:grid;gap:10px;text-align:center}
-  .dupbox p{margin:0;font-size:1.05rem;color:var(--ink)}
-  .dupbox .row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
-  .dupbox button{font:inherit;cursor:pointer;border:1px solid var(--sage-deep);border-radius:999px;padding:9px 16px;background:var(--paper);color:var(--sage-deep)}
-  .dupbox button.go{background:var(--sage-deep);color:#fff}
-  .dupbox .keep{display:grid;gap:6px;text-align:start}
-  .dupbox .keep label{display:flex;gap:8px;align-items:center;cursor:pointer;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--paper)}
-  .attend label.no.on{border-color:#c99a77;background:rgba(201,154,119,.15);color:#96684a;font-weight:600}
+  .big-in{width:100%;font-size:19px;padding:17px 18px;border-radius:16px;border:1px solid var(--line);
+    background:var(--paper);color:var(--ink);text-align:center;transition:border-color .2s,box-shadow .2s,background .2s}
+  .big-in::placeholder{color:#a39d89}
+  .big-in:focus{outline:none;border-color:var(--sage);background:var(--white);box-shadow:0 0 0 4px rgba(127,138,95,.16)}
+  .big-in.small{font-size:17px;padding:14px 16px;margin-top:10px}
 
-  .reveal{transition:.3s;overflow:hidden}
-  .reveal.hide{max-height:0;opacity:0;margin:0}
-  .reveal.show{max-height:420px;opacity:1}
+  .primary{display:block;width:100%;margin-top:18px;padding:17px;border:0;border-radius:999px;background:var(--sage-deep);
+    color:#fff;font-size:17px;font-weight:600;letter-spacing:.01em;cursor:pointer;transition:transform .14s var(--press),opacity .25s,background .2s}
+  .primary:disabled{opacity:.32;cursor:default}
+  .primary:active:not(:disabled){transform:scale(.97);background:#454f2e}
+  .primary.busy{opacity:.6}
 
-  .submit{
-    width:100%;font-family:"Cormorant Garamond",serif;font-size:1.3rem;letter-spacing:.03em;
-    background:var(--sage-deep);color:var(--white);border:none;border-radius:3px;padding:15px;cursor:pointer;transition:.25s;margin-top:6px;
-  }
-  body.rtl .submit{font-size:1.1rem}
-  .submit:hover{background:#454f2e}
-  .submit:disabled{opacity:.6;cursor:wait}
+  .choices{display:grid;gap:12px;margin-top:20px}
+  .choice{padding:19px 14px;border-radius:20px;border:1px solid var(--line);background:var(--paper);font-size:18px;color:var(--ink);
+    cursor:pointer;transition:transform .14s var(--press),background .2s,border-color .2s,color .2s}
+  .choice.main{background:var(--sage-deep);border-color:var(--sage-deep);color:#fff;font-weight:600}
+  .choice:active{transform:scale(.97)}
+  .choice.on{border-color:var(--sage-deep);background:rgba(127,138,95,.18);color:var(--sage-deep);font-weight:600}
+  .choice.main.on{background:#454f2e;color:#fff}
+  .choices.three{grid-template-columns:repeat(3,1fr)}
+  .choices.three .choice{padding:22px 6px}
 
+  .stepper{display:flex;align-items:center;justify-content:center;gap:26px;margin:16px 0 0}
+  .stepper button{width:54px;height:54px;border-radius:50%;border:1px solid var(--line);background:var(--paper);
+    font-size:26px;line-height:1;color:var(--sage-deep);cursor:pointer;transition:transform .14s var(--press),opacity .2s}
+  .stepper button:active:not(:disabled){transform:scale(.9)}
+  .stepper button:disabled{opacity:.3;cursor:default}
+  .stepper output{font-family:"Cormorant Garamond",serif;font-size:3rem;line-height:1;min-width:1.4em;color:var(--ink)}
+  .stepper-l{color:var(--ink-soft);font-size:1rem;margin:4px 0 18px}
+
+  .party{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;text-align:start}
+  .prow{display:flex;min-width:0;gap:10px;align-items:center;padding:7px 7px 7px 16px;border-radius:18px;background:var(--paper);border:1px solid var(--line);
+    transition:box-shadow .25s;animation:fadeOnly .3s both}
+  body.rtl .prow{padding:7px 16px 7px 7px}
+  .prow .you{flex:1;min-width:0;font-family:var(--ui,inherit);font-size:16px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .prow .you small{color:var(--ink-soft);font-size:13px;margin-inline-start:6px}
+  .prow input{flex:1;min-width:0;border:0;background:none;font-size:16px;color:var(--ink);padding:9px 0}
+  .prow input:focus{outline:none}
+  .mw{display:flex;flex:none;background:rgba(51,47,34,.07);border-radius:999px;padding:3px}
+  .mw button{border:0;background:none;border-radius:999px;padding:8px 13px;font-size:15px;color:var(--ink-soft);cursor:pointer;transition:background .2s,color .2s,box-shadow .2s}
+  .mw button.on{background:#fff;color:var(--ink);font-weight:600;box-shadow:0 1px 4px rgba(51,47,34,.18)}
+  .prow.need{box-shadow:0 0 0 2px rgba(201,154,119,.75)}
+  .hint{color:var(--ink-soft);font-size:.95rem;margin-top:12px;min-height:1.2em}
+  .hint.err{color:#a05a3c}
+
+  .chips{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin:14px 0 4px}
+  .chips span{padding:8px 16px;border-radius:999px;background:rgba(127,138,95,.13);color:var(--sage-deep);font-family:-apple-system,BlinkMacSystemFont,system-ui,sans-serif;font-size:15px}
+  .linkish{display:block;margin:14px auto 0;border:0;background:none;color:var(--sage-deep);font-size:16px;cursor:pointer;text-decoration:underline;text-underline-offset:4px;text-decoration-color:rgba(85,96,60,.35)}
+
+  .dupbox{margin:16px 0 0;padding:20px 16px;border-radius:20px;background:rgba(127,138,95,.1);display:grid;gap:14px;text-align:center;animation:fadeOnly .3s both}
+  .dupbox p{margin:0;font-size:1.1rem;color:var(--ink)}
+  .dupbox .row{display:grid;gap:10px}
+  .dupbox button{cursor:pointer;border:1px solid var(--sage-deep);border-radius:999px;padding:14px 16px;font-size:16px;background:var(--white);color:var(--sage-deep);transition:transform .14s}
+  .dupbox button.go{background:var(--sage-deep);color:#fff;font-weight:600}
+  .dupbox button:active{transform:scale(.97)}
   .msg{text-align:center;margin-top:16px;font-size:1.02rem;min-height:1.2em}
   .msg.ok{color:var(--sage-deep)}
   .msg.err{color:#a05a3c}
@@ -460,70 +497,60 @@
 
       <div class="rule"></div>
 
-      <!-- FORM -->
-      <div id="formArea">
-        <h2 class="sec" data-t="rsvp_h"></h2>
-        <p class="sec-sub" data-t="rsvp_sub"></p>
-
-        <div class="field">
-          <label data-t="name_l"></label>
-          <input type="text" id="fullname" autocomplete="name" data-ph="name_ph">
+      <!-- THE REPLY: one question at a time -->
+      <div id="formArea" class="rsvp">
+        <div class="rtop">
+          <button type="button" class="back" id="backBtn" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg><span data-t="back"></span></button>
+          <div class="dots" id="dots" aria-hidden="true"></div>
         </div>
 
-        <div class="field">
-          <label data-t="side_l"></label>
-          <div class="attend sides" id="sideSel">
-            <label data-side="B"><input type="radio" name="side" value="B"><span data-t="side_b"></span></label>
-            <label data-side="G"><input type="radio" name="side" value="G"><span data-t="side_g"></span></label>
-            <label data-side="X"><input type="radio" name="side" value="X"><span data-t="side_x"></span></label>
+        <section class="step" data-step="name">
+          <h2 class="sec" data-t="rsvp_h"></h2>
+          <p class="sec-sub" data-t="rsvp_sub"></p>
+          <input class="big-in" type="text" id="fullname" autocomplete="name" autocapitalize="words" enterkeyhint="next" maxlength="80" data-ph="name_ph">
+          <div class="dupbox" id="dupBox" hidden aria-live="polite"></div>
+          <button type="button" class="primary" id="nameNext" data-t="next" disabled></button>
+        </section>
+
+        <section class="step" data-step="attend" hidden>
+          <h2 class="sec" id="attendQ"></h2>
+          <div class="choices">
+            <button type="button" class="choice main" data-attend="yes" data-t="attend_yes"></button>
+            <button type="button" class="choice" data-attend="no" data-t="attend_no"></button>
           </div>
-        </div>
+        </section>
 
-        <div class="field">
-          <label data-t="attend_l"></label>
-          <div class="attend" id="attend">
-            <label class="yes" data-attend="yes"><input type="radio" name="attend" value="yes"><span data-t="attend_yes"></span></label>
-            <label class="no" data-attend="no"><input type="radio" name="attend" value="no"><span data-t="attend_no"></span></label>
+        <section class="step" data-step="who" hidden>
+          <h2 class="sec" data-t="who_h"></h2>
+          <div class="stepper">
+            <button type="button" data-n="-1" aria-label="−">−</button>
+            <output id="nOut">1</output>
+            <button type="button" data-n="1" aria-label="+">+</button>
           </div>
-        </div>
-
-        <div class="reveal hide" id="comingWrap">
-        <div class="field">
-          <label data-t="guests_l"></label>
-          <select id="guests">
-            <option value="1">1</option><option value="2">2</option><option value="3">3</option>
-            <option value="4">4</option><option value="5">5</option><option value="6">6</option>
-            <option value="7">7</option><option value="8">8</option><option value="9">9</option>
-            <option value="10">10</option><option value="11">11</option><option value="12">12</option>
-          </select>
-        </div>
-
-        <div class="field" id="partyWrap">
-          <label data-t="party_l" id="partyLabel"></label>
+          <p class="stepper-l" id="nLab"></p>
           <div class="party" id="party"></div>
-        </div>
+          <p class="hint" id="whoHint"></p>
+          <button type="button" class="primary" id="whoNext" data-t="next"></button>
+        </section>
 
-        <div class="field">
-          <label data-t="diet_l"></label>
-          <select id="diet">
-            <option value="none" data-t="diet_none"></option>
-            <option value="vegetarian" data-t="diet_vegetarian"></option>
-            <option value="vegan" data-t="diet_vegan"></option>
-            <option value="gluten-free" data-t="diet_gf"></option>
-            <option value="other" data-t="diet_other"></option>
-          </select>
-        </div>
+        <section class="step" data-step="side" hidden>
+          <h2 class="sec" data-t="side_l"></h2>
+          <div class="choices three">
+            <button type="button" class="choice" data-side="B" data-t="side_b"></button>
+            <button type="button" class="choice" data-side="G" data-t="side_g"></button>
+            <button type="button" class="choice" data-side="X" data-t="side_x"></button>
+          </div>
+        </section>
 
-        <div class="field reveal hide" id="dietNoteWrap">
-          <input type="text" id="dietNote" maxlength="140" data-ph="diet_note_ph">
-        </div>
-        </div>
-
-        <div class="dupbox" id="dupBox" hidden aria-live="polite"></div>
-        <button class="submit" id="submitBtn" data-t="submit"></button>
-        <p class="msg" id="msg"></p>
+        <section class="step" data-step="send" hidden>
+          <h2 class="sec" id="sumH"></h2>
+          <div class="chips" id="sumChips"></div>
+          <button type="button" class="linkish" id="foodBtn" data-t="food_add"></button>
+          <input class="big-in small" type="text" id="dietNote" maxlength="140" data-ph="diet_note_ph" hidden>
+          <button type="button" class="primary" id="submitBtn" data-t="submit"></button>
+          <p class="msg" id="msg"></p>
+        </section>
       </div>
-
       <div class="thanks" id="thanks">
         <div class="mark">✽</div>
         <h3 data-t="thanks_h"></h3>
@@ -564,7 +591,8 @@ const WEDDING = {
   end:   "20260101T235900",
   calTitle: "First & Second Wedding",   // keep it short: first names, the way a guest would write it
   calLocation: "Venue, City, Israel",
-  calDetails: "Kabbalat Panim 00:00, Chuppah 00:00."
+  calDetails: "Kabbalat Panim 00:00, Chuppah 00:00.",
+  separate: true                        // men's and women's tables: the reply asks man / woman (guessed from the name)
 };
 
 /* The quiet line at the foot of the page. Leave both empty to drop it.
@@ -603,21 +631,19 @@ const T = {
     map_h:"Getting there", map_sub:"VENUE, CITY",
     directions:"Open directions in Waze",
     cal_google:"Add to Google Calendar", cal_apple:"Add to Apple Calendar",
-    rsvp_h:"Will you join us?", rsvp_sub:"Kindly reply below",
-    name_l:"Full name", name_ph:"Your full name",
-    side_l:"Whose guest are you?", side_b:"The bride's", side_g:"The groom's", side_x:"Both",
-    err_side:"Please choose whose guest you are.",
+    rsvp_h:"Will you join us?", rsvp_sub:"Let’s start with your name",
+    name_ph:"Your full name", next:"Continue", back:"Back",
     dup_q:"Did you already reply as {name}?", dup_n:"{n} coming", dup_none:"not coming",
-    dup_yes:"Yes, update my reply", dup_no:"No, I'm someone else",
-    dup_keep:"Which name should we keep?", dup_go:"Update my reply", thanks_upd:"Your reply was updated.",
-    attend_l:"Will you attend?", attend_yes:"Joyfully yes", attend_no:"Sadly no",
-    guests_l:"How many guests (including you)?",
-    party_l:"Who's coming with you?", party_one:"You are", you:"You", man:"Man", woman:"Woman", name_opt:"Their name (optional)",
-    diet_l:"Anything we should know about food? (optional)",
-    diet_none:"No restrictions", diet_vegetarian:"Vegetarian", diet_vegan:"Vegan",
-    diet_gf:"Gluten free", diet_other:"Something else",
-    diet_note_ph:"Tell us what to avoid",
-    submit:"Send RSVP",
+    dup_yes:"Yes, that’s me", dup_no:"No, someone else", thanks_upd:"Your reply was updated.",
+    attend_q:"Will you be there, {first}?", attend_yes:"Yes, joyfully", attend_no:"Sorry, I can’t make it",
+    who_h:"How many of you?", n_one:"Just you", n_many:"including you",
+    you:"you", man:"Man", woman:"Woman", name_opt:"Name (optional)",
+    mw_hint:"For the men’s and women’s tables", mw_need:"Please tap Man or Woman for everyone",
+    side_l:"Whose guest are you?", side_b:"Bride", side_g:"Groom", side_x:"Both",
+    sum_yes:"Wonderful, {first}!", sum_one:"Just you", sum_n:"{n} people",
+    sum_no:"We’ll miss you, {first}", sum_no_p:"Thank you for letting us know",
+    food_add:"Any food needs?", diet_note_ph:"Allergies, vegetarian…",
+    submit:"Send my reply",
     thanks_h:"Thank you!", thanks_p:"Your reply has been received. We can't wait to celebrate with you.",
     again:"Send another reply",
     foot:"We can't wait to celebrate with you",
@@ -641,21 +667,19 @@ const T = {
     map_h:"איך מגיעים", map_sub:"שם המקום, יישוב",
     directions:"פתחו ניווט ב-Waze",
     cal_google:"הוספה ליומן Google", cal_apple:"הוספה ליומן Apple",
-    rsvp_h:"תבואו לחגוג איתנו?", rsvp_sub:"נודה לכם על אישור ההגעה",
-    name_l:"שם מלא", name_ph:"השם המלא שלכם",
-    side_l:"של מי אתם?", side_b:"של הכלה", side_g:"של החתן", side_x:"של שניהם",
-    err_side:"בחרו בבקשה של מי אתם.",
-    dup_q:"כבר אישרתם בשם {name}?", dup_n:"{n} מגיעים", dup_none:"לא מגיעים",
-    dup_yes:"כן, לעדכן את האישור", dup_no:"לא, אני מישהו אחר",
-    dup_keep:"איזה שם לשמור?", dup_go:"עדכון האישור", thanks_upd:"האישור שלכם עודכן.",
-    attend_l:"האם תגיעו?", attend_yes:"בשמחה, מגיעים", attend_no:"לצערנו לא",
-    guests_l:"כמה אורחים (כולל אתכם)?",
-    party_l:"מי מגיע איתכם?", party_one:"את/ה", you:"את/ה", man:"גבר", woman:"אישה", name_opt:"השם (לא חובה)",
-    diet_l:"משהו שכדאי לדעת לגבי האוכל? (לא חובה)",
-    diet_none:"ללא הגבלות", diet_vegetarian:"צמחוני", diet_vegan:"טבעוני",
-    diet_gf:"ללא גלוטן", diet_other:"משהו אחר",
-    diet_note_ph:"ספרו לנו ממה להימנע",
-    submit:"שליחת אישור",
+    rsvp_h:"תבואו לחגוג איתנו?", rsvp_sub:"נתחיל בשם שלכם",
+    name_ph:"שם מלא", next:"המשך", back:"חזרה",
+    dup_q:"כבר עניתם בשם {name}?", dup_n:"{n} מגיעים", dup_none:"לא מגיעים",
+    dup_yes:"כן, זה אני", dup_no:"לא, מישהו אחר", thanks_upd:"התשובה שלכם עודכנה.",
+    attend_q:"תגיעו, {first}?", attend_yes:"כן, בשמחה", attend_no:"לצערי לא אוכל",
+    who_h:"כמה תהיו?", n_one:"רק את/ה", n_many:"כולל אתכם",
+    you:"את/ה", man:"גבר", woman:"אישה", name_opt:"שם (לא חובה)",
+    mw_hint:"בשביל שולחנות הגברים והנשים", mw_need:"סמנו גבר או אישה לכל אחד",
+    side_l:"של מי אתם?", side_b:"הכלה", side_g:"החתן", side_x:"שניהם",
+    sum_yes:"נפלא, {first}!", sum_one:"רק את/ה", sum_n:"{n} אנשים",
+    sum_no:"נתגעגע, {first}", sum_no_p:"תודה שעדכנתם",
+    food_add:"משהו לגבי האוכל?", diet_note_ph:"אלרגיות, צמחוני…",
+    submit:"שליחת התשובה",
     thanks_h:"תודה רבה!", thanks_p:"אישור ההגעה התקבל. מחכים לחגוג איתכם!",
     again:"שליחת אישור נוסף",
     foot:"מחכים לחגוג איתכם",
@@ -747,7 +771,7 @@ function paintLang(l){
   }
   document.querySelectorAll(".langbar button").forEach(b=>b.classList.toggle("on", b.dataset.lang === l));
   try { localStorage.setItem("rsvp-lang", l); } catch(e){}
-  renderParty();
+  if (typeof paintStep === "function" && document.getElementById("dots")) paintStep();
 }
 
 function chatHref(t){
@@ -825,11 +849,64 @@ function chooseLang(){
   });
 })();
 
-/* whose guest */
-let side = null;
-document.querySelectorAll("#sideSel label").forEach(l=>{
-  l.addEventListener("click", ()=>{ side = l.dataset.side; document.querySelectorAll("#sideSel label").forEach(x=>x.classList.toggle("on", x === l)); });
-});
+/* ============================================================
+   The reply, one question at a time:
+   name → coming? → who's coming → whose guest → send.
+   A guest who isn't coming goes straight from "coming?" to send.
+   ============================================================ */
+const $id = id => document.getElementById(id);
+const tx = k => (T[lang] && T[lang][k] !== undefined) ? T[lang][k] : (T.en[k] !== undefined ? T.en[k] : "");
+const MW_ON = WEDDING.separate !== false;      // men's and women's tables: ask man / woman for each guest
+let side = null, knownSide = null, count = 1, dupFor = null, dupDone = "", stepNow = "name";
+const party = [{ n: "", g: "", auto: true }];
+
+/* man or woman from the first name, so most guests only have to agree.
+   Names that go both ways (Tal, Lior, Shai…) are left for the guest to tap. */
+const MEN = new Set(("david daniel michael yosef joseph yossi yosi yossef moshe moses avraham abraham avi yitzchak yitzhak isaac yaakov jacob "+
+  "yehuda shlomo solomon shmuel samuel sam eli elie eliyahu elijah aaron aharon benjamin binyamin benny ben natan nathan jonathan yonatan yehonatan "+
+  "yoni josh joshua yehoshua adam noah ethan eitan ari aryeh arie dov chaim haim meir menachem mendel mordechai moti motti nachum naftali "+
+  "gabriel gavriel raphael refael rafael rafi reuven ruben simon shimon levi zev zeev gad asher dan yair amir uri oren ofer ilan ron gil guy itai itay "+
+  "idan omri oded ehud elad erez eyal nir roy roi tomer yoav yigal yaron alon amos boaz ezra gideon hillel ido matan nadav nimrod omer rami shaul saul "+
+  "tzvi zvi yechiel yehiel akiva baruch betzalel elchanan elisha eliezer elimelech emanuel immanuel ephraim efraim hershel jaime jose juan carlos luis "+
+  "pedro pablo diego miguel alejandro andres fernando jorge javier ricardo roberto sergio mario marco marcos john james robert william richard thomas "+
+  "charles christopher matthew mark paul steven stephen andrew kevin brian george edward peter henry jack max leo sebastian nicolas felipe mauricio "+
+  "martin gustavo eduardo rodrigo ivan oscar victor raul hector alberto manuel francisco antonio ignacio tomas mateo santiago lucas joel mike steve "+
+  "dave jeff eric ryan jason scott frank harry kobi tzachi shuki avner nati netanel nethanel nehemia nechemia ovadia pinchas yechezkel zecharia "+
+  "zachary yisrael israel yishai jesse elyakim chanoch hanoch yirmiyahu yeshayahu gedalia gedalya matityahu avishai avinoam amichai shalom elkana "+
+  "eliav yehoshua luca nikita misha shaya yisroel yaakov yankel shmulik srulik avrumi dudi yehudah").split(" "));
+const WOMEN = new Set(("sarah sara rachel rachael rivka rebecca rebekah leah lea hannah hana chana miriam esther ruth rut naomi devorah deborah dvora "+
+  "tamar yael michal noa shira maya maia avigail abigail tova tzipora tziporah batsheva chaya haya dina dinah elisheva elizabeth liz beth hadas "+
+  "hadassah ayelet efrat adina aliza avital ilana orly orli galit sigal keren limor liat merav meital moran nili ofra osnat revital rina ronit "+
+  "shoshana shuli smadar tali tzila vered yafit yaffa yehudit judith zehava zahava nechama malka bracha gila hila inbal lihi maayan nofar noga "+
+  "nurit reut shani shelly stav talia tehila yasmin zoe emma olivia ava sophia sofia isabella mia emily charlotte amelia grace lily chloe anna ana "+
+  "maria mary jennifer jessica ashley amanda nicole stephanie laura lauren julia julie karen lisa linda susan nancy patricia barbara margaret "+
+  "betty helen carol debbie donna michelle melissa kim amy angela rose alice jane lucy kate katie catherine claire eva eve elena carmen lucia "+
+  "paula marta valentina camila daniela gabriela mariana andrea natalia alejandra fernanda veronica silvia monica beatriz raquel ines jimena "+
+  "ximena luciana florencia agustina victoria rosa pilar sandra diana gloria adriana claudia liora moriah odelia hodaya odaya ahuva ruti pnina "+
+  "penina zehavit tirtza tzofia sapir orit ortal ruchama yocheved bella chagit hagit tziona shulamit riki rikki leora rivky chani esti").split(" "));
+const MEN_HE = new Set(("דוד דניאל מיכאל יוסף יוסי משה אברהם אבי יצחק יעקב יהודה שלמה שמואל אלי אליהו אהרן אהרון בנימין בני נתן יונתן יהונתן "+
+  "יוני יהושע אדם נח איתן ארי אריה דב חיים מאיר מנחם מרדכי מוטי נחום נפתלי גבריאל רפאל רפי ראובן שמעון לוי זאב גד אשר דן יאיר אמיר אורי "+
+  "אורן עופר אילן רון גיל גיא איתי עידן עמרי עודד אהוד אלעד ארז אייל ניר רועי תומר יואב יגאל ירון אלון עמוס בועז עזרא גדעון הלל עידו מתן נדב "+
+  "נמרוד עומר רמי שאול צבי יחיאל עקיבא ברוך בצלאל אלחנן אלישע אליעזר אפרים נתנאל נחמיה עובדיה פנחס יחזקאל זכריה ישראל ישי אביחי עמיחי "+
+  "אבישי אבינועם קובי צחי שוקי אבנר מתתיהו חנוך אליקים ישעיהו ירמיהו גדליה שלום אלקנה אליאב חיים מנדי דודי שמוליק").split(" "));
+const WOMEN_HE = new Set(("שרה רחל רבקה לאה חנה מרים אסתר רות נעמי דבורה תמר יעל מיכל נועה שירה מאיה מיה אביגיל טובה ציפורה בתשבע חיה דינה "+
+  "אלישבע הדס הדסה איילת אפרת עדינה עליזה אביטל אילנה אורלי גלית סיגל קרן לימור ליאת מירב מיטל מורן נילי עפרה אסנת רויטל רינה רונית שושנה "+
+  "שולי סמדר טלי צילה ורד יפית יפה יהודית זהבה נחמה מלכה ברכה גילה הילה ענבל ליהי מעיין נופר נוגה נורית רעות שני שלי סתיו טליה תהילה יסמין "+
+  "זהבית תרצה צופיה ספיר אורית אורטל רוחמה יוכבד בלה פנינה אהובה רותי הודיה אודיה מוריה אודליה ליאורה חגית ציונה שולמית ריקי אסתי חני").split(" "));
+function guessMW(name){
+  const ws = String(name || "").toLowerCase().replace(/[.,'’׳"]/g, "").split(/[\s-]+/).filter(Boolean);
+  for (const w of ws.slice(0, 2)){
+    if (/^(mr|rabbi|rav|הרב|מר|ר)$/.test(w)) return "M";
+    if (/^(mrs|ms|miss|גב|גברת|הרבנית)$/.test(w)) return "W";
+    if (MEN.has(w) || MEN_HE.has(w)) return "M";
+    if (WOMEN.has(w) || WOMEN_HE.has(w)) return "W";
+    if (/^[֐-׿]{3,}ית$/.test(w)) return "W";              // Galit, Orit, Yafit…
+    if (/^[a-z]{3,}a$/.test(w)) return "W";                        // Latin names ending in -a (the men's are listed above)
+    if (w.length > 1) return "";                                    // first real word decides; unknown: ask
+  }
+  return "";
+}
+
 /* names in Title Case as they're written: "AVI cohen" → "Avi Cohen"; "McDonald" and Hebrew stay as they are */
 const JOIN = new Set(["and","et","y","e","de","da","di","du","del","van","von","la","le","bat","ben","bar"]);
 function titleName(v){ let k = 0;
@@ -838,132 +915,187 @@ function titleName(v){ let k = 0;
     const lw = w.toLowerCase(); if (!first && JOIN.has(lw)) return lw;
     return lw.replace(/(^|[-'’.])([a-z])/g, (m, a, b) => a + b.toUpperCase()); }); }
 document.addEventListener("focusout", e => { if (e.target.id === "fullname" || (e.target.closest && e.target.closest("#party") && e.target.type === "text")) { const v = titleName(e.target.value); if (v !== e.target.value) { e.target.value = v; e.target.dispatchEvent(new Event("input", { bubbles: true })); } } });
+const firstName = () => (titleName($id("fullname").value).split(" ")[0] || "");
+const safe = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
-/* someone who already replied: update that reply instead of adding a second one */
-let dupFor = null, dupSkip = "";
+/* the steps this guest will see, in order */
+function steps(){
+  if (attend === "no") return ["name", "attend", "send"];
+  return ["name", "attend", "who"].concat(knownSide ? [] : ["side"], ["send"]);
+}
+function go(s, back){
+  stepNow = s;
+  document.querySelectorAll("#formArea .step").forEach(el => {
+    const on = el.dataset.step === s; el.hidden = !on;
+    if (on){ el.classList.remove("in", "back-in"); void el.offsetWidth; el.classList.add(back ? "back-in" : "in"); }
+  });
+  const p = steps(), at = p.indexOf(s);
+  $id("dots").innerHTML = p.map((x, i) => `<i class="${i === at ? "on" : i < at ? "done" : ""}"></i>`).join("");
+  $id("backBtn").hidden = s === "name";
+  paintStep();
+  const top = $id("formArea").getBoundingClientRect().top;
+  if (top < 0) $id("formArea").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+/* everything on the steps that depends on the language or the answers so far */
+function paintStep(){
+  $id("attendQ").textContent = tx("attend_q").replace("{first}", firstName());
+  document.querySelectorAll("[data-attend]").forEach(b => b.classList.toggle("on", b.dataset.attend === attend));
+  document.querySelectorAll("[data-side]").forEach(b => b.classList.toggle("on", b.dataset.side === side));
+  if (stepNow === "who") renderParty();
+  if (stepNow === "send") renderSummary();
+  $id("nameNext").disabled = $id("fullname").value.trim().length < 2;
+}
+$id("backBtn").addEventListener("click", () => { const p = steps(), i = p.indexOf(stepNow); if (i > 0) go(p[i - 1], true); });
+const nextOf = s => { const p = steps(); return p[p.indexOf(s) + 1]; };
+
+/* 1 · name — and, if they already replied under it, update that reply instead of adding a second */
 async function findEarlier(name){
   if (!GUESTS_LINK) return null;
   let u; try { u = new URL(GUESTS_LINK, location.href); } catch(e){ return null; }
   const door = u.searchParams.get("d"); if (!door) return null;
   try {
     const ctl = new AbortController(); setTimeout(() => ctl.abort(), 3500);
-    const j = await fetch(u.origin + "/api/guests?rsvpcheck=" + encodeURIComponent(door) + "&q=" + encodeURIComponent(name), { signal: ctl.signal }).then(r => r.json());
-    return j && j.matches && j.matches[0] || null;
+    return await fetch(u.origin + "/api/guests?rsvpcheck=" + encodeURIComponent(door) + "&q=" + encodeURIComponent(name), { signal: ctl.signal }).then(r => r.json());
   } catch(e){ return null; }
 }
-function showDup(m, name){
-  const t = T[lang], box = document.getElementById("dupBox"), safe = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-  const longer = (m.name.length >= name.length ? m.name : name);
-  box.innerHTML = `<p>${safe(t.dup_q).replace("{name}", "<b>" + safe(m.name) + "</b>")} <span style="opacity:.75">(${safe(m.yes ? t.dup_n.replace("{n}", m.n) : t.dup_none)})</span></p>
-    <div class="row"><button type="button" class="go" data-dup="yes">${safe(t.dup_yes)}</button><button type="button" data-dup="no">${safe(t.dup_no)}</button></div>
-    <div class="keep" id="dupKeep" hidden><p style="text-align:center">${safe(t.dup_keep)}</p>
-      ${[...new Set([m.name, name])].map(n => `<label><input type="radio" name="keepname" value="${safe(n)}"${n === longer ? " checked" : ""}> ${safe(n)}</label>`).join("")}
-      <div class="row"><button type="button" class="go" data-dup="go">${safe(t.dup_go)}</button></div></div>`;
-  box.hidden = false; dupFor = m;
-  box.scrollIntoView({ behavior: "smooth", block: "center" });
+const nameIn = $id("fullname"), nameNext = $id("nameNext");
+nameIn.addEventListener("input", () => {
+  nameNext.disabled = nameIn.value.trim().length < 2;
+  if (!$id("dupBox").hidden){ $id("dupBox").hidden = true; nameNext.hidden = false; }
+});
+nameIn.addEventListener("keydown", e => { if (e.key === "Enter" && !nameNext.disabled){ e.preventDefault(); nameNext.click(); } });
+nameNext.addEventListener("click", async () => {
+  const name = titleName(nameIn.value); nameIn.value = name;
+  if (party[0].auto) party[0].g = MW_ON ? guessMW(name) : "";
+  if (dupDone !== name.toLowerCase()){
+    nameNext.disabled = true; nameNext.classList.add("busy");
+    const j = await findEarlier(name);
+    nameNext.disabled = false; nameNext.classList.remove("busy");
+    dupDone = name.toLowerCase(); dupFor = null;
+    knownSide = j && ["B", "G", "X"].includes(j.side) ? j.side : null;   // on the couple's list with a side: no need to ask
+    const m = j && j.matches && j.matches[0];
+    if (m){ showDup(m); return; }
+  }
+  nameIn.blur(); go("attend");
+});
+function showDup(m){
+  const box = $id("dupBox");
+  box.innerHTML = `<p>${safe(tx("dup_q")).replace("{name}", "<b>" + safe(m.name) + "</b>")}<br><span style="opacity:.7;font-size:.95rem">${safe(m.yes ? tx("dup_n").replace("{n}", m.n) : tx("dup_none"))}</span></p>
+    <div class="row"><button type="button" class="go" data-dup="yes">${safe(tx("dup_yes"))}</button><button type="button" data-dup="no">${safe(tx("dup_no"))}</button></div>`;
+  box.hidden = false; nameNext.hidden = true; box._m = m;
 }
 document.addEventListener("click", e => {
   const b = e.target.closest("[data-dup]"); if (!b) return;
-  const box = document.getElementById("dupBox");
-  if (b.dataset.dup === "no"){ dupSkip = document.getElementById("fullname").value.trim().toLowerCase(); dupFor = null; box.hidden = true; btn.click(); return; }
-  if (b.dataset.dup === "yes"){ document.getElementById("dupKeep").hidden = false; b.closest(".row").hidden = true; return; }
-  if (b.dataset.dup === "go"){ const k = box.querySelector('input[name="keepname"]:checked'); send({ replaces: dupFor.name, keep: k ? k.value : dupFor.name }); }
+  const box = $id("dupBox"), m = box._m;
+  if (b.dataset.dup === "yes"){
+    dupFor = m;
+    if (m.name.length > nameIn.value.trim().length) nameIn.value = m.name;   // keep the fuller of the two names
+    if (m.yes && m.n){ count = Math.min(12, m.n); }
+  } else dupFor = null;
+  box.hidden = true; nameNext.hidden = false; nameIn.blur(); go("attend");
 });
 
-/* attend selection */
-document.querySelectorAll("#attend label").forEach(l=>{
-  l.addEventListener("click", ()=>{
-    attend = l.dataset.attend;
-    document.querySelectorAll("#attend label").forEach(x=>x.classList.toggle("on", x === l));
-    const w = document.getElementById("comingWrap");
-    if (attend === "yes"){ w.classList.remove("hide"); w.classList.add("show"); }
-    else {
-      w.classList.remove("show"); w.classList.add("hide");
-      const dn = document.getElementById("dietNoteWrap");
-      dn.classList.remove("show"); dn.classList.add("hide");
-      document.getElementById("diet").value = "none";
-      document.getElementById("dietNote").value = "";
-    }
-  });
-});
+/* 2 · coming? one tap, and on to the next question */
 
-/* one row per guest: "You" first, then a name box for each one with them;
-   man / woman for everyone, so the men's and women's tables can be filled */
-const party = [{n:"",g:""}];
+document.querySelectorAll("[data-attend]").forEach(b => b.addEventListener("click", () => {
+  attend = b.dataset.attend; paintStep();
+  setTimeout(() => go(nextOf("attend")), 170);
+}));
+
+/* 3 · who's coming: how many, then a row for each — man or woman already
+   chosen from the name when we can tell, so they only need to agree */
+document.querySelectorAll(".stepper [data-n]").forEach(b => b.addEventListener("click", () => {
+  count = Math.max(1, Math.min(12, count + +b.dataset.n)); renderParty();
+}));
 function renderParty(){
-  const t = T[lang], k = +document.getElementById("guests").value || 1;
-  while (party.length < k) party.push({n:"",g:""}); party.length = k;
-  document.getElementById("partyLabel").textContent = k > 1 ? (t.party_l || "") : (t.party_one || "");
-  const box = document.getElementById("party"); box.innerHTML = "";
-  party.forEach((p,i)=>{
+  while (party.length < count) party.push({ n: "", g: "", auto: true }); party.length = count;
+  $id("nOut").textContent = count;
+  $id("nLab").textContent = count === 1 ? tx("n_one") : tx("n_many");
+  document.querySelector('.stepper [data-n="-1"]').disabled = count <= 1;
+  document.querySelector('.stepper [data-n="1"]').disabled = count >= 12;
+  const box = $id("party"); box.innerHTML = "";
+  party.forEach((p, i) => {
+    if (!MW_ON && i === 0) return;                       // nothing to ask about the guest themselves
     const row = document.createElement("div"); row.className = "prow";
-    if (i === 0){ const s = document.createElement("span"); s.className = "you"; s.textContent = t.you || ""; row.appendChild(s); }
-    else { const inp = document.createElement("input"); inp.type = "text"; inp.maxLength = 60; inp.value = p.n; inp.placeholder = t.name_opt || "";
-      inp.addEventListener("input", ()=>{ p.n = inp.value; }); row.appendChild(inp); }
-    const mw = document.createElement("div"); mw.className = "mw";
-    [["M",t.man],["W",t.woman]].forEach(([v,l])=>{ const b = document.createElement("button"); b.type = "button"; b.textContent = l || v; b.classList.toggle("on", p.g === v);
-      b.addEventListener("click", ()=>{ p.g = p.g === v ? "" : v; mw.querySelectorAll("button").forEach(x=>x.classList.toggle("on", x === b && p.g === v)); }); mw.appendChild(b); });
-    row.appendChild(mw); box.appendChild(row);
+    if (i === 0){
+      if (p.auto) p.g = guessMW(nameIn.value);
+      row.innerHTML = `<span class="you">${safe(titleName(nameIn.value))}<small>${safe(tx("you"))}</small></span>`;
+    } else {
+      const inp = document.createElement("input"); inp.type = "text"; inp.maxLength = 60; inp.value = p.n;
+      inp.placeholder = tx("name_opt"); inp.autocapitalize = "words"; inp.setAttribute("enterkeyhint", "next");
+      inp.addEventListener("input", () => { p.n = inp.value; if (p.auto && MW_ON){ p.g = guessMW(inp.value); paintMW(row, p); } });
+      row.appendChild(inp);
+    }
+    if (MW_ON){
+      const mw = document.createElement("div"); mw.className = "mw";
+      [["M", tx("man")], ["W", tx("woman")]].forEach(([v, l]) => {
+        const b = document.createElement("button"); b.type = "button"; b.dataset.g = v; b.textContent = l;
+        b.addEventListener("click", () => { p.g = v; p.auto = false; paintMW(row, p); row.classList.remove("need"); if (!box.querySelector(".need")) hint(""); });
+        mw.appendChild(b);
+      });
+      row.appendChild(mw); paintMW(row, p);
+    }
+    box.appendChild(row);
   });
+  hint(MW_ON ? tx("mw_hint") : "");
 }
-document.getElementById("guests").addEventListener("change", renderParty);
-
-/* "something else" opens a line to write in */
-document.getElementById("diet").addEventListener("change", function(){
-  const w = document.getElementById("dietNoteWrap");
-  const wanted = this.value === "other";
-  w.classList.toggle("show", wanted);
-  w.classList.toggle("hide", !wanted);
-  if (wanted) document.getElementById("dietNote").focus();
-  else document.getElementById("dietNote").value = "";
-});
-
-const msg = document.getElementById("msg");
-const btn = document.getElementById("submitBtn");
-
-btn.addEventListener("click", async ()=>{
-  const t = T[lang];
-  const name = titleName(document.getElementById("fullname").value);
-  document.getElementById("fullname").value = name;
-  msg.className = "msg";
-  if (!name){ msg.textContent = t.err_name; msg.classList.add("err"); return; }
-  if (!side){ msg.textContent = t.err_side; msg.classList.add("err"); return; }
-  if (!attend){ msg.textContent = t.err_attend; msg.classList.add("err"); return; }
-  // already replied under this name, or one that sounds like it? ask before adding a second reply
-  if (!dupFor && dupSkip !== name.toLowerCase()){
-    btn.disabled = true;
-    const m = await findEarlier(name);
-    btn.disabled = false;
-    if (m){ showDup(m, name); return; }
+function paintMW(row, p){ row.querySelectorAll(".mw button").forEach(b => b.classList.toggle("on", b.dataset.g === p.g)); }
+function hint(s, err){ const h = $id("whoHint"); h.textContent = s || (MW_ON ? tx("mw_hint") : ""); h.classList.toggle("err", !!err); }
+$id("whoNext").addEventListener("click", () => {
+  if (MW_ON){
+    const rows = [...document.querySelectorAll("#party .prow")]; let missing = false;
+    party.forEach((p, i) => { if (!p.g){ missing = true; rows[i] && rows[i].classList.add("need"); } });
+    if (missing){ hint(tx("mw_need"), true); return; }
   }
-  send({});
+  go(nextOf("who"));
 });
-async function send(extra){
-  const t = T[lang];
-  const name = extra.keep || titleName(document.getElementById("fullname").value);
 
+/* 4 · whose guest: Bride, Groom or Both — one tap */
+document.querySelectorAll("[data-side]").forEach(b => b.addEventListener("click", () => {
+  side = b.dataset.side; paintStep();
+  setTimeout(() => go("send"), 170);
+}));
+
+/* 5 · a last look, and send */
+function renderSummary(){
+  const yes = attend === "yes", s = side || knownSide;
+  $id("sumH").textContent = tx(yes ? "sum_yes" : "sum_no").replace("{first}", firstName());
+  $id("sumChips").innerHTML = yes
+    ? [count === 1 ? tx("sum_one") : tx("sum_n").replace("{n}", count), s ? tx("side_" + s.toLowerCase()) : ""].filter(Boolean).map(c => `<span>${safe(c)}</span>`).join("")
+    : `<p class="sec-sub" style="margin:0">${safe(tx("sum_no_p"))}</p>`;
+  $id("foodBtn").hidden = !yes || !$id("dietNote").hidden;
+  if (!yes) $id("dietNote").hidden = true;
+}
+$id("foodBtn").addEventListener("click", () => { $id("foodBtn").hidden = true; $id("dietNote").hidden = false; $id("dietNote").focus(); });
+
+const msg = $id("msg");
+const btn = $id("submitBtn");
+btn.addEventListener("click", () => send());
+async function send(){
+  const t = T[lang], yes = attend === "yes", s = side || knownSide;
+  const note = $id("dietNote").value.trim();
   const payload = {
-    name,
-    attending: attend === "yes" ? "Yes" : "No",
-    guests: attend === "yes" ? document.getElementById("guests").value : "0",
-    diet: attend === "yes" ? document.getElementById("diet").value : "",
-    dietNote: attend === "yes" ? document.getElementById("dietNote").value.trim() : "",
-    gender: attend === "yes" ? party[0].g : "",
-    with: attend === "yes" ? party.slice(1).map(p=>(p.n.trim() + (p.g ? " (" + p.g + ")" : "")).trim()).join("; ") : "",
+    name: titleName(nameIn.value),
+    attending: yes ? "Yes" : "No",
+    guests: yes ? String(count) : "0",
+    diet: yes && note ? "other" : yes ? "none" : "",
+    dietNote: yes ? note : "",
+    gender: yes ? party[0].g : "",
+    with: yes ? party.slice(1).map(p => (titleName(p.n) + (p.g ? " (" + p.g + ")" : "")).trim()).join("; ") : "",
     language: lang,
-    side: side === "B" ? "Bride" : side === "G" ? "Groom" : side === "X" ? "Both" : "",
-    replaces: extra.replaces || "",
+    side: s === "B" ? "Bride" : s === "G" ? "Groom" : s === "X" ? "Both" : "",
+    replaces: dupFor ? dupFor.name : "",
     timestamp: new Date().toISOString()
   };
 
   if (!ENDPOINT){
     console.log("RSVP (endpoint not set):", payload);
-    rememberReply(payload); showThanks();
+    rememberReply(payload); showThanks(!!payload.replaces);
     return;
   }
 
-  btn.disabled = true;
-  msg.textContent = t.sending; msg.classList.remove("err"); msg.classList.add("ok");
+  btn.disabled = true; btn.classList.add("busy");
+  msg.textContent = t.sending || tx("sending"); msg.className = "msg ok";
   try{
     await fetch(ENDPOINT, {
       method:"POST",
@@ -971,39 +1103,33 @@ async function send(extra){
       headers:{"Content-Type":"text/plain;charset=utf-8"},
       body: JSON.stringify(payload)
     });
-    rememberReply(payload); showThanks(!!extra.replaces);
+    rememberReply(payload); showThanks(!!payload.replaces);
   }catch(e){
     console.error(e);
-    msg.textContent = t.fail; msg.classList.remove("ok"); msg.classList.add("err");
+    msg.textContent = tx("fail"); msg.className = "msg err";
   }finally{
-    btn.disabled = false;
-    dupFor = null; const db = document.getElementById("dupBox"); if (db){ db.hidden = true; db.innerHTML = ""; }
+    btn.disabled = false; btn.classList.remove("busy");
   }
 }
 
 function showThanks(updated){
-  document.getElementById("formArea").hidden = true;
-  document.getElementById("thanks").classList.add("show");
-  const tp = document.querySelector('#thanks [data-t="thanks_p"]'); if (tp) tp.textContent = updated ? T[lang].thanks_upd : T[lang].thanks_p;
-  const me = myReply(), sb = document.getElementById("seatBar");
-  document.getElementById("seatLater").hidden = !(me && me.yes) || (sb && !sb.hidden);
+  $id("formArea").hidden = true;
+  $id("thanks").classList.add("show");
+  const tp = document.querySelector('#thanks [data-t="thanks_p"]'); if (tp) tp.textContent = updated ? tx("thanks_upd") : tx("thanks_p");
+  const me = myReply(), sb = $id("seatBar");
+  $id("seatLater").hidden = !(me && me.yes) || (sb && !sb.hidden);
   msg.textContent = "";
 }
 
-document.getElementById("againBtn").addEventListener("click", ()=>{
-  document.getElementById("thanks").classList.remove("show");
-  document.getElementById("formArea").hidden = false;
-  document.getElementById("fullname").value = "";
-  attend = null; side = null; dupFor = null; dupSkip = "";
-  document.querySelectorAll("#attend label,#sideSel label").forEach(x=>x.classList.remove("on"));
-  const w = document.getElementById("comingWrap"); w.classList.remove("show"); w.classList.add("hide");
-  document.getElementById("guests").value = "1"; party.length = 1; party[0] = {n:"",g:""}; renderParty();
-  document.getElementById("diet").value = "none";
-  document.getElementById("dietNote").value = "";
-  const dn = document.getElementById("dietNoteWrap"); dn.classList.remove("show"); dn.classList.add("hide");
-  document.querySelectorAll('input[name="attend"]').forEach(i=>i.checked = false);
+$id("againBtn").addEventListener("click", () => {
+  $id("thanks").classList.remove("show");
+  $id("formArea").hidden = false;
+  nameIn.value = ""; $id("dietNote").value = ""; $id("dietNote").hidden = true;
+  attend = null; side = null; knownSide = null; dupFor = null; dupDone = ""; count = 1;
+  party.length = 1; party[0] = { n: "", g: "", auto: true };
+  go("name");
 });
-
+go("name");
 /* calendar links */
 (function setupCalendars(){
   const g = document.getElementById("googleCalendar");

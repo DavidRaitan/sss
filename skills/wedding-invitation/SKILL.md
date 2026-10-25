@@ -45,18 +45,28 @@ that directory.
 
 ## Clean replies from the start
 
-The form asks every guest **whose guest they are** (bride's, groom's, both),
-one tap, so the guest manager never has to guess a side. Names are put in
-Title Case as they're typed ("avi COHEN" → "Avi Cohen").
+The reply is **one question at a time**, with a Back button and progress dots:
+name → coming? → how many (a − / + stepper, a row per guest) → whose guest
+(**Bride · Groom · Both**) → a last look and **Send my reply**. Someone who
+isn't coming goes straight from "coming?" to send. Food is one optional line
+("Any food needs?"), nothing more.
 
-When `GUESTS_LINK` is set, the form checks before sending whether someone
-already replied under that name, or one that sounds like it, in any alphabet
+- **Man or woman** is guessed from each first name (Hebrew and Latin lists,
+  Mr/Mrs, -ית, -a) and shown already chosen, so the guest only agrees; names
+  that go both ways (Tal, Lior) are left to tap. Set `WEDDING.separate: false`
+  for a wedding without men's and women's tables and the question disappears.
+- **Whose guest** is skipped when the name is already on the couple's guest
+  list with a side (`rsvpcheck` returns it).
+- Names are put in Title Case as they're typed ("avi COHEN" → "Avi Cohen").
+
+When `GUESTS_LINK` is set, right after the name the form checks whether
+someone already replied under it, or one that sounds like it, in any alphabet
 ("Kohen", "אבי כהן" → "Avi & Rachel Cohen"):
 
 > Did you already reply as **Avi & Rachel Cohen**? (5 coming)
-> **Yes, update my reply** · **No, I'm someone else**
+> **Yes, that's me** · **No, someone else**
 
-Yes asks which name to keep (the longer one is ticked), and the earlier row
+Yes keeps the fuller of the two names, and the earlier row
 in the sheet is **updated** instead of a second row being added. The row keeps
 its original time, and the name it was first sent under goes in the `Was`
 column, so the guest keeps their seat and anything the couple set for them.
