@@ -130,6 +130,15 @@
   .attend label{flex:1;cursor:pointer;text-align:center;border:1px solid var(--line);border-radius:3px;padding:14px 8px;transition:.2s;background:var(--paper);font-size:1.05rem;color:var(--ink)}
   .attend input{position:absolute;opacity:0;pointer-events:none}
   .attend label.yes.on{border-color:var(--sage-deep);background:rgba(127,138,95,.16);color:var(--sage-deep);font-weight:600}
+  .attend.sides label{padding:12px 6px;font-size:.98rem}
+  .attend.sides label.on{border-color:var(--sage-deep);background:rgba(127,138,95,.16);color:var(--sage-deep);font-weight:600}
+  .dupbox{margin:6px 0 14px;padding:16px;border:1px solid var(--line);border-radius:6px;background:rgba(127,138,95,.08);display:grid;gap:10px;text-align:center}
+  .dupbox p{margin:0;font-size:1.05rem;color:var(--ink)}
+  .dupbox .row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+  .dupbox button{font:inherit;cursor:pointer;border:1px solid var(--sage-deep);border-radius:999px;padding:9px 16px;background:var(--paper);color:var(--sage-deep)}
+  .dupbox button.go{background:var(--sage-deep);color:#fff}
+  .dupbox .keep{display:grid;gap:6px;text-align:start}
+  .dupbox .keep label{display:flex;gap:8px;align-items:center;cursor:pointer;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--paper)}
   .attend label.no.on{border-color:#c99a77;background:rgba(201,154,119,.15);color:#96684a;font-weight:600}
 
   .reveal{transition:.3s;overflow:hidden}
@@ -462,6 +471,15 @@
         </div>
 
         <div class="field">
+          <label data-t="side_l"></label>
+          <div class="attend sides" id="sideSel">
+            <label data-side="B"><input type="radio" name="side" value="B"><span data-t="side_b"></span></label>
+            <label data-side="G"><input type="radio" name="side" value="G"><span data-t="side_g"></span></label>
+            <label data-side="X"><input type="radio" name="side" value="X"><span data-t="side_x"></span></label>
+          </div>
+        </div>
+
+        <div class="field">
           <label data-t="attend_l"></label>
           <div class="attend" id="attend">
             <label class="yes" data-attend="yes"><input type="radio" name="attend" value="yes"><span data-t="attend_yes"></span></label>
@@ -501,6 +519,7 @@
         </div>
         </div>
 
+        <div class="dupbox" id="dupBox" hidden aria-live="polite"></div>
         <button class="submit" id="submitBtn" data-t="submit"></button>
         <p class="msg" id="msg"></p>
       </div>
@@ -586,6 +605,11 @@ const T = {
     cal_google:"Add to Google Calendar", cal_apple:"Add to Apple Calendar",
     rsvp_h:"Will you join us?", rsvp_sub:"Kindly reply below",
     name_l:"Full name", name_ph:"Your full name",
+    side_l:"Whose guest are you?", side_b:"The bride's", side_g:"The groom's", side_x:"Both",
+    err_side:"Please choose whose guest you are.",
+    dup_q:"Did you already reply as {name}?", dup_n:"{n} coming", dup_none:"not coming",
+    dup_yes:"Yes, update my reply", dup_no:"No, I'm someone else",
+    dup_keep:"Which name should we keep?", dup_go:"Update my reply", thanks_upd:"Your reply was updated.",
     attend_l:"Will you attend?", attend_yes:"Joyfully yes", attend_no:"Sadly no",
     guests_l:"How many guests (including you)?",
     party_l:"Who's coming with you?", party_one:"You are", you:"You", man:"Man", woman:"Woman", name_opt:"Their name (optional)",
@@ -619,6 +643,11 @@ const T = {
     cal_google:"הוספה ליומן Google", cal_apple:"הוספה ליומן Apple",
     rsvp_h:"תבואו לחגוג איתנו?", rsvp_sub:"נודה לכם על אישור ההגעה",
     name_l:"שם מלא", name_ph:"השם המלא שלכם",
+    side_l:"של מי אתם?", side_b:"של הכלה", side_g:"של החתן", side_x:"של שניהם",
+    err_side:"בחרו בבקשה של מי אתם.",
+    dup_q:"כבר אישרתם בשם {name}?", dup_n:"{n} מגיעים", dup_none:"לא מגיעים",
+    dup_yes:"כן, לעדכן את האישור", dup_no:"לא, אני מישהו אחר",
+    dup_keep:"איזה שם לשמור?", dup_go:"עדכון האישור", thanks_upd:"האישור שלכם עודכן.",
     attend_l:"האם תגיעו?", attend_yes:"בשמחה, מגיעים", attend_no:"לצערנו לא",
     guests_l:"כמה אורחים (כולל אתכם)?",
     party_l:"מי מגיע איתכם?", party_one:"את/ה", you:"את/ה", man:"גבר", woman:"אישה", name_opt:"השם (לא חובה)",
@@ -796,6 +825,51 @@ function chooseLang(){
   });
 })();
 
+/* whose guest */
+let side = null;
+document.querySelectorAll("#sideSel label").forEach(l=>{
+  l.addEventListener("click", ()=>{ side = l.dataset.side; document.querySelectorAll("#sideSel label").forEach(x=>x.classList.toggle("on", x === l)); });
+});
+/* names in Title Case as they're written: "AVI cohen" → "Avi Cohen"; "McDonald" and Hebrew stay as they are */
+const JOIN = new Set(["and","et","y","e","de","da","di","du","del","van","von","la","le","bat","ben","bar"]);
+function titleName(v){ let k = 0;
+  return String(v || "").replace(/\s+/g, " ").trim().replace(/[^\s]+/g, w => { const first = k++ === 0; if (!/[a-z]/i.test(w)) return w;
+    const L = w.replace(/[^a-z]/gi, ""); if (L.length > 1 && L !== L.toUpperCase() && L !== L.toLowerCase() && w[0] === w[0].toUpperCase()) return w;
+    const lw = w.toLowerCase(); if (!first && JOIN.has(lw)) return lw;
+    return lw.replace(/(^|[-'’.])([a-z])/g, (m, a, b) => a + b.toUpperCase()); }); }
+document.addEventListener("focusout", e => { if (e.target.id === "fullname" || (e.target.closest && e.target.closest("#party") && e.target.type === "text")) { const v = titleName(e.target.value); if (v !== e.target.value) { e.target.value = v; e.target.dispatchEvent(new Event("input", { bubbles: true })); } } });
+
+/* someone who already replied: update that reply instead of adding a second one */
+let dupFor = null, dupSkip = "";
+async function findEarlier(name){
+  if (!GUESTS_LINK) return null;
+  let u; try { u = new URL(GUESTS_LINK, location.href); } catch(e){ return null; }
+  const door = u.searchParams.get("d"); if (!door) return null;
+  try {
+    const ctl = new AbortController(); setTimeout(() => ctl.abort(), 3500);
+    const j = await fetch(u.origin + "/api/guests?rsvpcheck=" + encodeURIComponent(door) + "&q=" + encodeURIComponent(name), { signal: ctl.signal }).then(r => r.json());
+    return j && j.matches && j.matches[0] || null;
+  } catch(e){ return null; }
+}
+function showDup(m, name){
+  const t = T[lang], box = document.getElementById("dupBox"), safe = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+  const longer = (m.name.length >= name.length ? m.name : name);
+  box.innerHTML = `<p>${safe(t.dup_q).replace("{name}", "<b>" + safe(m.name) + "</b>")} <span style="opacity:.75">(${safe(m.yes ? t.dup_n.replace("{n}", m.n) : t.dup_none)})</span></p>
+    <div class="row"><button type="button" class="go" data-dup="yes">${safe(t.dup_yes)}</button><button type="button" data-dup="no">${safe(t.dup_no)}</button></div>
+    <div class="keep" id="dupKeep" hidden><p style="text-align:center">${safe(t.dup_keep)}</p>
+      ${[...new Set([m.name, name])].map(n => `<label><input type="radio" name="keepname" value="${safe(n)}"${n === longer ? " checked" : ""}> ${safe(n)}</label>`).join("")}
+      <div class="row"><button type="button" class="go" data-dup="go">${safe(t.dup_go)}</button></div></div>`;
+  box.hidden = false; dupFor = m;
+  box.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-dup]"); if (!b) return;
+  const box = document.getElementById("dupBox");
+  if (b.dataset.dup === "no"){ dupSkip = document.getElementById("fullname").value.trim().toLowerCase(); dupFor = null; box.hidden = true; btn.click(); return; }
+  if (b.dataset.dup === "yes"){ document.getElementById("dupKeep").hidden = false; b.closest(".row").hidden = true; return; }
+  if (b.dataset.dup === "go"){ const k = box.querySelector('input[name="keepname"]:checked'); send({ replaces: dupFor.name, keep: k ? k.value : dupFor.name }); }
+});
+
 /* attend selection */
 document.querySelectorAll("#attend label").forEach(l=>{
   l.addEventListener("click", ()=>{
@@ -849,10 +923,24 @@ const btn = document.getElementById("submitBtn");
 
 btn.addEventListener("click", async ()=>{
   const t = T[lang];
-  const name = document.getElementById("fullname").value.trim();
+  const name = titleName(document.getElementById("fullname").value);
+  document.getElementById("fullname").value = name;
   msg.className = "msg";
   if (!name){ msg.textContent = t.err_name; msg.classList.add("err"); return; }
+  if (!side){ msg.textContent = t.err_side; msg.classList.add("err"); return; }
   if (!attend){ msg.textContent = t.err_attend; msg.classList.add("err"); return; }
+  // already replied under this name, or one that sounds like it? ask before adding a second reply
+  if (!dupFor && dupSkip !== name.toLowerCase()){
+    btn.disabled = true;
+    const m = await findEarlier(name);
+    btn.disabled = false;
+    if (m){ showDup(m, name); return; }
+  }
+  send({});
+});
+async function send(extra){
+  const t = T[lang];
+  const name = extra.keep || titleName(document.getElementById("fullname").value);
 
   const payload = {
     name,
@@ -863,6 +951,8 @@ btn.addEventListener("click", async ()=>{
     gender: attend === "yes" ? party[0].g : "",
     with: attend === "yes" ? party.slice(1).map(p=>(p.n.trim() + (p.g ? " (" + p.g + ")" : "")).trim()).join("; ") : "",
     language: lang,
+    side: side === "B" ? "Bride" : side === "G" ? "Groom" : side === "X" ? "Both" : "",
+    replaces: extra.replaces || "",
     timestamp: new Date().toISOString()
   };
 
@@ -881,18 +971,20 @@ btn.addEventListener("click", async ()=>{
       headers:{"Content-Type":"text/plain;charset=utf-8"},
       body: JSON.stringify(payload)
     });
-    rememberReply(payload); showThanks();
+    rememberReply(payload); showThanks(!!extra.replaces);
   }catch(e){
     console.error(e);
     msg.textContent = t.fail; msg.classList.remove("ok"); msg.classList.add("err");
   }finally{
     btn.disabled = false;
+    dupFor = null; const db = document.getElementById("dupBox"); if (db){ db.hidden = true; db.innerHTML = ""; }
   }
-});
+}
 
-function showThanks(){
+function showThanks(updated){
   document.getElementById("formArea").hidden = true;
   document.getElementById("thanks").classList.add("show");
+  const tp = document.querySelector('#thanks [data-t="thanks_p"]'); if (tp) tp.textContent = updated ? T[lang].thanks_upd : T[lang].thanks_p;
   const me = myReply(), sb = document.getElementById("seatBar");
   document.getElementById("seatLater").hidden = !(me && me.yes) || (sb && !sb.hidden);
   msg.textContent = "";
@@ -902,8 +994,8 @@ document.getElementById("againBtn").addEventListener("click", ()=>{
   document.getElementById("thanks").classList.remove("show");
   document.getElementById("formArea").hidden = false;
   document.getElementById("fullname").value = "";
-  attend = null;
-  document.querySelectorAll("#attend label").forEach(x=>x.classList.remove("on"));
+  attend = null; side = null; dupFor = null; dupSkip = "";
+  document.querySelectorAll("#attend label,#sideSel label").forEach(x=>x.classList.remove("on"));
   const w = document.getElementById("comingWrap"); w.classList.remove("show"); w.classList.add("hide");
   document.getElementById("guests").value = "1"; party.length = 1; party[0] = {n:"",g:""}; renderParty();
   document.getElementById("diet").value = "none";

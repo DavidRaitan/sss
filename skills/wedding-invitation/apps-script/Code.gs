@@ -15,7 +15,10 @@
  */
 
 var SHEET_NAME = 'RSVPs';
-var HEADERS = ['Received', 'Name', 'Attending', 'Guests', 'Dietary', 'Details', 'Language', 'Gender', 'With'];
+var HEADERS = ['Received', 'Name', 'Attending', 'Guests', 'Dietary', 'Details', 'Language', 'Gender', 'With', 'Side', 'Updated', 'Was'];
+// Side: whose guest (Bride, Groom, Both). Updated: when a guest changed their reply.
+// Was: the name the reply was first sent under, so a guest who corrects their
+// name keeps their seat and everything the couple set for them.
 
 function doPost(e) {
   var lock = LockService.getScriptLock();       // two guests can reply at once
@@ -23,6 +26,19 @@ function doPost(e) {
   try {
     var data = JSON.parse(e.postData.contents);
     var sheet = getSheet_();
+    // "Yes, that was me": the earlier reply is updated, not answered a second time
+    if (data.replaces) {
+      var row = findReply_(sheet, data.replaces);
+      if (row) {
+        var cur = sheet.getRange(row, 1, 1, HEADERS.length).getValues()[0];
+        sheet.getRange(row, 2, 1, HEADERS.length - 1).setValues([[
+          data.name || cur[1], data.attending || '', data.guests || '', data.diet || '', data.dietNote || '',
+          data.language || cur[6], data.gender || '', data.with || '', data.side || cur[9],
+          new Date(), cur[11] || cur[1]
+        ]]);
+        return json_({ ok: true, updated: true });
+      }
+    }
     sheet.appendRow([
       data.timestamp ? new Date(data.timestamp) : new Date(),
       data.name || '',
@@ -32,7 +48,10 @@ function doPost(e) {
       data.dietNote || '',
       data.language || '',
       data.gender || '',                       // M or W, for the men's and women's tables
-      data.with || ''                          // the others: "Sarah (W); Yossi (M); (W)"
+      data.with || '',                         // the others: "Sarah (W); Yossi (M); (W)"
+      data.side || '',
+      '',
+      ''
     ]);
     return json_({ ok: true });
   } catch (err) {
@@ -40,6 +59,17 @@ function doPost(e) {
   } finally {
     lock.releaseLock();
   }
+}
+
+/* the latest row with this name (as shown, or as first sent) */
+function findReply_(sheet, name) {
+  var want = String(name).trim().toLowerCase(), last = sheet.getLastRow();
+  if (last < 2) return 0;
+  var vals = sheet.getRange(2, 1, last - 1, HEADERS.length).getValues();
+  for (var i = vals.length - 1; i >= 0; i--) {
+    if (String(vals[i][1]).trim().toLowerCase() === want || String(vals[i][11]).trim().toLowerCase() === want) return i + 2;
+  }
+  return 0;
 }
 
 function doGet() {
@@ -56,7 +86,7 @@ function getSheet_() {
     sheet.appendRow(HEADERS);
     sheet.getRange(1, 1, 1, HEADERS.length).setFontWeight('bold');
     sheet.setFrozenRows(1);
-  } else if (sheet.getLastColumn() < HEADERS.length) {     // a sheet from before Gender and With: add their headings
+  } else if (sheet.getLastColumn() < HEADERS.length) {     // a sheet from before the newer columns: add their headings
     var from = sheet.getLastColumn() + 1;
     sheet.getRange(1, from, 1, HEADERS.length - from + 1).setValues([HEADERS.slice(from - 1)]).setFontWeight('bold');
   }

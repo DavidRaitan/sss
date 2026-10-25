@@ -43,6 +43,28 @@ that directory.
 5. Set up the spreadsheet (below) and paste its URL into `ENDPOINT`.
 6. Open it, check both directions, send it over.
 
+## Clean replies from the start
+
+The form asks every guest **whose guest they are** (bride's, groom's, both),
+one tap, so the guest manager never has to guess a side. Names are put in
+Title Case as they're typed ("avi COHEN" → "Avi Cohen").
+
+When `GUESTS_LINK` is set, the form checks before sending whether someone
+already replied under that name, or one that sounds like it, in any alphabet
+("Kohen", "אבי כהן" → "Avi & Rachel Cohen"):
+
+> Did you already reply as **Avi & Rachel Cohen**? (5 coming)
+> **Yes, update my reply** · **No, I'm someone else**
+
+Yes asks which name to keep (the longer one is ticked), and the earlier row
+in the sheet is **updated** instead of a second row being added. The row keeps
+its original time, and the name it was first sent under goes in the `Was`
+column, so the guest keeps their seat and anything the couple set for them.
+The sheet's columns are now `… With, Side, Updated, Was`; an older sheet gets
+the new headings on the next reply. After changing `Code.gs`, deploy a **new
+version** of the web app (Deploy → Manage deployments → edit → New version),
+or the old code keeps answering.
+
 ## What to ask the client for
 
 - the couple's names, and the two initials for the opening monogram
