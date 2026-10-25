@@ -574,9 +574,11 @@
 <script>
 /* ============================================================
    1) WHERE THE REPLIES GO
-   Paste the Google Apps Script web app URL between the quotes.
-   Left empty, the form still works for previewing — replies are
-   written to the browser console instead of a spreadsheet.
+   With GUESTS_LINK set (below), every reply is kept by Dudaim, beside
+   the couple's guest list. Nothing else is needed.
+   ENDPOINT is optional: a Google Apps Script web app URL, for a couple
+   who also want the replies in a Google Sheet. With neither, the form
+   still works for previewing (replies go to the browser console).
    ============================================================ */
 const ENDPOINT = "";
 
@@ -948,16 +950,33 @@ function paintStep(){
 $id("backBtn").addEventListener("click", () => { const p = steps(), i = p.indexOf(stepNow); if (i > 0) go(p[i - 1], true); });
 const nextOf = s => { const p = steps(); return p[p.indexOf(s) + 1]; };
 
+/* Dudaim: where the replies are kept (the couple's guest list), from GUESTS_LINK */
+const DUDAIM = (() => { try { const u = new URL(GUESTS_LINK, location.href), d = u.searchParams.get("d"); return d ? { api: u.origin + "/api/guests", door: d } : null; } catch(e){ return null; } })();
+const MY_G = (new URLSearchParams(location.search).get("g") || "").toLowerCase().replace(/[^a-z0-9]/g, "");   // this guest's own link
+
 /* 1 · name — and, if they already replied under it, update that reply instead of adding a second */
 async function findEarlier(name){
-  if (!GUESTS_LINK) return null;
-  let u; try { u = new URL(GUESTS_LINK, location.href); } catch(e){ return null; }
-  const door = u.searchParams.get("d"); if (!door) return null;
+  if (!DUDAIM) return null;
   try {
     const ctl = new AbortController(); setTimeout(() => ctl.abort(), 3500);
-    return await fetch(u.origin + "/api/guests?rsvpcheck=" + encodeURIComponent(door) + "&q=" + encodeURIComponent(name), { signal: ctl.signal }).then(r => r.json());
+    return await fetch(DUDAIM.api + "?rsvpcheck=" + encodeURIComponent(DUDAIM.door) + "&q=" + encodeURIComponent(name), { signal: ctl.signal }).then(r => r.json());
   } catch(e){ return null; }
 }
+/* opened from their own link: we already know who they are, so it starts at "Will you be there, Avi?" */
+(async function personal(){
+  if (!DUDAIM || !MY_G) return;
+  try {
+    const j = await fetch(DUDAIM.api + "?invite=" + encodeURIComponent(DUDAIM.door) + "&g=" + MY_G).then(r => r.json());
+    if (!j || !j.ok || stepNow !== "name" || nameIn.value.trim()) return;
+    const was = j.reply;
+    nameIn.value = titleName(was ? was.name : j.name); dupDone = nameIn.value.toLowerCase();
+    knownSide = ["B", "G", "X"].includes(j.side) ? j.side : null;
+    count = Math.max(1, Math.min(12, (was && was.yes && was.n) || j.n || 1));
+    if (party[0].auto) party[0].g = MW_ON ? guessMW(nameIn.value) : "";
+    if (was) attend = was.yes ? "yes" : "no";
+    go("attend");
+  } catch(e){}
+})();
 const nameIn = $id("fullname"), nameNext = $id("nameNext");
 nameIn.addEventListener("input", () => {
   nameNext.disabled = nameIn.value.trim().length < 2;
@@ -1088,7 +1107,7 @@ async function send(){
     timestamp: new Date().toISOString()
   };
 
-  if (!ENDPOINT){
+  if (!ENDPOINT && !DUDAIM){
     console.log("RSVP (endpoint not set):", payload);
     rememberReply(payload); showThanks(!!payload.replaces);
     return;
@@ -1097,13 +1116,20 @@ async function send(){
   btn.disabled = true; btn.classList.add("busy");
   msg.textContent = t.sending || tx("sending"); msg.className = "msg ok";
   try{
-    await fetch(ENDPOINT, {
-      method:"POST",
-      mode:"no-cors",                 // Apps Script needs this
-      headers:{"Content-Type":"text/plain;charset=utf-8"},
-      body: JSON.stringify(payload)
-    });
-    rememberReply(payload); showThanks(!!payload.replaces);
+    let updated = !!payload.replaces;
+    // kept by Dudaim, beside the couple's guest list: a real "saved", and a second reply updates the first
+    if (DUDAIM){
+      const j = await fetch(DUDAIM.api, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ op: "reply", d: DUDAIM.door, g: MY_G || undefined, reply: payload }) }).then(r => r.json());
+      if (!j || !j.ok) throw new Error(j && j.error || "not saved");
+      updated = updated || !!j.updated;
+    }
+    // a Google Sheet too, when the couple want one (Apps Script; nothing comes back from it)
+    if (ENDPOINT){
+      const mirror = fetch(ENDPOINT, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(payload) });
+      if (DUDAIM) mirror.catch(() => {}); else await mirror;
+    }
+    rememberReply(payload); showThanks(updated);
   }catch(e){
     console.error(e);
     msg.textContent = tx("fail"); msg.className = "msg err";
