@@ -690,6 +690,43 @@ const T = {
     err_name:"נא להזין שם.",
     err_attend:"נא לציין אם תגיעו.",
     sending:"שולח…", fail:"משהו השתבש. נסו שוב בבקשה."
+  },
+  // Spanish (neutral Latin American, the Spanish most guests in Israel speak): ready for couples who want it
+  es:{
+    seat_find:"Encuentra tu mesa",
+    seat_later:"Cuando la distribución de mesas esté lista, vas a ver tu lugar aquí.",
+    name:"Español",
+    dir:"ltr",
+    date:"DÍA, NÚMERO DE MES DE AÑO",
+    hebdate:"FECHA HEBREA",
+    venue:"SALÓN",
+    kabbalat_l:"Recepción", chuppah_l:"Jupá",
+    couple:"Nombre y Nombre",
+    seam:"Con cariño, te pedimos que confirmes tu asistencia",
+    map_h:"Cómo llegar", map_sub:"SALÓN, CIUDAD",
+    directions:"Abrir la ruta en Waze",
+    cal_google:"Agregar a Google Calendar", cal_apple:"Agregar a Apple Calendar",
+    rsvp_h:"¿Nos acompañas?", rsvp_sub:"Empecemos por tu nombre",
+    name_ph:"Tu nombre y apellido", next:"Continuar", back:"Volver",
+    dup_q:"¿Ya respondiste como {name}?", dup_n:"{n} asistentes", dup_none:"no asisten",
+    dup_yes:"Sí, soy yo", dup_no:"No, soy otra persona", thanks_upd:"Actualizamos tu respuesta.",
+    attend_q:"¿Vas a venir, {first}?", attend_yes:"¡Sí, con mucha alegría!", attend_no:"Lo siento, no voy a poder",
+    who_h:"¿Cuántos van a venir?", n_one:"Solo tú", n_many:"contándote a ti",
+    you:"tú", man:"Hombre", woman:"Mujer", name_opt:"Nombre (opcional)",
+    mw_hint:"Para las mesas de hombres y de mujeres", mw_need:"Marca Hombre o Mujer para cada persona",
+    side_l:"¿De parte de quién vienes?", side_b:"Novia", side_g:"Novio", side_x:"Ambos",
+    sum_yes:"¡Qué alegría, {first}!", sum_one:"Solo tú", sum_n:"{n} personas",
+    sum_no:"Te vamos a extrañar, {first}", sum_no_p:"Gracias por avisarnos",
+    food_add:"¿Alguna restricción alimentaria?", diet_note_ph:"Alergias, vegetariano…",
+    submit:"Enviar mi respuesta",
+    thanks_h:"¡Muchas gracias!", thanks_p:"Recibimos tu respuesta. Nos encantará celebrar contigo.",
+    again:"Enviar otra respuesta",
+    foot:"Nos encantará celebrar contigo",
+    credit_lead:"Invitación diseñada por", credit_brand:"Dudaim",
+    credit_msg:"Hola Dudaim, vi una de sus invitaciones y me gustaría una para nuestra boda",
+    err_name:"Por favor, escribe tu nombre.",
+    err_attend:"Por favor, cuéntanos si vas a venir.",
+    sending:"Enviando…", fail:"Algo salió mal. Por favor, inténtalo de nuevo."
   }
 };
 
@@ -896,7 +933,7 @@ const WOMEN_HE = new Set(("שרה רחל רבקה לאה חנה מרים אסת�
   "שולי סמדר טלי צילה ורד יפית יפה יהודית זהבה נחמה מלכה ברכה גילה הילה ענבל ליהי מעיין נופר נוגה נורית רעות שני שלי סתיו טליה תהילה יסמין "+
   "זהבית תרצה צופיה ספיר אורית אורטל רוחמה יוכבד בלה פנינה אהובה רותי הודיה אודיה מוריה אודליה ליאורה חגית ציונה שולמית ריקי אסתי חני").split(" "));
 function guessMW(name){
-  const ws = String(name || "").toLowerCase().replace(/[.,'’׳"]/g, "").split(/[\s-]+/).filter(Boolean);
+  const ws = String(name || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[.,'’׳"]/g, "").split(/[\s-]+/).filter(Boolean);   // María is maria
   for (const w of ws.slice(0, 2)){
     if (/^(mr|rabbi|rav|הרב|מר|ר)$/.test(w)) return "M";
     if (/^(mrs|ms|miss|גב|גברת|הרבנית)$/.test(w)) return "W";
