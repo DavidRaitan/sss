@@ -248,6 +248,27 @@
   @media (prefers-reduced-motion:reduce){.gm-dot .r2{animation:none}}
   .gm-dot[hidden]{display:none}
   /* "Find your seat": appears by itself once the couple publishes the seating */
+  /* the day itself */
+  .today{position:relative;z-index:1;max-width:620px;margin:0 auto 22px;padding:30px 26px 26px;border-radius:26px;text-align:center;
+    background:linear-gradient(180deg,var(--white),#f8f2e3);border:1px solid var(--line);box-shadow:var(--shadow);animation:todayIn .7s cubic-bezier(.2,.8,.2,1) both}
+  .today[hidden]{display:none}
+  .today-eye{font-size:.78rem;letter-spacing:.24em;text-transform:uppercase;color:var(--gold)}
+  .today-h{font-family:"Cormorant Garamond",serif;font-weight:500;font-size:clamp(1.9rem,6vw,2.6rem);line-height:1.1;margin:6px 0 4px;color:var(--ink)}
+  body.rtl .today-h{font-family:"Frank Ruhl Libre",serif}
+  .today-p{color:var(--ink-soft);font-size:1.08rem}
+  .today-times{display:flex;justify-content:center;gap:28px;flex-wrap:wrap;margin:16px 0 4px}
+  .today-times div{display:grid}.today-times .lab{font-size:.78rem;letter-spacing:.12em;text-transform:uppercase;color:var(--sage)}
+  .today-times .val{font-family:"Cormorant Garamond",serif;font-size:1.9rem;color:var(--ink);line-height:1.1}
+  .today-times .now .val{color:var(--sage-deep)}.today-times .now .lab::after{content:" ·";color:var(--gold)}
+  .today-acts{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:18px}
+  .today-btn{display:inline-flex;align-items:center;justify-content:center;min-height:50px;min-width:180px;padding:12px 24px;border-radius:999px;text-decoration:none;
+    font-size:1.08rem;color:var(--sage-deep);border:1px solid var(--sage);background:transparent;transition:transform .15s}
+  .today-btn.gold{background:var(--sage-deep);border-color:var(--sage-deep);color:#fdfaf3}
+  .today-btn[hidden]{display:none}
+  .today-btn:active{transform:scale(.97)}
+  body.is-today .seatbar{display:none}   /* the card above carries it */
+  @keyframes todayIn{from{opacity:0;transform:translateY(10px)}}
+  @media (prefers-reduced-motion:reduce){.today{animation:none}}
   .seatbar{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:20;display:inline-flex;align-items:center;justify-content:center;
     padding:14px 30px;border-radius:999px;background:var(--gold,#b8913f);color:#fff;text-decoration:none;font-size:16px;letter-spacing:.02em;
     box-shadow:0 10px 30px rgba(60,45,20,.25);animation:seatIn .6s cubic-bezier(.2,.8,.2,1) both;white-space:nowrap}
@@ -440,6 +461,18 @@
   <div class="wrap">
     <div class="langbar" id="langbar" role="group" aria-label="Language"></div>
 
+    <!-- ON THE DAY (and the days after): the page becomes the wedding's own page -->
+    <section class="today" id="today" hidden aria-live="polite">
+      <div class="today-eye" data-t="today_eye"></div>
+      <h2 class="today-h" data-t="today_h"></h2>
+      <p class="today-p" data-t="today_p"></p>
+      <div class="today-times" id="todayTimes"></div>
+      <div class="today-acts">
+        <a class="today-btn gold" id="todaySeat" hidden><span data-t="seat_find"></span></a>
+        <a class="today-btn" id="todayWaze" target="_blank" rel="noopener"><span data-t="directions"></span></a>
+      </div>
+    </section>
+
     <div class="card">
       <!-- THE INVITATION ITSELF (swaps with language) -->
       <figure class="invite-img">
@@ -620,6 +653,7 @@ const AUTO_DETECT  = true;   // open in the visitor's own language when we have 
    ============================================================ */
 const T = {
   en:{
+    today_eye:"Today", today_h:"Today’s the day", today_p:"We can’t wait to see you.", after_eye:"Thank you", after_h:"Thank you for celebrating with us", after_p:"It meant the world to have you there.",
     seat_find:"Find your seat",
     seat_later:"Once the seating is ready, your seat will be right here.",
     name:"English",
@@ -656,6 +690,7 @@ const T = {
     sending:"Sending…", fail:"Something went wrong. Please try again."
   },
   he:{
+    today_eye:"היום", today_h:"היום זה קורה", today_p:"מחכים לראות אתכם.", after_eye:"תודה", after_h:"תודה שחגגתם איתנו", after_p:"היה לנו חשוב כל כך שהייתם איתנו.",
     seat_find:"מצאו את המקום שלכם",
     seat_later:"כשסידור הישיבה יהיה מוכן, המקום שלכם יחכה כאן.",
     name:"עברית",
@@ -693,6 +728,7 @@ const T = {
   },
   // Spanish (neutral Latin American, the Spanish most guests in Israel speak): ready for couples who want it
   es:{
+    today_eye:"Hoy", today_h:"¡Hoy es el día!", today_p:"Tenemos muchas ganas de verlos.", after_eye:"Gracias", after_h:"Gracias por celebrar con nosotros", after_p:"Que hayan estado ahí significó muchísimo.",
     seat_find:"Encuentra tu mesa",
     seat_later:"Cuando la distribución de mesas esté lista, vas a ver tu lugar aquí.",
     name:"Español",
@@ -757,6 +793,33 @@ function applyLang(l, animate){
   paintLang(l);
 }
 
+/* On the day the page leads with the day: the times, the way there, and the seat.
+   The two weeks after, a thank-you. ?day=1 (or ?day=after) shows it any day, to check it. */
+function dayMode(){
+  const d = WEDDING.start.slice(0, 8), ymd = d.slice(0, 4) + "-" + d.slice(4, 6) + "-" + d.slice(6, 8);
+  const here = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem" }).format(new Date());   // the date in Israel, YYYY-MM-DD
+  const q = new URLSearchParams(location.search).get("day");
+  const after = (Date.parse(here) - Date.parse(ymd)) / 864e5;
+  return q === "after" ? "after" : q ? "today" : here === ymd ? "today" : after >= 1 && after <= 14 ? "after" : "";
+}
+function paintDay(){
+  const m = dayMode(), box = document.getElementById("today"); if (!box) return;
+  box.hidden = !m; document.body.classList.toggle("is-today", m === "today"); if (!m) return;
+  const t = T[lang];
+  box.querySelector(".today-eye").textContent = m === "after" ? t.after_eye : t.today_eye;
+  box.querySelector(".today-h").textContent = m === "after" ? t.after_h : t.today_h;
+  box.querySelector(".today-p").textContent = m === "after" ? t.after_p : t.today_p;
+  const times = document.getElementById("todayTimes"), acts = box.querySelector(".today-acts");
+  times.hidden = acts.hidden = m === "after";
+  // the times are the ones on the page; the one that comes next is marked
+  const now = new Date().toLocaleTimeString("en-GB", { timeZone: "Asia/Jerusalem", hour: "2-digit", minute: "2-digit" });
+  const rows = [...document.querySelectorAll(".times > div")].map(x => [x.querySelector(".lab").textContent, x.querySelector(".val").textContent.trim()]);
+  const next = rows.findIndex(r => r[1] >= now);
+  times.innerHTML = rows.map((r, i) => `<div class="${i === next ? "now" : ""}"><span class="lab"></span><span class="val"></span></div>`).join("");
+  times.querySelectorAll("div").forEach((el, i) => { el.querySelector(".lab").textContent = rows[i][0]; el.querySelector(".val").textContent = rows[i][1]; });
+  const wz = document.querySelector(".maplink"); if (wz) document.getElementById("todayWaze").href = wz.href;
+}
+
 /* Find your seat: when the couple publishes the seating in the guest manager,
    a button appears here, so guests use the same invitation link they already have. */
 let seatsChecked = false;
@@ -777,7 +840,8 @@ function checkSeats(){
   fetch(u.origin + "/api/guests?find=" + encodeURIComponent(door)).then(r=>r.json()).then(j=>{
     if (!j || !j.on) return;
     const bar = document.getElementById("seatBar");
-    bar.href = u.origin + u.pathname + "?find=" + encodeURIComponent(door) + (me && me.name ? "&n=" + encodeURIComponent(me.name) : ""); bar.hidden = false; const sl = document.getElementById("seatLater"); if (sl) sl.hidden = true;
+    bar.href = u.origin + u.pathname + "?find=" + encodeURIComponent(door) + (me && me.name ? "&n=" + encodeURIComponent(me.name) : ""); bar.hidden = false;
+    const ts = document.getElementById("todaySeat"); if (ts){ ts.href = bar.href; ts.hidden = false; } const sl = document.getElementById("seatLater"); if (sl) sl.hidden = true;
   }).catch(()=>{});
 }
 function paintLang(l){
@@ -795,7 +859,7 @@ function paintLang(l){
   document.querySelectorAll("[data-ph]").forEach(el=>{
     el.placeholder = t[el.getAttribute("data-ph")] || "";
   });
-  checkSeats();
+  checkSeats(); paintDay();
   const dot = document.getElementById("gmDot");
   if (dot && GUESTS_LINK && dot.hidden){
     dot.href = GUESTS_LINK; dot.hidden = false;

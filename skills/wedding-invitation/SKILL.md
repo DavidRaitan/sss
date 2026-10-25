@@ -207,6 +207,16 @@ browser (`localStorage` "rsvp-reply"). It is never sent anywhere, and the
 couple's sheet gets nothing extra: no phone number, no IP, no device ID. Replies
 made before a site had this have no note, so those guests type their name.
 
+## On the day
+
+On the wedding date (Israel time, from `WEDDING.start`) the page opens with
+a card above the invitation: "Today's the day", the times from the page with
+the next one marked, **Find your seat** (once the seating is published) and
+the Waze button. For two weeks after, the card says thank you instead. The
+invitation, the map and the reply stay below it. `?day=1` and `?day=after`
+show either card on any day, to check them. The wording is the `today_*` and
+`after_*` keys in each language.
+
 ## If a language has no artwork
 
 `$SKILL/invitation-typeset.html` is the same invitation with the wording as real
