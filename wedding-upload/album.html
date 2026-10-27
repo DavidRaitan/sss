@@ -561,6 +561,7 @@ a{color:var(--accent)}
   color:#e8e4d5;font-size:19px;line-height:1.6;text-align:center;max-width:680px;
 }
 .lb-wish b{color:var(--accent);font-weight:600}
+.lb-wish.quiet{color:#a9b39a;font-size:16px}
 .lb-count{
   font-size:12.5px;letter-spacing:.16em;color:#8d9b7c;text-align:center;
   padding-bottom:10px;flex:none;font-variant-numeric:tabular-nums;
@@ -846,7 +847,7 @@ a{color:var(--accent)}
   </div>
 </div>
 <div class="toast" id="toast" hidden></div>
-<input type="file" id="upFile" accept="image/*,video/*" multiple hidden>
+<input type="file" id="upFile" accept="image/*,video/*,.zip,application/zip,application/x-zip-compressed" multiple hidden>
 <div class="ask" id="upWho" hidden role="dialog" aria-modal="true" aria-labelledby="upWhoT">
   <div class="ask-card">
     <p class="ask-t" id="upWhoT">Who's adding photos?</p>
@@ -893,7 +894,7 @@ const $ = i => document.getElementById(i);
 let ITEMS = [];          // every upload, newest first - replaced on each poll
 let WISHES = [];
 let VIEW = [];           // what the open viewer steps through (all, or one person's)
-const WISH_BY_GUEST = {};
+const WISH_BY_GUEST = {}, WISH_BY_ID = {};
 let at = -1;
 
 const keyOf = (name) => String(name || "").trim().toLowerCase();
@@ -1030,6 +1031,9 @@ function render(d, live){
     const k = keyOf(w.guest);
     if (k && !WISH_BY_GUEST[k]) WISH_BY_GUEST[k] = w.message;
   }
+  // each photo's own wish: the one sent with it (batchOf), else that guest's latest
+  for (const k in WISH_BY_ID) delete WISH_BY_ID[k];
+  for (const w of WISHES.slice().reverse()) for (const u of batchOf(w)) WISH_BY_ID[u.drive_id] = w.message;
   if (d.stats) drawDonut(d.stats);
   drawLast();
   $("count").textContent = counts(d);
@@ -1100,7 +1104,7 @@ function versions(u){
   return u;
 }
 const tileKey = (u) => u.drive_id + (u.show ? "~" + u.show : "") + (u.lk ? "♥" : "");
-const wishOf = (u) => WISH_BY_GUEST[keyOf(u.guest)];
+const wishOf = (u) => WISH_BY_ID[u.drive_id] || WISH_BY_GUEST[keyOf(u.guest)];
 const uploadsOf = (name) => ITEMS.filter((u) => keyOf(u.guest) === keyOf(name));
 const wishesOf = (name) => WISHES.filter((w) => keyOf(w.guest) === keyOf(name));
 const initial = (name) => (String(name || "?").trim().charAt(0) || "?").toUpperCase();
@@ -1762,11 +1766,11 @@ function showSingle(i){
   }
   fetchFull(VIEW[i + 1]); fetchFull(VIEW[i + 2]);
   const w = $("lbWish"), wish = wishOf(u);
-  if (wish) {
-    w.hidden = false; w.innerHTML = "";
-    const b = el("b"); b.textContent = (u.guest || "A guest") + " wrote: ";
-    w.append(b, document.createTextNode("“" + wish + "”"));
-  } else { w.hidden = true; }
+  w.hidden = false; w.innerHTML = "";
+  const b = el("b");
+  if (wish) { b.textContent = (u.guest || "A guest") + " wrote: "; w.append(b, document.createTextNode("“" + wish + "”")); }
+  else { b.textContent = u.guest || "A guest"; w.append(b, document.createTextNode(" · " + when(u.created_at))); w.classList.add("quiet"); }
+  if (wish) w.classList.remove("quiet");
 }
 
 function open_(i, list){
@@ -2494,9 +2498,15 @@ $("upWhoGo").onclick = () => {
   $("upWho").hidden = true;
   $("upFile").value = ""; $("upFile").click();          // still inside the tap, so iPhone allows it
 };
-$("upFile").onchange = () => {
-  const files = [...$("upFile").files].filter((f) => /^(image|video)\//.test(f.type || "") || /\.(heic|heif)$/i.test(f.name));
-  if (!files.length) return;
+$("upFile").onchange = async () => {
+  let picked = [...$("upFile").files];
+  if (picked.some(isZip)) {
+    toast("Opening the zip…");
+    try { picked = (await Promise.all(picked.map((f) => isZip(f) ? unzipMedia(f) : [f]))).flat(); }
+    catch (e) { toast("Couldn’t open that zip. Try unzipping it first and choosing the photos."); return; }
+  }
+  const files = picked.filter((f) => /^(image|video)\//.test(f.type || "") || /\.(heic|heif)$/i.test(f.name));
+  if (!files.length) { if (picked.length) toast("No photos or videos in there"); return; }
   UP.files = files.map((file) => ({ file, loaded: 0, state: "ready", url: URL.createObjectURL(file),
     vid: (file.type || "").startsWith("video/") }));
   const strip = $("upStrip"), track = $("upTrack");
@@ -2516,6 +2526,50 @@ $("upFile").onchange = () => {
   setTimeout(() => { if (UP.busy) { $("upIntro").hidden = true; $("upMain").hidden = false; upSlide(); } }, 1300);
   upStart();
 };
+/* A zip of photos (from a photographer, WeTransfer, Google Photos…), opened right
+   here: its photos and videos join the upload like any picked file. Reads the
+   zip's own index and inflates one file at a time (DecompressionStream), so
+   nothing to install and big zips (ZIP64 too) don't load into memory at once. */
+const isZip = (f) => /\.zip$/i.test(f.name) || /zip/.test(f.type || "");
+const ZIP_TYPES = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", gif: "image/gif", webp: "image/webp",
+  heic: "image/heic", heif: "image/heif", mp4: "video/mp4", m4v: "video/mp4", mov: "video/quicktime", webm: "video/webm" };
+async function unzipMedia(zip){
+  const buf = async (a, b) => new DataView(await zip.slice(a, b).arrayBuffer());
+  const tailAt = Math.max(0, zip.size - 66000), tail = await buf(tailAt, zip.size);
+  let e = -1;
+  for (let i = tail.byteLength - 22; i >= 0; i--) if (tail.getUint32(i, true) === 0x06054b50) { e = i; break; }
+  if (e < 0) throw new Error("not a zip");
+  let count = tail.getUint16(e + 10, true), size = tail.getUint32(e + 12, true), at = tail.getUint32(e + 16, true);
+  if (count === 0xffff || at === 0xffffffff) {                     // ZIP64: the real numbers are in its own record
+    const loc = e - 20;
+    if (loc < 0 || tail.getUint32(loc, true) !== 0x07064b50) throw new Error("zip64");
+    const r = await buf(Number(tail.getBigUint64(loc + 8, true)), Number(tail.getBigUint64(loc + 8, true)) + 56);
+    count = Number(r.getBigUint64(32, true)); size = Number(r.getBigUint64(40, true)); at = Number(r.getBigUint64(48, true));
+  }
+  const cd = await buf(at, at + size), out = [], dec = new TextDecoder();
+  for (let p = 0, n = 0; n < count && p + 46 <= cd.byteLength; n++) {
+    if (cd.getUint32(p, true) !== 0x02014b50) break;
+    const method = cd.getUint16(p + 10, true), nl = cd.getUint16(p + 28, true), xl = cd.getUint16(p + 30, true), cl = cd.getUint16(p + 32, true);
+    let csize = cd.getUint32(p + 20, true), usize = cd.getUint32(p + 24, true), off = cd.getUint32(p + 42, true);
+    const name = dec.decode(new Uint8Array(cd.buffer, cd.byteOffset + p + 46, nl));
+    for (let x = p + 46 + nl, end = x + xl; x + 4 <= end; ) {     // ZIP64 sizes and offset, in that order, only those set to the max
+      const id = cd.getUint16(x, true), len = cd.getUint16(x + 2, true);
+      if (id === 1) { let q = x + 4;
+        if (usize === 0xffffffff) { usize = Number(cd.getBigUint64(q, true)); q += 8; }
+        if (csize === 0xffffffff) { csize = Number(cd.getBigUint64(q, true)); q += 8; }
+        if (off === 0xffffffff) { off = Number(cd.getBigUint64(q, true)); } }
+      x += 4 + len;
+    }
+    p += 46 + nl + xl + cl;
+    const base = name.split("/").pop(), ext = (base.split(".").pop() || "").toLowerCase();
+    if (!base || base.startsWith(".") || /(^|\/)__MACOSX\//.test(name) || !ZIP_TYPES[ext] || (method !== 0 && method !== 8)) continue;
+    const lh = await buf(off, off + 30), start = off + 30 + lh.getUint16(26, true) + lh.getUint16(28, true);
+    const raw = zip.slice(start, start + csize);
+    const body = method === 0 ? raw : await new Response(raw.stream().pipeThrough(new DecompressionStream("deflate-raw"))).blob();
+    out.push(new File([body], base, { type: ZIP_TYPES[ext], lastModified: zip.lastModified }));
+  }
+  return out;
+}
 /* Show the first photo still uploading; load the ones around it only. */
 function upSlide(){
   const k = Math.max(0, UP.files.findIndex((i) => i.state !== "done"));
